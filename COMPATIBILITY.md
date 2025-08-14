@@ -1,6 +1,6 @@
 # Browser Compatibility Guide
 
-This document outlines the compatibility improvements made to ensure the P2P LAN Webapp works across Firefox, Chrome, and Safari.
+This document outlines the compatibility improvements made to ensure the P2P LAN web app works across Firefox, Chrome, and Safari.
 
 ## Issues Fixed
 
