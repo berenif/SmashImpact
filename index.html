@@ -234,7 +234,8 @@
 </script>
 
 <script type="module">
-(() => {
+import './src/main.js';
+(() => { return;
   const el = id => document.getElementById(id);
   const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
   const now = () => performance.now();
