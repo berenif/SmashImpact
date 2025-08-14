@@ -144,9 +144,9 @@
     </div>
   </main>
 
+<script src="./vendor/qrcode.js"></script>
 <script>
 (function(){
-  var qrcode=function(typeNumber, errorCorrectLevel){
     var PAD0=0xEC, PAD1=0x11;
     var _typeNumber=typeNumber,_errorCorrectLevel=QRErrorCorrectLevel[errorCorrectLevel],_modules=null,_moduleCount=0,_dataList=[],_dataCache=null;
     var makeImpl=function(test,maskPattern){_moduleCount=_typeNumber?(_typeNumber*4+17):(40*4+17);_modules=new Array(_moduleCount);for(var r=0;r<_moduleCount;r++){_modules[r]=new Array(_moduleCount);for(var c=0;c<_moduleCount;c++)_modules[r][c]=null}setupPositionProbePattern(0,0);setupPositionProbePattern(_moduleCount-7,0);setupPositionProbePattern(0,_moduleCount-7);setupTimingPattern();setupTypeInfo(test,maskPattern);if(_typeNumber>=7)setupTypeNumber(test);var data=createData(getBestRSBlocks(_typeNumber,_errorCorrectLevel),_dataList);mapData(data,maskPattern)};
@@ -227,14 +227,11 @@
   var totalCodeCount=0;for(r=0;r<rsBlocks.length;r++)totalCodeCount+=rsBlocks[r].totalCount;var data=[];for(i=0;i<totalCodeCount;i++)data.push(0);var index=0;for(i=0;i<maxDc;i++)for(r=0;r<rsBlocks.length;r++)if(i<dcdata[r].length)data[index++]=dcdata[r][i];for(i=0;i<maxEc;i++)for(r=0;r<rsBlocks.length;r++)if(i<ecdata[r].length)data[index++]=ecdata[r][i];return data}
   function getErrorCorrectPolynomial(ecLength){var a=new QRPolynomial([1],0);for(var i=0;i<ecLength;i++)a=a.multiply(new QRPolynomial([1, QRMath.gexp(i)],0));return a}
 
-  window.qrcode = qrcode;
-  window.QRErrorCorrectLevel = QRErrorCorrectLevel;
-  window.RS_BLOCK_TABLE = RS_BLOCK_TABLE;
 })();
 </script>
 
+<script type="module" src="./src/main.js"></script>
 <script type="module">
-import './src/main.js';
 (() => { return;
   const el = id => document.getElementById(id);
   const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
