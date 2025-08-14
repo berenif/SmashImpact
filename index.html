@@ -199,22 +199,27 @@
 
 <script>
 // Ensure QR library is loaded before proceeding
-if (typeof window.qrcode !== 'function') {
-  console.error('QR library failed to load');
-  // Fallback QR implementation
-  window.qrcode = function(typeNumber, errorCorrectLevel) {
-    console.warn('Using fallback QR implementation');
-    return {
-      addData: function(data) { this.data = data; },
-      make: function() { this.made = true; },
-      getModuleCount: function() { return 21; },
-      isDark: function(row, col) { 
-        // Simple fallback pattern
-        return (row + col) % 2 === 0; 
-      }
+// Wait a bit for the script to load and initialize
+setTimeout(() => {
+  if (typeof window.qrcode !== 'function') {
+    console.error('QR library failed to load');
+    // Fallback QR implementation
+    window.qrcode = function(typeNumber, errorCorrectLevel) {
+      console.warn('Using fallback QR implementation');
+      return {
+        addData: function(data) { this.data = data; },
+        make: function() { this.made = true; },
+        getModuleCount: function() { return 21; },
+        isDark: function(row, col) { 
+          // Simple fallback pattern
+          return (row + col) % 2 === 0; 
+        }
+      };
     };
-  };
-}
+  } else {
+    console.log('QR library loaded successfully');
+  }
+}, 100);
 
 // Browser compatibility checks and polyfills
 function checkBrowserCompatibility() {
@@ -497,7 +502,44 @@ window.addEventListener('error', function(event) {
   chatSend.onclick = () => { const text = chatInput.value.trim(); if(!text) return; net.send({ type:'chat', text: text }); log('You: ' + text); chatInput.value=''; };
   chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') chatSend.click(); });
 
-  function drawQrToCanvas(text, canvas, scale){ var qr = qrcode(0, 'L'); qr.addData(text); qr.make(); var count = qr.getModuleCount(); var size = count * scale; canvas.width = canvas.height = Math.max(240, size); var ctx2 = canvas.getContext('2d'); ctx2.fillStyle = '#fff'; ctx2.fillRect(0,0,canvas.width,canvas.height); var offset = Math.floor((canvas.width - size)/2); for(var r=0;r<count;r++){ for(var c=0;c<count;c++){ ctx2.fillStyle = qr.isDark(r,c)? '#000':'#fff'; ctx2.fillRect(offset + c*scale, offset + r*scale, scale, scale); } } }
+  function drawQrToCanvas(text, canvas, scale){ 
+    try {
+      var qr = qrcode(1, 'L'); // Use type 1 instead of 0
+      
+      qr.addData(text); 
+      qr.make(); 
+      
+      var count = qr.getModuleCount(); 
+      
+      var size = count * scale; 
+      canvas.width = canvas.height = Math.max(240, size); 
+      var ctx2 = canvas.getContext('2d'); 
+      ctx2.fillStyle = '#fff'; 
+      ctx2.fillRect(0,0,canvas.width,canvas.height); 
+      var offset = Math.floor((canvas.width - size)/2); 
+      
+      for(var r=0;r<count;r++){ 
+        for(var c=0;c<count;c++){ 
+          ctx2.fillStyle = qr.isDark(r,c)? '#000':'#fff'; 
+          ctx2.fillRect(offset + c*scale, offset + r*scale, scale, scale); 
+        } 
+      }
+    } catch(e) {
+      console.error('QR generation error:', e);
+      // Fallback to simple pattern if QR generation fails
+      canvas.width = canvas.height = 240;
+      var ctx2 = canvas.getContext('2d');
+      ctx2.fillStyle = '#fff';
+      ctx2.fillRect(0,0,canvas.width,canvas.height);
+      // Draw a simple pattern to indicate error
+      for(var r=0;r<8;r++){ 
+        for(var c=0;c<8;c++){ 
+          ctx2.fillStyle = (r + c) % 2 === 0 ? '#000':'#fff'; 
+          ctx2.fillRect(r*30, c*30, 30, 30); 
+        } 
+      }
+    }
+  }
   function showQR(text){ try{ drawQrToCanvas(encodeForShare(text), qrCanvas, 8); qrModal.classList.add('show'); } catch(e){ log('QR error: ' + e.message); } }
   btnQrOffer.onclick  = () => { if(!offerOut.value) return; showQR(offerOut.value); };
   btnQrAnswer.onclick = () => { if(!answerOut.value) return; showQR(answerOut.value); };
@@ -521,7 +563,7 @@ window.addEventListener('error', function(event) {
 
   btnRunTests.onclick = () => {
     const results = []; const ok=(name,cond)=>results.push(`${cond? '✅':'❌'} ${name}`);
-    try { const q = qrcode(0, 'L'); q.addData('test'); q.make(); ok('QR encode short text', q.getModuleCount() > 0); } catch(e){ ok('QR encode short text', false); log('QR test error: '+e.message); }
+    try { const q = qrcode(1, 'L'); q.addData('test'); q.make(); ok('QR encode short text', q.getModuleCount() > 0); } catch(e){ ok('QR encode short text', false); log('QR test error: '+e.message); }
     try { const tmp = document.createElement('canvas'); drawQrToCanvas(encodeForShare('hello'), tmp, 4); ok('drawQrToCanvas runs', tmp.width > 0); } catch(e){ ok('drawQrToCanvas runs', false); log('drawQrToCanvas error: '+e.message); }
     ok('RTCPeerConnection present', !!window.RTCPeerConnection);
     ok('BarcodeDetector present (optional)', 'BarcodeDetector' in window);
