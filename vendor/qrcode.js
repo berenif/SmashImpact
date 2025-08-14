@@ -114,7 +114,9 @@
     H: 2
   };
 
-  // Expose to global scope
-  window.qrcode = QRCode;
+  // Expose to global scope - create a factory function that returns new instances
+  window.qrcode = function(typeNumber, errorCorrectLevel) {
+    return new QRCode(typeNumber, errorCorrectLevel);
+  };
   window.QRErrorCorrectLevel = QRErrorCorrectLevel;
 })();
