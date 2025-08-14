@@ -157,6 +157,130 @@
       border-color: #00ff00;
       box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
     }
+
+    /* Quick Connect Modal Styles */
+    .quick-connect-card {
+      max-width: 600px;
+      width: 90vw;
+    }
+
+    .quick-connect-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .quick-connect-header h3 {
+      margin: 0 0 8px 0;
+      color: #333;
+    }
+
+    .quick-connect-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .offer-section, .answer-section {
+      text-align: center;
+    }
+
+    .offer-section h4, .answer-section h4 {
+      margin: 0 0 12px 0;
+      color: #555;
+      font-size: 16px;
+    }
+
+    .quick-connect-status {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .status-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      flex: 1;
+      position: relative;
+    }
+
+    .status-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      right: -50%;
+      width: 100%;
+      height: 2px;
+      background: #e9ecef;
+      z-index: 1;
+    }
+
+    .status-step.active::after {
+      background: #007cba;
+    }
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #e9ecef;
+      color: #6c757d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-bottom: 8px;
+      z-index: 2;
+      position: relative;
+    }
+
+    .status-step.active .step-number {
+      background: #007cba;
+      color: white;
+    }
+
+    .status-step.completed .step-number {
+      background: #28a745;
+      color: white;
+    }
+
+    .step-text {
+      font-size: 12px;
+      color: #6c757d;
+      max-width: 80px;
+      line-height: 1.2;
+    }
+
+    .status-step.active .step-text {
+      color: #007cba;
+      font-weight: 500;
+    }
+
+    .status-step.completed .step-text {
+      color: #28a745;
+    }
+
+    /* Responsive design for mobile */
+    @media (max-width: 768px) {
+      .quick-connect-content {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      
+      .quick-connect-status {
+        flex-direction: column;
+        gap: 16px;
+      }
+      
+      .status-step:not(:last-child)::after {
+        display: none;
+      }
+    }
     
     /* Cross-browser compatibility improvements */
     * { box-sizing: border-box; }
@@ -215,43 +339,49 @@
 
     <div class="grid">
       <section class="box">
-        <h2>1) Host</h2>
-        <div class="row" style="margin-bottom:8px">
+        <h2>Host (create offer)</h2>
+        <div class="row">
           <button id="btnHostStart">Create Offer</button>
-          <span id="hostState" class="tag">idle</span>
+          <button id="btnQuickConnect">🚀 Quick Connect</button>
         </div>
-        <label class="small">Offer to share</label>
-        <textarea id="offerOut" class="mono" rows="6" readonly></textarea>
-        <div class="row" style="margin:6px 0 10px">
+        <div class="row">
           <button id="btnCopyOffer" disabled>Copy</button>
           <button id="btnQrOffer" disabled>Show QR</button>
         </div>
-        <label class="small">Paste Answer from peer</label>
-        <textarea id="answerIn" class="mono" rows="6" placeholder="Paste peer answer JSON here"></textarea>
-        <div class="row" style="margin-top:6px">
-          <button id="btnApplyAnswer" disabled>Apply Answer</button>
-          <button id="btnScanAnswer">Scan QR</button>
+        <div class="row">
+          <input id="offerOut" placeholder="Offer will appear here" readonly />
         </div>
+        <div class="row">
+          <button id="btnApplyAnswer" disabled>Apply Answer</button>
+          <button id="btnScanAnswer" disabled>Scan Answer</button>
+        </div>
+        <div class="row">
+          <input id="answerIn" placeholder="Paste or scan answer here" />
+        </div>
+        <div class="small muted" id="hostState">idle</div>
       </section>
 
       <section class="box">
-        <h2>2) Peer</h2>
-        <div class="row" style="margin-bottom:8px">
-          <button id="btnPeerStart">Accept Offer</button>
-          <span id="peerState" class="tag">idle</span>
+        <h2>Peer (join offer)</h2>
+        <div class="row">
+          <button id="btnPeerStart">Ready to Join</button>
+          <button id="btnScanHost">📱 Scan Host</button>
         </div>
-        <label class="small">Paste Offer from host</label>
-        <textarea id="offerIn" class="mono" rows="6" placeholder="Paste host offer JSON here"></textarea>
-        <div class="row" style="margin:6px 0 10px">
+        <div class="row">
+          <input id="offerIn" placeholder="Paste or scan offer here" />
+        </div>
+        <div class="row">
           <button id="btnApplyOffer" disabled>Apply Offer</button>
-          <button id="btnScanOffer">Scan QR</button>
+          <button id="btnScanOffer" disabled>Scan Offer</button>
         </div>
-        <label class="small">Answer to return</label>
-        <textarea id="answerOut" class="mono" rows="6" readonly></textarea>
-        <div class="row" style="margin-top:6px">
+        <div class="row">
           <button id="btnCopyAnswer" disabled>Copy</button>
           <button id="btnQrAnswer" disabled>Show QR</button>
         </div>
+        <div class="row">
+          <input id="answerOut" placeholder="Answer will appear here" readonly />
+        </div>
+        <div class="small muted" id="peerState">idle</div>
       </section>
 
       <section class="box">
@@ -325,6 +455,66 @@
         <div class="row qr-hint" style="justify-content:space-between">
           <span class="small muted">Point at QR. It will auto-fill.</span>
           <button id="scanClose">Close</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Quick Connect Modal -->
+    <div id="quickConnectModal" class="qr-modal">
+      <div class="qr-card quick-connect-card">
+        <div class="quick-connect-header">
+          <h3>🚀 Quick Connect</h3>
+          <p class="small muted">Show this QR to peer, then wait for their answer</p>
+        </div>
+        
+        <div class="quick-connect-content">
+          <!-- Offer QR Section -->
+          <div class="offer-section">
+            <h4>Your Offer QR</h4>
+            <canvas id="quickConnectOfferQR" width="200" height="200"></canvas>
+          </div>
+          
+          <!-- Answer Scanning Section -->
+          <div class="answer-section">
+            <h4>Waiting for Answer...</h4>
+            <div class="scan-container">
+              <video id="quickConnectScanVideo" autoplay playsinline muted></video>
+              <div class="scan-overlay">
+                <div class="scan-frame">
+                  <div class="scan-corner scan-corner-tl"></div>
+                  <div class="scan-corner scan-corner-tr"></div>
+                  <div class="scan-corner scan-corner-bl"></div>
+                  <div class="scan-corner scan-corner-br"></div>
+                  <div class="scan-line"></div>
+                </div>
+                <div class="scan-status">Waiting for peer's answer QR...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="quick-connect-status" id="quickConnectStatus">
+          <div class="status-step active">
+            <span class="step-number">1</span>
+            <span class="step-text">Show offer QR to peer</span>
+          </div>
+          <div class="status-step">
+            <span class="step-number">2</span>
+            <span class="step-text">Peer scans and creates answer</span>
+          </div>
+          <div class="status-step">
+            <span class="step-number">3</span>
+            <span class="step-text">Peer shows answer QR</span>
+          </div>
+          <div class="status-step">
+            <span class="step-number">4</span>
+            <span class="step-text">Auto-connect when answer detected</span>
+          </div>
+        </div>
+        
+        <div class="row qr-hint" style="justify-content:space-between">
+          <span class="small muted">Connection will be established automatically</span>
+          <button id="quickConnectClose">Cancel</button>
         </div>
       </div>
     </div>

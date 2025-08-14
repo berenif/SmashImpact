@@ -65,11 +65,19 @@ const qrClose  = el('qrClose');
 const scanModal = el('scanModal');
 const scanVideo = el('scanVideo');
 const scanClose = el('scanClose');
+const quickConnectModal = el('quickConnectModal');
+const quickConnectOfferQR = el('quickConnectOfferQR');
+const quickConnectScanVideo = el('quickConnectScanVideo');
+const quickConnectClose = el('quickConnectClose');
+const quickConnectStatus = el('quickConnectStatus');
 const chatInput = el('chatInput');
 const chatSend  = el('chatSend');
 const btnRunTests = el('btnRunTests');
+const btnTestScan = el('btnTestScan');
 const btnStartGame = el('btnStartGame');
 const btnResetGame = el('btnResetGame');
+const btnQuickConnect = el('btnQuickConnect');
+const btnScanHost = el('btnScanHost');
 
 const log = makeLogger(logEl);
 function setStatus(text, good){ setStatusDom(statusEl, text, good); }
@@ -369,6 +377,331 @@ function stopScan(){
 btnScanOffer.onclick  = () => startScan(offerIn);
 btnScanAnswer.onclick = () => startScan(answerIn);
 scanClose.onclick     = () => stopScan();
+
+// Quick Connect functionality
+async function startQuickConnect() {
+  try {
+    log('🚀 Starting Quick Connect...');
+    
+    // Start as host
+    net.role = 'host';
+    setRoleTag(meTag, 'host');
+    btnHostStart.disabled = true;
+    btnPeerStart.disabled = true;
+    hostState.textContent = 'creating';
+    
+    // Create the peer connection and offer
+    net.makePC();
+    const ch = net.pc.createDataChannel('game', { ordered: true });
+    net.bindDC(ch);
+    
+    const offer = await net.pc.createOffer();
+    await net.pc.setLocalDescription(offer);
+    await net.waitICE();
+    
+    const offerJson = JSON.stringify(net.pc.localDescription);
+    offerOut.value = offerJson;
+    
+    // Show Quick Connect modal
+    quickConnectModal.classList.add('show');
+    
+    // Generate and display the offer QR
+    drawQrToCanvas(encodeForShare(offerJson), quickConnectOfferQR, 8);
+    
+    // Update status to step 1
+    updateQuickConnectStatus(1);
+    
+    // Start scanning for answer automatically
+    await startQuickConnectScan();
+    
+  } catch (e) {
+    log('Quick Connect failed: ' + e.message);
+    alert('Quick Connect failed. Check console for details.');
+    stopQuickConnect();
+  }
+}
+
+async function startQuickConnectScan() {
+  try {
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      alert('Camera requires HTTPS or localhost for Quick Connect.');
+      return;
+    }
+    
+    // Update status to step 2
+    updateQuickConnectStatus(2);
+    
+    // Start camera for scanning answer
+    const stream = await getUserMedia({ 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }, 
+      audio: false 
+    });
+    
+    quickConnectScanVideo.srcObject = stream;
+    await quickConnectScanVideo.play();
+    
+    // Update status to step 3
+    updateQuickConnectStatus(3);
+    
+    // Start scanning loop
+    let scanRunning = true;
+    let detector = null;
+    
+    // Try to use BarcodeDetector if available
+    if ('BarcodeDetector' in window) {
+      try {
+        detector = new BarcodeDetector({ formats: ['qr_code'] });
+      } catch (e) {
+        console.warn('BarcodeDetector failed, using jsQR fallback');
+      }
+    }
+    
+    const scanLoop = async () => {
+      if (!scanRunning) return;
+      
+      try {
+        let raw = '';
+        
+        if (detector) {
+          // Use BarcodeDetector
+          const codes = await detector.detect(quickConnectScanVideo);
+          if (codes && codes.length > 0) {
+            raw = codes[0].rawValue || '';
+          }
+        } else {
+          // Use jsQR fallback
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (quickConnectScanVideo.videoWidth > 0 && quickConnectScanVideo.videoHeight > 0) {
+            canvas.width = quickConnectScanVideo.videoWidth;
+            canvas.height = quickConnectScanVideo.videoHeight;
+            ctx.drawImage(quickConnectScanVideo, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            if (window.jsQR) {
+              const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+              if (code) {
+                raw = code.data;
+              }
+            }
+          }
+        }
+        
+        if (raw && raw.trim()) {
+          console.log('Quick Connect: Answer detected!');
+          
+          // Update status to step 4
+          updateQuickConnectStatus(4);
+          
+          // Stop scanning
+          scanRunning = false;
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Process the answer
+          try {
+            await net.applyAnswerFromText(raw);
+            log('✅ Quick Connect successful! Answer applied automatically.');
+            
+            // Close modal and show success
+            setTimeout(() => {
+              quickConnectModal.classList.remove('show');
+              alert('🎉 Quick Connect successful! You are now connected.');
+            }, 1000);
+            
+          } catch (e) {
+            log('❌ Failed to apply answer: ' + e.message);
+            alert('Answer detected but failed to apply. Please try manual connection.');
+            stopQuickConnect();
+          }
+          
+          return;
+        }
+        
+      } catch (err) {
+        console.warn('Quick Connect scan error:', err);
+      }
+      
+      requestAnimationFrame(scanLoop);
+    };
+    
+    requestAnimationFrame(scanLoop);
+    
+  } catch (e) {
+    log('Quick Connect scan failed: ' + e.message);
+    alert('Failed to start camera for Quick Connect scanning.');
+    stopQuickConnect();
+  }
+}
+
+function updateQuickConnectStatus(step) {
+  const steps = quickConnectStatus.querySelectorAll('.status-step');
+  steps.forEach((stepEl, index) => {
+    if (index < step) {
+      stepEl.classList.add('completed');
+      stepEl.classList.remove('active');
+    } else if (index === step - 1) {
+      stepEl.classList.add('active');
+      stepEl.classList.remove('completed');
+    } else {
+      stepEl.classList.remove('active', 'completed');
+    }
+  });
+}
+
+function stopQuickConnect() {
+  // Reset UI
+  btnHostStart.disabled = false;
+  btnPeerStart.disabled = false;
+  hostState.textContent = 'idle';
+  setRoleTag(meTag, null);
+  
+  // Close modal
+  quickConnectModal.classList.remove('show');
+  
+  // Stop any active streams
+  if (quickConnectScanVideo.srcObject) {
+    quickConnectScanVideo.srcObject.getTracks().forEach(track => track.stop());
+    quickConnectScanVideo.srcObject = null;
+  }
+  
+  // Reset status
+  updateQuickConnectStatus(1);
+}
+
+// Quick Connect button handlers
+btnQuickConnect.onclick = startQuickConnect;
+quickConnectClose.onclick = stopQuickConnect;
+
+// Scan Host functionality for peer
+async function scanHost() {
+  try {
+    log('📱 Starting host scan...');
+    
+    // Start as peer
+    net.role = 'peer';
+    setRoleTag(meTag, 'peer');
+    btnPeerStart.disabled = true;
+    btnHostStart.disabled = true;
+    peerState.textContent = 'scanning';
+    
+    // Open scanning modal
+    scanModal.classList.add('show');
+    
+    // Start scanning for offer
+    const stream = await getUserMedia({ 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }, 
+      audio: false 
+    });
+    
+    scanVideo.srcObject = stream;
+    await scanVideo.play();
+    
+    let scanRunning = true;
+    let detector = null;
+    
+    // Try to use BarcodeDetector if available
+    if ('BarcodeDetector' in window) {
+      try {
+        detector = new BarcodeDetector({ formats: ['qr_code'] });
+      } catch (e) {
+        console.warn('BarcodeDetector failed, using jsQR fallback');
+      }
+    }
+    
+    const scanLoop = async () => {
+      if (!scanRunning) return;
+      
+      try {
+        let raw = '';
+        
+        if (detector) {
+          // Use BarcodeDetector
+          const codes = await detector.detect(scanVideo);
+          if (codes && codes.length > 0) {
+            raw = codes[0].rawValue || '';
+          }
+        } else {
+          // Use jsQR fallback
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
+            canvas.width = scanVideo.videoWidth;
+            canvas.height = scanVideo.videoHeight;
+            ctx.drawImage(scanVideo, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            if (window.jsQR) {
+              const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+              if (code) {
+                raw = code.data;
+              }
+            }
+          }
+        }
+        
+        if (raw && raw.trim()) {
+          console.log('Host scan: Offer detected!');
+          
+          // Stop scanning
+          scanRunning = false;
+          stream.getTracks().forEach(track => track.stop());
+          scanModal.classList.remove('show');
+          
+          // Apply the offer
+          try {
+            await net.applyOfferFromText(raw);
+            log('✅ Offer applied successfully!');
+            
+            // Auto-create and show answer QR
+            const answerJson = JSON.stringify(net.pc.localDescription);
+            answerOut.value = answerJson;
+            
+            // Show answer QR modal
+            qrModal.classList.add('show');
+            drawQrToCanvas(encodeForShare(answerJson), qrCanvas, 8);
+            
+            log('📱 Show this QR to the host to complete Quick Connect!');
+            
+          } catch (e) {
+            log('❌ Failed to apply offer: ' + e.message);
+            alert('Offer detected but failed to apply. Please try manual connection.');
+            peerState.textContent = 'idle';
+            btnPeerStart.disabled = false;
+            btnHostStart.disabled = false;
+          }
+          
+          return;
+        }
+        
+      } catch (err) {
+        console.warn('Host scan error:', err);
+      }
+      
+      requestAnimationFrame(scanLoop);
+    };
+    
+    requestAnimationFrame(scanLoop);
+    
+  } catch (e) {
+    log('Host scan failed: ' + e.message);
+    alert('Failed to start camera for host scanning.');
+    peerState.textContent = 'idle';
+    btnPeerStart.disabled = false;
+    btnHostStart.disabled = false;
+  }
+}
+
+btnScanHost.onclick = scanHost;
 
 // Test scanning setup
 btnTestScan.onclick = async () => {
