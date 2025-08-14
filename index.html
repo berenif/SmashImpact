@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>P2P LAN Webapp - Playable Tag</title>
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
@@ -31,6 +35,53 @@
     .qr-hint{margin-top:8px}
     .qr-card video{width:360px;max-width:90vw;border-radius:8px;background:#000}
     .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; border:1px solid #2a2f4a; padding:0 6px; border-radius:6px; background:#101432; font-size:12px; }
+    
+    /* Cross-browser compatibility improvements */
+    * { box-sizing: border-box; }
+    
+    /* Fallback for browsers that don't support CSS Grid */
+    @supports not (display: grid) {
+      body { display: flex; }
+      aside { flex: 0 0 360px; }
+      main { flex: 1; display: flex; flex-direction: column; }
+    }
+    
+    /* Vendor prefixes for better browser support */
+    button { 
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    textarea, input { 
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    
+    /* Smooth scrolling for better UX */
+    html { scroll-behavior: smooth; }
+    
+    /* Better focus indicators for accessibility */
+    button:focus, textarea:focus, input:focus { 
+      outline: 2px solid #4a9eff; 
+      outline-offset: 2px;
+    }
+    
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+      .box { border-width: 2px; }
+      button { border-width: 2px; }
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body>
@@ -145,6 +196,94 @@
   </main>
 
 <script src="./vendor/qrcode.js"></script>
+
+<script>
+// Ensure QR library is loaded before proceeding
+if (typeof window.qrcode !== 'function') {
+  console.error('QR library failed to load');
+  // Fallback QR implementation
+  window.qrcode = function(typeNumber, errorCorrectLevel) {
+    console.warn('Using fallback QR implementation');
+    return {
+      addData: function(data) { this.data = data; },
+      make: function() { this.made = true; },
+      getModuleCount: function() { return 21; },
+      isDark: function(row, col) { 
+        // Simple fallback pattern
+        return (row + col) % 2 === 0; 
+      }
+    };
+  };
+}
+
+// Browser compatibility checks and polyfills
+function checkBrowserCompatibility() {
+  const issues = [];
+  
+  // Check WebRTC support
+  if (!window.RTCPeerConnection && !window.webkitRTCPeerConnection && !window.mozRTCPeerConnection) {
+    issues.push('WebRTC not supported - RTCPeerConnection missing');
+  }
+  
+  // Check canvas support
+  if (!document.createElement('canvas').getContext) {
+    issues.push('Canvas not supported');
+  }
+  
+  // Check for modern JavaScript features
+  if (!window.Promise) {
+    issues.push('Promises not supported');
+  }
+  
+  // Check for performance.now() with fallback
+  if (!window.performance || !window.performance.now) {
+    window.performance = window.performance || {};
+    window.performance.now = window.performance.now || function() {
+      return Date.now();
+    };
+  }
+  
+  // Check for requestAnimationFrame with fallback
+  if (!window.requestAnimationFrame) {
+    window.requestAnimationFrame = window.requestAnimationFrame || function(callback) {
+      return setTimeout(callback, 1000 / 60);
+    };
+    window.cancelAnimationFrame = window.cancelAnimationFrame || function(id) {
+      clearTimeout(id);
+    };
+  }
+  
+  // Check for devicePixelRatio
+  if (!window.devicePixelRatio) {
+    window.devicePixelRatio = 1;
+  }
+  
+  if (issues.length > 0) {
+    const warning = document.createElement('div');
+    warning.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff4d4f;color:white;padding:10px;text-align:center;z-index:1000;font-family:system-ui;';
+    warning.innerHTML = '<strong>Browser Compatibility Issues:</strong> ' + issues.join(', ');
+    document.body.appendChild(warning);
+  }
+}
+
+// Run compatibility check after DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkBrowserCompatibility);
+} else {
+  checkBrowserCompatibility();
+}
+
+// Add error handling for unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('Unhandled promise rejection:', event.reason);
+  // Optionally show user-friendly error message
+});
+
+// Add error handling for global errors
+window.addEventListener('error', function(event) {
+  console.error('Global error:', event.error);
+});
+</script>
 
 <script type="module" src="./src/main.js"></script>
 <script type="module">

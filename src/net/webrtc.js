@@ -1,5 +1,19 @@
 import { now } from '../utils/time.js';
 
+// WebRTC compatibility layer
+function createRTCPeerConnection(config) {
+	// Handle different browser implementations
+	const RTCPeerConnection = window.RTCPeerConnection || 
+							 window.webkitRTCPeerConnection || 
+							 window.mozRTCPeerConnection;
+	
+	if (!RTCPeerConnection) {
+		throw new Error('WebRTC not supported in this browser');
+	}
+	
+	return new RTCPeerConnection(config);
+}
+
 export class Net {
 	constructor(bindings){
 		this.pc = null;
@@ -15,14 +29,44 @@ export class Net {
 	makePC(){
 		if(this.pc){ try{ this.pc.close(); }catch(e){} this.pc=null; }
 		if(this.dc){ try{ this.dc.close(); }catch(e){} this.dc=null; }
-		const rtcConfig = { iceServers: [] };
-		this.pc = new RTCPeerConnection(rtcConfig);
-		this.pc.onconnectionstatechange = () => {
-			const st = this.pc.connectionState;
-			this.bindings.setStatus(`State: ${st}`, st === 'connected');
-			if(st==='failed') this.bindings.log('Connection failed, check network or HTTPS.');
+		
+		// Enhanced ICE configuration for better cross-browser compatibility
+		const rtcConfig = { 
+			iceServers: [
+				{ urls: 'stun:stun.l.google.com:19302' },
+				{ urls: 'stun:stun1.l.google.com:19302' }
+			],
+			iceCandidatePoolSize: 10
 		};
-		this.pc.onicecandidateerror = (e) => this.bindings.log('ICE error: ' + (e.errorText || e.hostCandidate || ''));
+		
+		try {
+			this.pc = createRTCPeerConnection(rtcConfig);
+		} catch (error) {
+			this.bindings.log('WebRTC creation failed: ' + error.message);
+			throw error;
+		}
+		
+		// Handle connection state changes with fallback for older browsers
+		if (this.pc.connectionState !== undefined) {
+			this.pc.onconnectionstatechange = () => {
+				const st = this.pc.connectionState;
+				this.bindings.setStatus(`State: ${st}`, st === 'connected');
+				if(st==='failed') this.bindings.log('Connection failed, check network or HTTPS.');
+			};
+		} else if (this.pc.iceConnectionState !== undefined) {
+			// Fallback for older browsers
+			this.pc.oniceconnectionstatechange = () => {
+				const st = this.pc.iceConnectionState;
+				this.bindings.setStatus(`ICE State: ${st}`, st === 'connected');
+				if(st==='failed') this.bindings.log('ICE connection failed, check network or HTTPS.');
+			};
+		}
+		
+		// Handle ICE candidate errors with fallback
+		if (this.pc.onicecandidateerror !== undefined) {
+			this.pc.onicecandidateerror = (e) => this.bindings.log('ICE error: ' + (e.errorText || e.hostCandidate || ''));
+		}
+		
 		return this.pc;
 	}
 	bindDC(channel){
