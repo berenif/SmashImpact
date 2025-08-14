@@ -67,6 +67,11 @@
     var data = this.dataList.join('');
     var bitIndex = 0;
     
+    // Firefox compatibility: ensure data is valid
+    if (!data || data.length === 0) {
+      data = 'test'; // Fallback data
+    }
+    
     for (var r = 0; r < this.moduleCount; r++) {
       for (var c = 0; c < this.moduleCount; c++) {
         // Skip position detection and timing patterns
@@ -77,6 +82,10 @@
         // Simple data encoding - alternate pattern based on data
         if (bitIndex < data.length * 8) {
           var charCode = data.charCodeAt(Math.floor(bitIndex / 8));
+          // Firefox compatibility: ensure charCode is valid
+          if (isNaN(charCode) || charCode < 0) {
+            charCode = 0;
+          }
           var bit = (charCode >> (bitIndex % 8)) & 1;
           this.modules[r][c] = bit === 1;
           bitIndex++;

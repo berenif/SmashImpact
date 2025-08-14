@@ -504,6 +504,11 @@ window.addEventListener('error', function(event) {
 
   function drawQrToCanvas(text, canvas, scale){ 
     try {
+      // Firefox compatibility: ensure text is valid
+      if (!text || typeof text !== 'string') {
+        text = 'QR Code Error';
+      }
+      
       var qr = qrcode(1, 'L'); // Use type 1 instead of 0
       
       qr.addData(text); 
@@ -514,6 +519,12 @@ window.addEventListener('error', function(event) {
       var size = count * scale; 
       canvas.width = canvas.height = Math.max(240, size); 
       var ctx2 = canvas.getContext('2d'); 
+      
+      // Firefox compatibility: ensure canvas context is valid
+      if (!ctx2) {
+        throw new Error('Canvas 2D context not available');
+      }
+      
       ctx2.fillStyle = '#fff'; 
       ctx2.fillRect(0,0,canvas.width,canvas.height); 
       var offset = Math.floor((canvas.width - size)/2); 
@@ -529,14 +540,16 @@ window.addEventListener('error', function(event) {
       // Fallback to simple pattern if QR generation fails
       canvas.width = canvas.height = 240;
       var ctx2 = canvas.getContext('2d');
-      ctx2.fillStyle = '#fff';
-      ctx2.fillRect(0,0,canvas.width,canvas.height);
-      // Draw a simple pattern to indicate error
-      for(var r=0;r<8;r++){ 
-        for(var c=0;c<8;c++){ 
-          ctx2.fillStyle = (r + c) % 2 === 0 ? '#000':'#fff'; 
-          ctx2.fillRect(r*30, c*30, 30, 30); 
-        } 
+      if (ctx2) {
+        ctx2.fillStyle = '#fff';
+        ctx2.fillRect(0,0,canvas.width,canvas.height);
+        // Draw a simple pattern to indicate error
+        for(var r=0;r<8;r++){ 
+          for(var c=0;c<8;c++){ 
+            ctx2.fillStyle = (r + c) % 2 === 0 ? '#000':'#fff'; 
+            ctx2.fillRect(r*30, c*30, 30, 30); 
+          } 
+        }
       }
     }
   }
