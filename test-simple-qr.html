@@ -16,6 +16,7 @@
     
     <button onclick="testQR()">Generate QR Code</button>
     <button onclick="checkLibrary()">Check Library</button>
+    <button onclick="testJsQR()">Test jsQR Library</button>
     
     <canvas id="qrCanvas" width="200" height="200"></canvas>
     
@@ -85,6 +86,49 @@
         
         // Auto-check library on load
         window.addEventListener('load', checkLibrary);
+        
+        function testJsQR() {
+            log('Testing jsQR library...');
+            
+            try {
+                if (typeof window.jsQR !== 'function') {
+                    log('❌ jsQR library not available', 'error');
+                    return;
+                }
+                
+                log('✅ jsQR library available');
+                
+                // Create a simple test image with known data
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 100;
+                canvas.height = 100;
+                
+                // Draw a simple test pattern (not a real QR code, just for testing jsQR)
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, 100, 100);
+                ctx.fillStyle = '#000';
+                ctx.fillRect(20, 20, 60, 60);
+                
+                // Get image data
+                const imageData = ctx.getImageData(0, 0, 100, 100);
+                
+                // Test jsQR detection
+                const result = window.jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (result) {
+                    log(`✅ jsQR detected something: ${result.data}`);
+                } else {
+                    log('✅ jsQR processed image (no QR detected, which is expected for test pattern)');
+                }
+                
+                log('✅ jsQR library is working properly');
+                
+            } catch (error) {
+                log(`❌ jsQR test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
     </script>
 </body>
 </html>

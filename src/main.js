@@ -180,60 +180,158 @@ async function startScan(targetField){
       try {
         detector = new BarcodeDetector({ formats:['qr_code'] });
         useBarcodeDetector = true;
+        console.log('Using BarcodeDetector API');
       } catch (e) {
         console.warn('BarcodeDetector failed, using jsQR fallback');
       }
+    } else {
+      console.log('BarcodeDetector not available, using jsQR fallback');
     }
     
     scanModal.classList.add('show');
     
+    // Reset scan UI
+    const scanFrame = document.querySelector('.scan-frame');
+    const scanStatus = document.querySelector('.scan-status');
+    if (scanFrame) scanFrame.classList.remove('detected');
+    if (scanStatus) {
+      scanStatus.textContent = 'Point camera at QR code';
+      scanStatus.className = 'scan-status';
+    }
+    
     // Use cross-browser compatible camera access
-    scanStream = await getUserMedia({ video:{ facingMode:'environment' }, audio:false }); 
+    scanStream = await getUserMedia({ 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }, 
+      audio: false 
+    }); 
+    
     scanVideo.srcObject = scanStream; 
     await scanVideo.play(); 
-    scanRunning=true;
+    scanRunning = true;
+    
+    let detectionCount = 0;
+    let lastDetectionTime = 0;
     
     const loop = async ()=>{
       if(!scanRunning) return; 
+      
       try{
         let raw = '';
+        let detected = false;
         
         if (useBarcodeDetector && detector) {
           // Use modern BarcodeDetector
-          const codes = await detector.detect(scanVideo); 
-          if(codes && codes.length){ 
-            raw = codes[0].rawValue || ''; 
+          try {
+            const codes = await detector.detect(scanVideo); 
+            if(codes && codes.length > 0){ 
+              raw = codes[0].rawValue || ''; 
+              detected = true;
+              console.log('BarcodeDetector found QR:', raw.substring(0, 50) + '...');
+            }
+          } catch (e) {
+            console.warn('BarcodeDetector detection error:', e);
           }
         } else {
           // Use jsQR fallback for Firefox and other browsers
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = scanVideo.videoWidth;
-          canvas.height = scanVideo.videoHeight;
-          ctx.drawImage(scanVideo, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Ensure video has valid dimensions
+            if (scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
+              canvas.width = scanVideo.videoWidth;
+              canvas.height = scanVideo.videoHeight;
+              ctx.drawImage(scanVideo, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              
+              if (window.jsQR) {
+                const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+                if (code) {
+                  raw = code.data;
+                  detected = true;
+                  console.log('jsQR found QR:', raw.substring(0, 50) + '...');
+                }
+              } else {
+                console.warn('jsQR library not available for fallback scanning');
+              }
+            } else {
+              // Debug video dimensions
+              if (detectionCount % 30 === 0) { // Log every 30 frames to avoid spam
+                console.log('Video dimensions:', scanVideo.videoWidth, 'x', scanVideo.videoHeight);
+              }
+            }
+          } catch (e) {
+            console.warn('jsQR detection error:', e);
+          }
+        }
+        
+        // Update UI based on detection
+        if (detected) {
+          detectionCount++;
+          lastDetectionTime = Date.now();
           
-          if (window.jsQR) {
-            const code = window.jsQR(imageData.data, imageData.width, imageData.height);
-            if (code) {
-              raw = code.data;
+          // Highlight the scan frame
+          if (scanFrame) {
+            scanFrame.classList.add('detected');
+          }
+          
+          // Update status
+          if (scanStatus) {
+            scanStatus.textContent = `QR Code Detected! (${detectionCount})`;
+            scanStatus.className = 'scan-status detecting';
+          }
+          
+          // Wait a bit to show the detection feedback
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Process the detected QR code
+          if(raw && raw.trim()){
+            console.log('Processing detected QR code:', raw.substring(0, 100) + '...');
+            
+            // Show success status
+            if (scanStatus) {
+              scanStatus.textContent = 'QR Code Processed Successfully!';
+              scanStatus.className = 'scan-status success';
+            }
+            
+            // Wait for success animation
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Fill the target field and stop scanning
+            targetField.value = raw; 
+            stopScan(); 
+            
+            // Apply the detected data
+            if (targetField === offerIn) { 
+              await applyOfferFromText(raw); 
+            } else if (targetField === answerIn) { 
+              await applyAnswerFromText(raw); 
+            } 
+            return; 
+          }
+        } else {
+          // No QR detected, reset UI if enough time has passed
+          if (Date.now() - lastDetectionTime > 2000) {
+            if (scanFrame) scanFrame.classList.remove('detected');
+            if (scanStatus && scanStatus.textContent !== 'Point camera at QR code') {
+              scanStatus.textContent = 'Point camera at QR code';
+              scanStatus.className = 'scan-status';
             }
           }
         }
         
-        if(raw){
-          targetField.value = raw; 
-          stopScan(); 
-          if (targetField === offerIn) { 
-            await applyOfferFromText(raw); 
-          } else if (targetField === answerIn) { 
-            await applyAnswerFromText(raw); 
-          } 
-          return; 
-        } 
       } catch (err) {
         console.warn('QR detection error:', err);
+        if (scanStatus) {
+          scanStatus.textContent = 'Detection error - retrying...';
+          scanStatus.className = 'scan-status';
+        }
       } 
+      
       requestAnimationFrame(loop); 
     };
     
@@ -247,17 +345,88 @@ async function startScan(targetField){
 }
 
 function stopScan(){
-  scanRunning=false; 
+  scanRunning = false; 
+  
+  // Reset scan UI
+  const scanFrame = document.querySelector('.scan-frame');
+  const scanStatus = document.querySelector('.scan-status');
+  if (scanFrame) scanFrame.classList.remove('detected');
+  if (scanStatus) {
+    scanStatus.textContent = 'Point camera at QR code';
+    scanStatus.className = 'scan-status';
+  }
+  
+  // Stop camera stream
   if(scanStream){
-    scanStream.getTracks().forEach(t=>t.stop()); 
-    scanStream=null; 
+    scanStream.getTracks().forEach(track => track.stop()); 
+    scanStream = null; 
   } 
+  
+  // Hide modal
   scanModal.classList.remove('show'); 
 }
 
 btnScanOffer.onclick  = () => startScan(offerIn);
 btnScanAnswer.onclick = () => startScan(answerIn);
 scanClose.onclick     = () => stopScan();
+
+// Test scanning setup
+btnTestScan.onclick = async () => {
+  log('Testing scan setup...');
+  
+  try {
+    // Check if we're on a secure origin
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      log('❌ Camera requires HTTPS or localhost', 'error');
+      return;
+    }
+    
+    // Check if getUserMedia is available
+    if (!getMediaDevices()) {
+      log('❌ Camera access not supported', 'error');
+      return;
+    }
+    
+    log('✅ Camera access supported');
+    
+    // Check if jsQR is available
+    if (typeof window.jsQR === 'function') {
+      log('✅ jsQR library available');
+    } else {
+      log('❌ jsQR library not available', 'error');
+    }
+    
+    // Check if BarcodeDetector is available
+    if ('BarcodeDetector' in window) {
+      log('✅ BarcodeDetector API available');
+    } else {
+      log('⚠️ BarcodeDetector API not available (will use jsQR fallback)');
+    }
+    
+    // Test camera permissions
+    try {
+      const stream = await getUserMedia({ video: true, audio: false });
+      log('✅ Camera permission granted');
+      
+      // Get video track info
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const capabilities = videoTrack.getCapabilities();
+        log(`📹 Camera: ${videoTrack.label || 'Unknown'}`);
+        log(`📐 Max resolution: ${capabilities.width?.max || 'Unknown'}x${capabilities.height?.max || 'Unknown'}`);
+      }
+      
+      // Stop the test stream
+      stream.getTracks().forEach(track => track.stop());
+      
+    } catch (e) {
+      log(`❌ Camera permission denied: ${e.message}`, 'error');
+    }
+    
+  } catch (e) {
+    log(`❌ Scan setup test failed: ${e.message}`, 'error');
+  }
+};
 
 btnRunTests.onclick = () => {
 	const results = []; const ok=(name,cond)=>results.push(`${cond? '✅':'❌'} ${name}`);
