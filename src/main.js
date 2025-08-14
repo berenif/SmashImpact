@@ -70,6 +70,9 @@ const chatSend  = el('chatSend');
 const btnRunTests = el('btnRunTests');
 const btnStartGame = el('btnStartGame');
 const btnResetGame = el('btnResetGame');
+const roleModal = el('roleModal');
+const chooseHost = el('chooseHost');
+const choosePlayer = el('choosePlayer');
 
 const log = makeLogger(logEl);
 function setStatus(text, good){ setStatusDom(statusEl, text, good); }
@@ -77,17 +80,19 @@ function setLatency(ms){ latencyEl.textContent = `RTT ~ ${ms} ms`; }
 function setChatEnabled(enabled){ chatSend.disabled = !enabled; }
 function resetUiForDisconnect(){ btnHostStart.disabled=false; btnPeerStart.disabled=false; setRoleTag(meTag, null); hostState.textContent='idle'; peerState.textContent='idle'; }
 
+let nextAction = null;
+
 const net = new Net({
-	setStatus,
-	setChatEnabled,
-	resetUiForDisconnect,
+        setStatus,
+        setChatEnabled,
+        resetUiForDisconnect,
 	setLatency,
 	log,
 	setRole: (r) => setRoleTag(meTag, r),
 	onHostStart: () => { btnHostStart.disabled = true; btnPeerStart.disabled = true; hostState.textContent = 'creating'; },
-	onOfferReady: (offerJson) => { offerOut.value = offerJson; btnCopyOffer.disabled = false; btnApplyAnswer.disabled = false; btnQrOffer.disabled = false; hostState.textContent='offer ready'; setStatus('Share offer with peer', false); },
-	onPeerStart: () => { btnPeerStart.disabled = true; btnHostStart.disabled = true; peerState.textContent='ready'; btnApplyOffer.disabled = false; },
-	onAnswerReady: (answerJson) => { answerOut.value = answerJson; btnCopyAnswer.disabled = false; btnQrAnswer.disabled = false; peerState.textContent ='answer ready'; setStatus('Send answer back to host', false); },
+        onOfferReady: (offerJson) => { offerOut.value = offerJson; btnCopyOffer.disabled = false; btnApplyAnswer.disabled = false; btnQrOffer.disabled = false; hostState.textContent='offer ready'; setStatus('Share offer with peer', false); showQR(offerJson); nextAction='scanAnswer'; },
+        onPeerStart: () => { btnPeerStart.disabled = true; btnHostStart.disabled = true; peerState.textContent='ready'; btnApplyOffer.disabled = false; },
+        onAnswerReady: (answerJson) => { answerOut.value = answerJson; btnCopyAnswer.disabled = false; btnQrAnswer.disabled = false; peerState.textContent ='answer ready'; setStatus('Send answer back to host', false); showQR(answerJson); },
 	onAnswerApplied: () => { hostState.textContent = 'answer applied'; setStatus('Waiting for channel open', false); },
 	decodeShared,
 });
@@ -136,6 +141,8 @@ net.onmessage = (msg) => { if(msg.type==='pos'){ them.tx = Math.min(Math.max(msg
 
 btnHostStart.onclick = async () => { try { setRole('host'); net.role='host'; await net.startHost(); } catch (e) { log('Host failed: ' + (e && e.message ? e.message : e)); btnHostStart.disabled=false; btnPeerStart.disabled=false; setRoleTag(meTag, null); hostState.textContent='idle'; } };
 btnPeerStart.onclick = () => { try { setRole('peer'); net.startPeer(); } catch (e) { log('Peer init failed: ' + (e && e.message ? e.message : e)); btnHostStart.disabled=false; btnPeerStart.disabled=false; setRoleTag(meTag, null); peerState.textContent='idle'; } };
+chooseHost.onclick = async () => { roleModal.classList.remove('show'); await btnHostStart.onclick(); };
+choosePlayer.onclick = () => { roleModal.classList.remove('show'); btnPeerStart.onclick(); startScan(offerIn); };
 btnCopyOffer.onclick = async () => { await navigator.clipboard.writeText(encodeForShare(offerOut.value)); btnCopyOffer.textContent='Copied'; setTimeout(()=>btnCopyOffer.textContent='Copy', 800); };
 btnCopyAnswer.onclick = async () => { await navigator.clipboard.writeText(encodeForShare(answerOut.value)); btnCopyAnswer.textContent='Copied'; setTimeout(()=>btnCopyAnswer.textContent='Copy', 800); };
 
@@ -162,7 +169,7 @@ function showQR(text){
 
 btnQrOffer.onclick  = () => { if(!offerOut.value) return; showQR(offerOut.value); };
 btnQrAnswer.onclick = () => { if(!answerOut.value) return; showQR(answerOut.value); };
-qrClose.onclick     = () => { qrModal.classList.remove('show'); };
+qrClose.onclick     = () => { qrModal.classList.remove('show'); if(nextAction==='scanAnswer'){ nextAction=null; startScan(answerIn); } };
 
 // QR Scanning functionality
 let scanStream=null; let scanRunning=false; let detector=null;
