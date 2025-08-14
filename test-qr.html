@@ -65,7 +65,7 @@
                 const ctx = canvas.getContext('2d');
                 
                 // Generate QR code
-                const qr = window.qrcode(0, 'L');
+                const qr = window.qrcode(1, 'L');
                 qr.addData(text);
                 qr.make();
                 

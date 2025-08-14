@@ -138,7 +138,7 @@ qrClose.onclick     = () => { qrModal.classList.remove('show'); };
 
 btnRunTests.onclick = () => {
 	const results = []; const ok=(name,cond)=>results.push(`${cond? '✅':'❌'} ${name}`);
-	try { const q = window.qrcode(0, 'L'); q.addData('test'); q.make(); ok('QR encode short text', q.getModuleCount() > 0); } catch(e){ ok('QR encode short text', false); log('QR test error: '+e.message); }
+	    try { const q = window.qrcode(1, 'L'); q.addData('test'); q.make(); ok('QR encode short text', q.getModuleCount() > 0); } catch(e){ ok('QR encode short text', false); log('QR test error: '+e.message); }
 	try { const tmp = document.createElement('canvas'); drawQrToCanvas(encodeForShare('hello'), tmp, 4); ok('drawQrToCanvas runs', tmp.width > 0); } catch(e){ ok('drawQrToCanvas runs', false); log('drawQrToCanvas error: '+e.message); }
 	ok('RTCPeerConnection present', !!window.RTCPeerConnection);
 	ok('BarcodeDetector present (optional)', 'BarcodeDetector' in window);

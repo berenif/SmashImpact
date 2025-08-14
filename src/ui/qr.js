@@ -6,7 +6,7 @@ export function drawQrToCanvas(text, canvas, scale) {
 			throw new Error('QR library not loaded');
 		}
 
-		const qr = window.qrcode(0, 'L');
+		const qr = window.qrcode(1, 'L');
 		qr.addData(text);
 		qr.make();
 		const count = qr.getModuleCount();
