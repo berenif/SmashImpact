@@ -40,6 +40,7 @@
     </div>
 
     <script src="./vendor/qrcode.js"></script>
+    <script src="./vendor/jsqr.js"></script>
     <script>
         function showStatus(message, isSuccess) {
             const status = document.getElementById('status');
@@ -88,9 +89,22 @@
                         ctx.fillRect(offset + c * scale, offset + r * scale, scale, scale);
                     }
                 }
-                
-                showStatus('QR code generated successfully!', true);
-                
+
+                // Decode the generated QR code using jsQR
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                if (typeof window.jsQR === 'function') {
+                    const decoded = window.jsQR(imageData.data, imageData.width, imageData.height);
+                    if (decoded && decoded.data === text) {
+                        showStatus('QR code generated and decoded successfully!', true);
+                    } else if (decoded) {
+                        showStatus('Decoded text does not match original', false);
+                    } else {
+                        showStatus('Unable to decode QR code', false);
+                    }
+                } else {
+                    showStatus('jsQR library not loaded', false);
+                }
+
             } catch (error) {
                 showStatus('Error generating QR code: ' + error.message, false);
                 console.error('QR generation error:', error);
