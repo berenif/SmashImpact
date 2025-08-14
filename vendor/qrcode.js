@@ -123,14 +123,9 @@
     H: 2
   };
 
-<<<<<<< HEAD
-  // Expose to global scope
-  window.qrcode = QRCode;
-=======
   // Expose to global scope - create a factory function that returns new instances
   window.qrcode = function(typeNumber, errorCorrectLevel) {
     return new QRCode(typeNumber, errorCorrectLevel);
   };
->>>>>>> cursor/fix-qr-code-scanning-in-firefox-806d
   window.QRErrorCorrectLevel = QRErrorCorrectLevel;
 })();

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QR Code Debug Test</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #005a87; }
+        canvas { border: 1px solid #ccc; margin: 10px 0; }
+        .log { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>QR Code Debug Test</h1>
+        <p>This page tests the QR code functionality step by step.</p>
+        
+        <div>
+            <button onclick="testQRLibrary()">1. Test QR Library</button>
+            <button onclick="testDrawFunction()">2. Test Draw Function</button>
+            <button onclick="testFullQR()">3. Test Full QR Generation</button>
+        </div>
+        
+        <canvas id="qrCanvas" width="300" height="300"></canvas>
+        
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <!-- Load required libraries -->
+    <script src="./vendor/qrcode.js"></script>
+    <script src="./vendor/jsqr.js"></script>
+    
+    <script>
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logEntry.className = type;
+            logEl.appendChild(logEntry);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+        
+        function testQRLibrary() {
+            log('Testing QR library...');
+            
+            try {
+                if (typeof window.qrcode !== 'function') {
+                    log('❌ QR library not loaded', 'error');
+                    return;
+                }
+                
+                log('✅ QR library is available', 'success');
+                
+                // Test creating a QR instance
+                const qr = window.qrcode(0, 'L');
+                log('✅ QR instance created', 'success');
+                
+                // Test adding data
+                qr.addData('test');
+                log('✅ Data added to QR', 'success');
+                
+                // Test making QR
+                qr.make();
+                log('✅ QR code generated', 'success');
+                
+                // Test getting module count
+                const count = qr.getModuleCount();
+                log(`✅ Module count: ${count}`, 'success');
+                
+                // Test isDark function
+                const isDark = qr.isDark(0, 0);
+                log(`✅ isDark(0,0): ${isDark}`, 'success');
+                
+            } catch (error) {
+                log(`❌ QR library test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        function testDrawFunction() {
+            log('Testing draw function...');
+            
+            try {
+                const canvas = document.getElementById('qrCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                if (!ctx) {
+                    log('❌ Canvas context not available', 'error');
+                    return;
+                }
+                
+                log('✅ Canvas context available', 'success');
+                
+                // Test basic canvas operations
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                log('✅ Canvas cleared with white', 'success');
+                
+                // Test drawing a simple pattern
+                ctx.fillStyle = '#000';
+                ctx.fillRect(10, 10, 50, 50);
+                log('✅ Simple pattern drawn', 'success');
+                
+            } catch (error) {
+                log(`❌ Draw function test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        function testFullQR() {
+            log('Testing full QR generation...');
+            
+            try {
+                const canvas = document.getElementById('qrCanvas');
+                
+                // Test the drawQrToCanvas function
+                if (typeof window.drawQrToCanvas === 'function') {
+                    log('✅ drawQrToCanvas function available', 'success');
+                    window.drawQrToCanvas('Hello World!', canvas, 8);
+                    log('✅ QR code drawn successfully', 'success');
+                } else {
+                    log('❌ drawQrToCanvas function not available', 'error');
+                    log('Trying to create QR manually...', 'info');
+                    
+                    // Manual QR creation
+                    const qr = window.qrcode(0, 'L');
+                    qr.addData('Hello World!');
+                    qr.make();
+                    
+                    const count = qr.getModuleCount();
+                    const scale = 8;
+                    const size = count * scale;
+                    
+                    canvas.width = canvas.height = Math.max(300, size);
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Clear canvas
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    const offset = Math.floor((canvas.width - size) / 2);
+                    
+                    // Draw QR code
+                    for (let r = 0; r < count; r++) {
+                        for (let c = 0; c < count; c++) {
+                            ctx.fillStyle = qr.isDark(r, c) ? '#000' : '#fff';
+                            ctx.fillRect(offset + c * scale, offset + r * scale, scale, scale);
+                        }
+                    }
+                    
+                    log('✅ Manual QR generation successful', 'success');
+                }
+                
+            } catch (error) {
+                log(`❌ Full QR test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            log('QR Debug Test Page Loaded');
+            log('Browser: ' + navigator.userAgent);
+            
+            // Check what's available
+            log(`QR library available: ${typeof window.qrcode === 'function'}`);
+            log(`jsQR available: ${typeof window.jsQR === 'function'}`);
+            log(`Canvas available: ${!!document.createElement('canvas').getContext}`);
+        });
+    </script>
+</body>
+</html>
