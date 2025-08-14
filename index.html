@@ -185,12 +185,13 @@
   QRBitBuffer.prototype.putBit=function(bit){this.buffer[Math.floor(this.length/8)]>>>=0;if(this.length%8==0)this.buffer.push(0);if(bit)this.buffer[Math.floor(this.length/8)]|=(0x80>>> (this.length%8));this.length++};
   var QRUtil=(function(){
     var PATTERN_POSITION_TABLE=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,54,82,110,138],[6,30,56,84,112,140],[6,34,62,90,118,146],[6,30,58,86,114,142,170]];
-    var G15=0x537,G18=0x1f25,G15_MASK=0x5412;
-    function getBCHTypeInfo(data){var d=data<<10;while(getBCHDigit(d)-getBCHDigit(G15)>=0)d^=(G15<<(getBCHDigit(d)-getBCHDigit(G15)));return ((data<<10)|d)^G15_MASK}
-    function getBCHTypeNumber(data){var d=data<<12;while(getBCHDigit(d)-getBCHDigit(G18)>=0)d^=(G18<<(getBCHDigit(d)-getBCHDigit(G18)));return (data<<12)|d}
-    function getBCHDigit(data){var digit=0;while(data!=0){digit++;data>>>=1}return digit}
-    function getMask(maskPattern,i,j){switch(maskPattern){case 0: return (i+j)%2==0; case 1: return i%2==0; case 2: return j%3==0; case 3: return (i+j)%3==0; case 4: return (Math.floor(i/2)+Math.floor(j/3))%2==0; case 5: return (i*j)%2+(i*j)%3==0; case 6: return ((i*j)%2+(i*j)%3)%2==0; case 7: return ((i*j)%3+(i+j)%2)%2==0; default: throw new Error('bad mask'); }}
-    function getLostPoint(qr){
+         var G15=0x537,G18=0x1f25,G15_MASK=0x5412;
+      function getPatternPosition(typeNumber){ return PATTERN_POSITION_TABLE[typeNumber-1]||[]; }
+      function getBCHTypeInfo(data){var d=data<<10;while(getBCHDigit(d)-getBCHDigit(G15)>=0)d^=(G15<<(getBCHDigit(d)-getBCHDigit(G15)));return ((data<<10)|d)^G15_MASK}
+      function getBCHTypeNumber(data){var d=data<<12;while(getBCHDigit(d)-getBCHDigit(G18)>=0)d^=(G18<<(getBCHDigit(d)-getBCHDigit(G18)));return (data<<12)|d}
+      function getBCHDigit(data){var digit=0;while(data!=0){digit++;data>>>=1}return digit}
+      function getMask(maskPattern,i,j){switch(maskPattern){case 0: return (i+j)%2==0; case 1: return i%2==0; case 2: return j%3==0; case 3: return (i+j)%3==0; case 4: return (Math.floor(i/2)+Math.floor(j/3))%2==0; case 5: return (i*j)%2+(i*j)%3==0; case 6: return ((i*j)%2+(i*j)%3)%2==0; case 7: return ((i*j)%3+(i+j)%2)%2==0; default: throw new Error('bad mask'); }}
+      function getLostPoint(qr){
       var mc=qr.moduleCount,modules=qr.modules,lost=0;
       for(var r=0;r<mc;r++){
         for(var c=0;c<mc;c++){
@@ -315,19 +316,19 @@
   const btnStartGame = el('btnStartGame');
   const btnResetGame = el('btnResetGame');
 
-  function log(msg){ logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + logEl.textContent; }
+     function log(msg){ const entry = `[${new Date().toLocaleTimeString()}] ${msg}\n`; logEl.textContent = entry + logEl.textContent; if (logEl.textContent.length > 8000) { logEl.textContent = logEl.textContent.slice(0, 8000); } }
   function setStatus(s, good){ status.textContent = s; status.className = 'small mono ' + (good ? 'ok' : 'muted'); }
   function setRoleTag(r){ meTag.textContent = r ? `${r} ready` : 'not joined'; }
 
   class Net {
     constructor(){ this.pc=null; this.dc=null; this.role=null; this.pingTimer=0; this.rtt=null; this.onopen=null; this.onclose=null; this.onmessage=null; }
-    makePC(){ const rtcConfig = { iceServers: [] }; this.pc = new RTCPeerConnection(rtcConfig);
+    makePC(){ if (this.pc) { try { this.pc.close(); } catch(e){} this.pc = null; } if (this.dc) { try { this.dc.close(); } catch(e){} this.dc = null; } const rtcConfig = { iceServers: [] }; this.pc = new RTCPeerConnection(rtcConfig);
       this.pc.onconnectionstatechange = () => { const st=this.pc.connectionState; setStatus(`State: ${st}`, st === 'connected'); if(st==='failed') log('Connection failed, check network or HTTPS.'); };
       this.pc.onicecandidateerror = (e) => log('ICE error: ' + (e.errorText || e.hostCandidate || ''));
       return this.pc; }
-    bindDC(channel){ this.dc = channel; chatSend.disabled = false;
-      this.dc.onopen  = () => { setStatus('Connected', true); this.startPings(); if(this.onopen) this.onopen(); };
-      this.dc.onclose = () => { setStatus('Disconnected', false); this.stopPings(); if(this.onclose) this.onclose(); };
+    bindDC(channel){ this.dc = channel; chatSend.disabled = true;
+      this.dc.onopen  = () => { setStatus('Connected', true); chatSend.disabled = false; this.startPings(); if(this.onopen) this.onopen(); };
+      this.dc.onclose = () => { setStatus('Disconnected', false); chatSend.disabled = true; this.stopPings(); if(this.onclose) this.onclose(); btnHostStart.disabled=false; btnPeerStart.disabled=false; setRoleTag(null); hostState.textContent='idle'; peerState.textContent='idle'; };
       this.dc.onmessage = (e) => { try{ const msg = JSON.parse(e.data); if(msg.type==='ping'){ this.send({type:'pong', t:msg.t}); } else if(msg.type==='pong'){ this.rtt = Math.round(performance.now() - msg.t); latency.textContent = `RTT ~ ${this.rtt} ms`; } else { if(this.onmessage) this.onmessage(msg); } } catch (err) { log(`Raw: ${e.data}`); } };
     }
     startHost(){ this.role='host'; setRoleTag('host'); btnHostStart.disabled = true; btnPeerStart.disabled = true; hostState.textContent='creating';
@@ -347,7 +348,7 @@
     send(obj){ if(this.dc && this.dc.readyState==='open'){ try{ this.dc.send(JSON.stringify(obj)); }catch(e){} } }
     startPings(){ this.stopPings(); this.pingTimer = setInterval(()=>{ this.send({type:'ping', t:performance.now()}); }, 1000); }
     stopPings(){ if(this.pingTimer){ clearInterval(this.pingTimer); this.pingTimer=0; } }
-    async waitICE(){ if(this.pc.iceGatheringState==='complete') return; await new Promise(res=>{ const check=()=>{ if(this.pc.iceGatheringState==='complete'){ this.pc.removeEventListener('icegatheringstatechange', check); res(); } }; this.pc.addEventListener('icegatheringstatechange', check); }); }
+         async waitICE(){ if(!this.pc) return; if(this.pc.iceGatheringState==='complete') return; await new Promise((res)=>{ let done=false; const cleanup=()=>{ if(done) return; done=true; this.pc && this.pc.removeEventListener('icegatheringstatechange', check); res(); }; const check=()=>{ if(!this.pc) return cleanup(); if(this.pc.iceGatheringState==='complete'){ cleanup(); } }; this.pc.addEventListener('icegatheringstatechange', check); setTimeout(cleanup, 3000); }); }
   }
 
   const net = new Net();
@@ -409,7 +410,7 @@
   net.onopen = () => { btnStartGame.disabled = (net.role!=='host'); btnResetGame.disabled = (net.role!=='host'); if(net.role==='host'){
       me.x=200; me.y=200; them.x=1400; them.y=700; them.tx=them.x; them.ty=them.y; me.score=0; them.score=0; game={ started:false, it: Math.random()<0.5? 'me':'peer', tLeft: ROUND_TIME, lastTick: now(), lastTagAt: 0 }; broadcastState(); }
   };
-  net.onclose = () => { btnStartGame.disabled = true; btnResetGame.disabled = true; };
+  net.onclose = () => { btnStartGame.disabled = true; btnResetGame.disabled = true; chatSend.disabled = true; };
   net.onmessage = (msg) => { if(msg.type==='pos'){ them.tx = clamp(msg.x, R, world.w-R); them.ty = clamp(msg.y, R, world.h-R); them.lastUpdate = now(); }
     else if(msg.type==='state'){ applyState(msg.state); }
     else if(msg.type==='chat'){ log(`Peer: ${msg.text}`); }
@@ -427,8 +428,8 @@
 
   let lastSend = 0; function sendThrottled(obj){ const t=now(); if(t - lastSend > 33){ net.send(obj); lastSend = t; } }
 
-  btnHostStart.onclick = async () => { role='host'; net.role='host'; await net.startHost(); };
-  btnPeerStart.onclick = () => { role='peer'; net.startPeer(); };
+  btnHostStart.onclick = async () => { try { role='host'; net.role='host'; await net.startHost(); } catch (e) { log('Host failed: ' + (e && e.message ? e.message : e)); btnHostStart.disabled=false; btnPeerStart.disabled=false; setRoleTag(null); hostState.textContent='idle'; } };
+  btnPeerStart.onclick = () => { try { role='peer'; net.startPeer(); } catch (e) { log('Peer init failed: ' + (e && e.message ? e.message : e)); btnHostStart.disabled=false; btnPeerStart.disabled=false; setRoleTag(null); peerState.textContent='idle'; } };
   btnCopyOffer.onclick = async () => { await navigator.clipboard.writeText(encodeForShare(offerOut.value)); btnCopyOffer.textContent='Copied'; setTimeout(()=>btnCopyOffer.textContent='Copy', 800); };
   btnCopyAnswer.onclick = async () => { await navigator.clipboard.writeText(encodeForShare(answerOut.value)); btnCopyAnswer.textContent='Copied'; setTimeout(()=>btnCopyAnswer.textContent='Copy', 800); };
 
