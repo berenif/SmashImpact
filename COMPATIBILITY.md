@@ -14,7 +14,17 @@ This document outlines the compatibility improvements made to ensure the P2P LAN
 - Implemented fallback QR implementation
 - Added error handling and graceful degradation
 
-### 2. WebRTC Compatibility
+### 2. QR Code Scanning Unsupported in Firefox
+**Problem**: `QR scan unsupported in this browser (firefox)`
+
+**Root Cause**: Firefox doesn't support the `BarcodeDetector` API
+
+**Solution**:
+- Implemented cross-browser camera access compatibility
+- Added jsQR fallback library for Firefox and other browsers
+- Graceful fallback from modern to legacy APIs
+
+### 3. WebRTC Compatibility
 **Problem**: Different browser implementations of RTCPeerConnection
 
 **Solution**:
@@ -22,7 +32,7 @@ This document outlines the compatibility improvements made to ensure the P2P LAN
 - Implemented fallback connection state handling
 - Enhanced ICE configuration with STUN servers
 
-### 3. Browser Feature Detection
+### 4. Browser Feature Detection
 **Problem**: Missing modern JavaScript features in older browsers
 
 **Solution**:
@@ -37,7 +47,8 @@ This document outlines the compatibility improvements made to ensure the P2P LAN
 | WebRTC | ✅ | ✅ | ✅ | ✅ |
 | Canvas 2D | ✅ | ✅ | ✅ | ✅ |
 | ES6 Modules | ✅ | ✅ | ✅ | ✅ |
-| QR Codes | ✅ | ✅ | ✅ | ✅ |
+| QR Code Generation | ✅ | ✅ | ✅ | ✅ |
+| QR Code Scanning | ✅ | ✅ | ✅ | ✅ |
 | CSS Grid | ✅ | ✅ | ✅ | ✅ |
 
 ## Implementation Details
@@ -47,13 +58,16 @@ This document outlines the compatibility improvements made to ensure the P2P LAN
 <!-- 1. Load QR library first -->
 <script src="./vendor/qrcode.js"></script>
 
-<!-- 2. Add compatibility layer -->
+<!-- 2. Add QR scanning fallback -->
+<script src="./vendor/jsqr.js"></script>
+
+<!-- 3. Add compatibility layer -->
 <script>
   // Browser compatibility checks and polyfills
   // Fallback implementations
 </script>
 
-<!-- 3. Load ES6 modules -->
+<!-- 4. Load ES6 modules -->
 <script type="module" src="./src/main.js"></script>
 ```
 
@@ -72,6 +86,57 @@ window.qrcode = function(typeNumber, errorCorrectLevel) {
 };
 ```
 
+### Cross-Browser Camera Access
+```javascript
+function getUserMedia(constraints) {
+  const mediaDevices = navigator.mediaDevices || 
+                       navigator.getUserMedia || 
+                       navigator.webkitGetUserMedia || 
+                       navigator.mozGetUserMedia;
+  
+  if (mediaDevices && mediaDevices.getUserMedia) {
+    return mediaDevices.getUserMedia(constraints);
+  }
+  
+  // Fallback for older browsers
+  if (navigator.getUserMedia) {
+    return new Promise((resolve, reject) => {
+      navigator.getUserMedia(constraints, resolve, reject);
+    });
+  }
+  
+  throw new Error('Camera access not supported in this browser');
+}
+```
+
+### QR Scanning with Fallback
+```javascript
+// Try modern BarcodeDetector first, then fallback to jsQR
+let useBarcodeDetector = false;
+if ('BarcodeDetector' in window) {
+  try {
+    detector = new BarcodeDetector({ formats:['qr_code'] });
+    useBarcodeDetector = true;
+  } catch (e) {
+    console.warn('BarcodeDetector failed, using jsQR fallback');
+  }
+}
+
+// Use jsQR fallback for Firefox and other browsers
+if (!useBarcodeDetector && window.jsQR) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  
+  const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+  if (code) {
+    raw = code.data;
+  }
+}
+```
 ### WebRTC Compatibility Layer
 ```javascript
 function createRTCPeerConnection(config) {
@@ -100,23 +165,22 @@ function createRTCPeerConnection(config) {
 
 ## Testing
 
-### Test Page
-Use `test-qr.html` to verify compatibility:
-- QR code generation
-- Browser feature detection
-- WebRTC support verification
+### Test Pages
+- **`test-qr.html`**: Basic QR code generation and compatibility testing
+- **`test-qr-scan.html`**: Comprehensive QR scanning functionality testing
 
 ### Manual Testing Checklist
-- [ ] Firefox (latest)
-- [ ] Chrome (latest)
-- [ ] Safari (latest)
-- [ ] Edge (latest)
+- [ ] Firefox (latest) - QR generation ✅, QR scanning ✅
+- [ ] Chrome (latest) - QR generation ✅, QR scanning ✅
+- [ ] Safari (latest) - QR generation ✅, QR scanning ✅
+- [ ] Edge (latest) - QR generation ✅, QR scanning ✅
 - [ ] Mobile browsers (iOS Safari, Chrome Mobile)
 
 ## Error Handling
 
 ### Graceful Degradation
 - QR codes show error message if generation fails
+- QR scanning falls back to jsQR if BarcodeDetector unavailable
 - WebRTC connections provide clear error messages
 - Canvas fallbacks for unsupported features
 
@@ -124,6 +188,7 @@ Use `test-qr.html` to verify compatibility:
 - Browser compatibility warnings
 - Feature support indicators
 - Clear error messages in console
+- Fallback method notifications
 
 ## Performance Considerations
 
@@ -136,6 +201,7 @@ Use `test-qr.html` to verify compatibility:
 - Scripts load in correct order
 - No blocking operations
 - Efficient error handling
+- Local library files (no external dependencies)
 
 ## Future Improvements
 
@@ -144,11 +210,13 @@ Use `test-qr.html` to verify compatibility:
 - Progressive Web App features
 - Enhanced mobile experience
 - Better accessibility features
+- Improved QR detection algorithms
 
 ### Monitoring
 - Browser usage analytics
 - Feature support tracking
 - Error rate monitoring
+- QR scanning success rates
 
 ## Troubleshooting
 
@@ -159,12 +227,18 @@ Use `test-qr.html` to verify compatibility:
    - Verify QR library loaded successfully
    - Check canvas support
 
-2. **WebRTC connection failures**
+2. **QR scanning not working**
+   - Verify camera permissions
+   - Check if on HTTPS or localhost
+   - Verify jsQR fallback loaded
+   - Test with `test-qr-scan.html`
+
+3. **WebRTC connection failures**
    - Verify HTTPS/localhost usage
    - Check firewall settings
    - Verify browser permissions
 
-3. **Layout issues**
+4. **Layout issues**
    - Check CSS Grid support
    - Verify viewport meta tag
    - Test responsive design
@@ -176,13 +250,30 @@ Enable console logging for detailed error information:
 localStorage.setItem('debug', 'true');
 ```
 
+### Browser-Specific Issues
+
+#### Firefox
+- **QR Scanning**: Uses jsQR fallback (BarcodeDetector not supported)
+- **Camera Access**: Requires HTTPS or localhost
+- **WebRTC**: Full support with vendor prefixes
+
+#### Chrome
+- **QR Scanning**: Uses modern BarcodeDetector API
+- **Camera Access**: Full support
+- **WebRTC**: Full support
+
+#### Safari
+- **QR Scanning**: Uses jsQR fallback (BarcodeDetector limited support)
+- **Camera Access**: Full support
+- **WebRTC**: Full support
 ## Support
 
 For compatibility issues:
 1. Check browser console for errors
 2. Verify browser version support
-3. Test with `test-qr.html`
+3. Test with `test-qr.html` and `test-qr-scan.html`
 4. Review this compatibility guide
+5. Check browser-specific troubleshooting section
 
 ## Version History
 
@@ -190,3 +281,4 @@ For compatibility issues:
 - **v1.1**: Enhanced WebRTC support
 - **v1.2**: Added comprehensive error handling
 - **v1.3**: Improved CSS compatibility
+- **v1.4**: Added Firefox QR scanning support with jsQR fallback

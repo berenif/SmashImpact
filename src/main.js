@@ -5,6 +5,40 @@ import { Net } from './net/webrtc.js';
 import { world, R, SPEED, SCORE_TO_WIN, ROUND_TIME, TAG_COOLDOWN, me, them, role as roleRef, game, setRole, moveLocal, updateRemote, hostTick, broadcastState, applyState, resetForHostStart } from './game/state.js';
 import { drawQrToCanvas } from './ui/qr.js';
 
+// Cross-browser camera access compatibility
+function getUserMedia(constraints) {
+  const mediaDevices = navigator.mediaDevices || 
+                       navigator.getUserMedia || 
+                       navigator.webkitGetUserMedia || 
+                       navigator.mozGetUserMedia || 
+                       navigator.msGetUserMedia;
+  
+  if (mediaDevices && mediaDevices.getUserMedia) {
+    return mediaDevices.getUserMedia(constraints);
+  }
+  
+  // Fallback for older browsers
+  if (navigator.getUserMedia) {
+    return new Promise((resolve, reject) => {
+      navigator.getUserMedia(constraints, resolve, reject);
+    });
+  }
+  
+  if (navigator.webkitGetUserMedia) {
+    return new Promise((resolve, reject) => {
+      navigator.webkitGetUserMedia(constraints, resolve, reject);
+    });
+  }
+  
+  if (navigator.mozGetUserMedia) {
+    return new Promise((resolve, reject) => {
+      navigator.mozGetUserMedia(constraints, resolve, reject);
+    });
+  }
+  
+  throw new Error('Camera access not supported in this browser');
+}
+
 const hostState = el('hostState');
 const peerState = el('peerState');
 const statusEl = el('status');
@@ -119,12 +153,71 @@ chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') chatSend.cli
 let scanStream=null; let scanRunning=false; let detector=null;
 async function startScan(targetField){ try{
 		if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') { alert('Camera requires HTTPS or localhost. Use copy paste if not available.'); return; }
-		if (!('BarcodeDetector' in window)) { log('QR scan unsupported in this browser'); alert('QR scanning not supported here. Use copy paste instead.'); return; }
-		detector = new BarcodeDetector({ formats:['qr_code'] }); scanModal.classList.add('show');
-		scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false }); scanVideo.srcObject = scanStream; await scanVideo.play(); scanRunning=true;
-		const loop = async ()=>{ if(!scanRunning) return; try{ const codes = await detector.detect(scanVideo); if(codes && codes.length){ const raw = codes[0].rawValue || ''; if(raw){ targetField.value = raw; stopScan(); if (targetField === offerIn) { await applyOfferFromText(raw); } else if (targetField === answerIn) { await applyAnswerFromText(raw); } return; } } } catch (err) {} requestAnimationFrame(loop); };
-		requestAnimationFrame(loop);
-	}catch(e){ log('Camera error: ' + e.message); alert('Camera access failed. Check permissions.'); stopScan(); }
+		
+		// Try modern BarcodeDetector first, then fallback to jsQR
+		let useBarcodeDetector = false;
+		if ('BarcodeDetector' in window) {
+			try {
+				detector = new BarcodeDetector({ formats:['qr_code'] });
+				useBarcodeDetector = true;
+			} catch (e) {
+				console.warn('BarcodeDetector failed, using jsQR fallback');
+			}
+		}
+		
+		scanModal.classList.add('show');
+		
+		// Use cross-browser compatible camera access
+		scanStream = await getUserMedia({ video:{ facingMode:'environment' }, audio:false }); 
+		scanVideo.srcObject = scanStream; 
+		await scanVideo.play(); 
+		scanRunning=true;
+		
+		const loop = async ()=>{
+			if(!scanRunning) return; 
+			try{
+				let raw = '';
+				
+				if (useBarcodeDetector && detector) {
+					// Use modern BarcodeDetector
+					const codes = await detector.detect(scanVideo); 
+					if(codes && codes.length){ 
+						raw = codes[0].rawValue || ''; 
+					}
+				} else {
+					// Use jsQR fallback for Firefox and other browsers
+					const canvas = document.createElement('canvas');
+					const ctx = canvas.getContext('2d');
+					canvas.width = scanVideo.videoWidth;
+					canvas.height = scanVideo.videoHeight;
+			ctx.drawImage(scanVideo, 0, 0, canvas.width, canvas.height);
+			const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+			
+			if (window.jsQR) {
+				const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+				if (code) {
+					raw = code.data;
+				}
+			}
+		}
+		
+		if(raw){
+			targetField.value = raw; 
+			stopScan(); 
+			if (targetField === offerIn) { 
+				await applyOfferFromText(raw); 
+			} else if (targetField === answerIn) { 
+				await applyAnswerFromText(raw); 
+			} 
+			return; 
+		} 
+	} catch (err) {
+		console.warn('QR detection error:', err);
+	} 
+	requestAnimationFrame(loop); 
+};
+requestAnimationFrame(loop);
+}catch(e){ log('Camera error: ' + e.message); alert('Camera access failed. Check permissions.'); stopScan(); }
 }
 function stopScan(){ scanRunning=false; if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } scanModal.classList.remove('show'); }
 btnScanOffer.onclick  = () => startScan(offerIn);
@@ -142,6 +235,7 @@ btnRunTests.onclick = () => {
 	try { const tmp = document.createElement('canvas'); drawQrToCanvas(encodeForShare('hello'), tmp, 4); ok('drawQrToCanvas runs', tmp.width > 0); } catch(e){ ok('drawQrToCanvas runs', false); log('drawQrToCanvas error: '+e.message); }
 	ok('RTCPeerConnection present', !!window.RTCPeerConnection);
 	ok('BarcodeDetector present (optional)', 'BarcodeDetector' in window);
+	ok('jsQR fallback present (optional)', 'jsQR' in window);
 	ok('#btnQrOffer single element', document.querySelectorAll('#btnQrOffer').length === 1);
 	ok('#btnQrAnswer single element', document.querySelectorAll('#btnQrAnswer').length === 1);
 	try { const s='{"a":1}'; const enc=encodeForShare(s); const dec=decodeShared(enc); ok('Compression roundtrip', dec===s && enc.startsWith('z')); } catch(e){ ok('Compression roundtrip', false); }
