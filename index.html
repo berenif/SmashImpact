@@ -12,7 +12,7 @@
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     body { margin: 0; background:#0f1220; color:#e8ecff; display:grid; grid-template-columns: 360px 1fr; height: 100vh; }
     aside { border-right: 1px solid #2a2f4a; padding: 16px; overflow:auto; }
-    main { display:grid; grid-template-rows: auto 1fr; }
+    main { display:grid; grid-template-rows: auto 1fr; position:relative; }
     h1 { font-size: 18px; margin: 0 0 12px; }
     h2 { font-size: 15px; margin: 16px 0 8px; }
     .box { background:#151936; border:1px solid #2a2f4a; border-radius:12px; padding:12px; }
@@ -329,6 +329,38 @@
     @media (prefers-reduced-motion: reduce) {
       * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
+
+    /* Simple UI overlay */
+    .ui-container {
+      position:absolute;
+      inset:0;
+      z-index:10;
+      background:#fff;
+      color:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .ui-container .screen { display:none; width:100%; height:100%; }
+    .ui-container .screen.active { display:flex; }
+    .role-selection { display:flex; gap:40px; margin:auto; }
+    .role-box {
+      width:200px; height:200px; border:2px solid #000;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+    }
+    .host-layout, .player-layout { display:flex; width:100%; height:100%; }
+    .sidebar { width:120px; padding:20px; display:flex; flex-direction:column; gap:20px; }
+    .sidebar .label { font-weight:bold; }
+    .qr-toggle {
+      width:60px; height:60px; border:2px solid #000;
+      display:flex; align-items:center; justify-content:center;
+      text-align:center; font-size:12px; cursor:pointer;
+    }
+    .content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+    .wide-btn { width:60%; padding:20px; border:2px solid #000; background:#fff; text-align:center; }
+    .player-scan { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+    .scan-box { width:200px; height:200px; border:2px solid #000; }
   </style>
 </head>
 <body>
@@ -419,6 +451,58 @@
   </aside>
 
   <main>
+    <div id="uiContainer" class="ui-container">
+      <div id="screenSelect" class="screen active">
+        <div class="role-selection">
+          <div id="chooseHost" class="role-box">HOST</div>
+          <div id="choosePlayer" class="role-box">PLAYER</div>
+        </div>
+      </div>
+      <div id="screenHostWait" class="screen">
+        <div class="host-layout">
+          <div class="sidebar">
+            <div class="label">HOST</div>
+            <div id="hostQrBtn" class="qr-toggle">QR CODE<br>PRESS TO SHOW</div>
+          </div>
+          <div class="content">
+            <div class="wide-btn">YOU</div>
+            <div id="hostWaitBtn" class="wide-btn">WAITING FOR AN OTHER PLAYER</div>
+          </div>
+        </div>
+      </div>
+      <div id="screenHostScan" class="screen">
+        <div class="host-layout">
+          <div class="sidebar">
+            <div class="label">HOST</div>
+            <div class="qr-toggle">QR CODE</div>
+          </div>
+          <div class="content">
+            <div class="wide-btn">YOU</div>
+            <div id="hostScanBtn" class="wide-btn">SCAN PLAYER CODE</div>
+          </div>
+        </div>
+      </div>
+      <div id="screenPlayerScan" class="screen">
+        <div class="player-layout">
+          <div class="player-scan">
+            <div id="playerScanBox" class="scan-box"></div>
+            <div>SCAN HOST QR CODE</div>
+          </div>
+        </div>
+      </div>
+      <div id="screenPlayerReady" class="screen">
+        <div class="player-layout">
+          <div class="sidebar">
+            <div class="label">PLAYER</div>
+            <div id="playerShowQr" class="qr-toggle">QR CODE</div>
+          </div>
+          <div class="player-scan">
+            <div class="scan-box"></div>
+            <div>SCAN HOST QR CODE</div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="row" style="padding:10px; gap:16px; align-items:center; border-bottom:1px solid #2a2f4a;">
       <div>Game</div>
       <div class="small muted">You are <span id="meTag" class="tag">not joined</span>, move with WASD or arrows</div>
@@ -690,6 +774,25 @@ function loadModules() {
 
 // Start loading modules after a short delay to ensure everything is ready
 setTimeout(loadModules, 200);
+</script>
+<script>
+  (function() {
+    const screens = {
+      select: document.getElementById('screenSelect'),
+      hostWait: document.getElementById('screenHostWait'),
+      hostScan: document.getElementById('screenHostScan'),
+      playerScan: document.getElementById('screenPlayerScan'),
+      playerReady: document.getElementById('screenPlayerReady')
+    };
+    function show(name) {
+      Object.values(screens).forEach(s => s.classList.remove('active'));
+      screens[name].classList.add('active');
+    }
+    document.getElementById('chooseHost')?.addEventListener('click', () => show('hostWait'));
+    document.getElementById('choosePlayer')?.addEventListener('click', () => show('playerScan'));
+    document.getElementById('hostWaitBtn')?.addEventListener('click', () => show('hostScan'));
+    document.getElementById('playerScanBox')?.addEventListener('click', () => show('playerReady'));
+  })();
 </script>
 </body>
 </html>
