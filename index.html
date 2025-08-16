@@ -19,6 +19,7 @@
     textarea, input { width:100%; background:#0f1129; color:#e8ecff; border:1px solid #2a2f4a; border-radius:8px; padding:8px; }
     button { cursor:pointer; border:1px solid #2a2f4a; background:#1a1f3f; color:#e8ecff; border-radius:8px; padding:8px 10px; }
     button:disabled { opacity: .6; cursor: not-allowed; }
+    :focus-visible { outline:2px solid #00d084; outline-offset:2px; }
     .row { display:flex; gap:8px; align-items:center; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
     .small { font-size: 12px; opacity:.9; }
@@ -412,21 +413,21 @@
           <button id="btnQrAnswer" disabled>Show QR</button>
         </div>
         <div class="row">
-          <input id="answerOut" placeholder="Answer will appear here" readonly />
+          <input id="answerOut" placeholder="Answer will appear here" readonly aria-label="Generated answer" />
         </div>
         <div class="small muted" id="peerState">idle</div>
       </section>
 
       <section class="box">
         <h2>Status</h2>
-        <div class="small mono" id="status">Not connected</div>
+        <div class="small mono" id="status" aria-live="polite">Not connected</div>
         <div class="small mono" id="latency"></div>
       </section>
 
       <section class="box">
         <h2>Chat, debug</h2>
         <div class="row">
-          <input id="chatInput" placeholder="Type a message" />
+          <input id="chatInput" placeholder="Type a message" aria-label="Chat message" />
           <button id="chatSend" disabled>Send</button>
         </div>
         <pre id="log" class="small mono" style="white-space:pre-wrap"></pre>
