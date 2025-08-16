@@ -6,12 +6,16 @@ import { world, R, SPEED, SCORE_TO_WIN, ROUND_TIME, TAG_COOLDOWN, me, them, role
 import { drawQrToCanvas } from './ui/qr.js';
 
 // Cross-browser camera access compatibility
+function getMediaDevices() {
+  return navigator.mediaDevices ||
+         navigator.getUserMedia ||
+         navigator.webkitGetUserMedia ||
+         navigator.mozGetUserMedia ||
+         navigator.msGetUserMedia;
+}
+
 function getUserMedia(constraints) {
-  const mediaDevices = navigator.mediaDevices || 
-                       navigator.getUserMedia || 
-                       navigator.webkitGetUserMedia || 
-                       navigator.mozGetUserMedia || 
-                       navigator.msGetUserMedia;
+  const mediaDevices = getMediaDevices();
   
   if (mediaDevices && mediaDevices.getUserMedia) {
     return mediaDevices.getUserMedia(constraints);
