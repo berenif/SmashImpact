@@ -9,20 +9,22 @@ export function drawQrToCanvas(text, canvas, scale) {
 		const qr = window.qrcode(0, 'L');
 		qr.addData(text);
 		qr.make();
-		const count = qr.getModuleCount();
-		const size = count * scale;
-		canvas.width = canvas.height = Math.max(240, size);
-		
-		const ctx = canvas.getContext('2d');
-		if (!ctx) {
-			throw new Error('Canvas 2D context not available');
-		}
-		
-		// Clear canvas with white background
-		ctx.fillStyle = '#fff';
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
-		
-		const offset = Math.floor((canvas.width - size) / 2);
+                const count = qr.getModuleCount();
+                const qrSize = count * scale;
+                const margin = 4 * scale; // ensure quiet zone for scanners
+                const canvasSize = Math.max(240, qrSize + margin * 2);
+                canvas.width = canvas.height = canvasSize;
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                        throw new Error('Canvas 2D context not available');
+                }
+
+                // Clear canvas with white background
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const offset = Math.floor((canvas.width - qrSize) / 2);
 		
 		// Draw QR code
 		for (let r = 0; r < count; r++) {
