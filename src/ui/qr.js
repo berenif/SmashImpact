@@ -34,19 +34,14 @@ export function drawQrToCanvas(text, canvas, scale) {
 			}
 		}
 	} catch (error) {
-		console.error('QR generation failed:', error);
-		
-		// Fallback: draw a simple error pattern
-		canvas.width = canvas.height = 240;
-		const ctx = canvas.getContext('2d');
-		if (ctx) {
-			ctx.fillStyle = '#f0f0f0';
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
-			ctx.fillStyle = '#666';
-			ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
-			ctx.textAlign = 'center';
-			ctx.fillText('QR Code Error', canvas.width / 2, canvas.height / 2 - 10);
-			ctx.fillText('Text: ' + (text ? text.substring(0, 20) + '...' : 'empty'), canvas.width / 2, canvas.height / 2 + 10);
-		}
+                console.error('QR generation failed:', error);
+
+                // Clear to blank canvas so scanners do not misread errors as codes
+                canvas.width = canvas.height = 240;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
 	}
 }
