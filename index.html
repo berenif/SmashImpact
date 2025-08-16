@@ -349,6 +349,8 @@
       width:200px; height:200px; border:2px solid #000;
       display:flex; align-items:center; justify-content:center;
       cursor:pointer;
+      background:#fff;
+      font: inherit;
     }
     .host-layout, .player-layout { display:flex; width:100%; height:100%; }
     .sidebar { width:120px; padding:20px; display:flex; flex-direction:column; gap:20px; }
@@ -357,6 +359,8 @@
       width:60px; height:60px; border:2px solid #000;
       display:flex; align-items:center; justify-content:center;
       text-align:center; font-size:12px; cursor:pointer;
+      background:#fff;
+      font: inherit;
     }
     .content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
     .wide-btn { width:60%; padding:20px; border:2px solid #000; background:#fff; text-align:center; }
@@ -365,7 +369,8 @@
   </style>
 </head>
 <body>
-  <aside>
+  <a href="#mainContent" class="skip-link">Skip to main content</a>
+  <aside aria-label="Connection controls">
     <h1>P2P over LAN, pure browser</h1>
     <div class="small muted box" style="margin-bottom:10px">
       Two roles. Host creates an offer, peer pastes it and returns an answer. No server, copy paste or QR only. Same Wi‑Fi is ideal.
@@ -383,6 +388,7 @@
           <button id="btnQrOffer" disabled>Show QR</button>
         </div>
         <div class="row">
+          <label for="offerOut" class="sr-only">Generated offer</label>
           <input id="offerOut" placeholder="Offer will appear here" readonly />
         </div>
         <div class="row">
@@ -390,9 +396,10 @@
           <button id="btnScanAnswer" disabled>Scan Answer</button>
         </div>
         <div class="row">
+          <label for="answerIn" class="sr-only">Answer from peer</label>
           <input id="answerIn" placeholder="Paste or scan answer here" />
         </div>
-        <div class="small muted" id="hostState">idle</div>
+        <div class="small muted" id="hostState" aria-live="polite">idle</div>
       </section>
 
       <section class="box">
@@ -402,6 +409,7 @@
           <button id="btnScanHost">📱 Scan Host</button>
         </div>
         <div class="row">
+          <label for="offerIn" class="sr-only">Offer from host</label>
           <input id="offerIn" placeholder="Paste or scan offer here" />
         </div>
         <div class="row">
@@ -413,21 +421,18 @@
           <button id="btnQrAnswer" disabled>Show QR</button>
         </div>
         <div class="row">
-          <input id="answerOut" placeholder="Answer will appear here" readonly aria-label="Generated answer" />
         </div>
-        <div class="small muted" id="peerState">idle</div>
+        <div class="small muted" id="peerState" aria-live="polite">idle</div>
       </section>
 
       <section class="box">
         <h2>Status</h2>
-        <div class="small mono" id="status" aria-live="polite">Not connected</div>
         <div class="small mono" id="latency"></div>
       </section>
 
       <section class="box">
         <h2>Chat, debug</h2>
         <div class="row">
-          <input id="chatInput" placeholder="Type a message" aria-label="Chat message" />
           <button id="chatSend" disabled>Send</button>
         </div>
         <pre id="log" class="small mono" style="white-space:pre-wrap"></pre>
@@ -451,55 +456,56 @@
     </div>
   </aside>
 
-  <main>
+  <main id="mainContent">
     <div id="uiContainer" class="ui-container">
       <div id="screenSelect" class="screen active">
+        <h2>Choose your role</h2>
         <div class="role-selection">
-          <div id="chooseHost" class="role-box">HOST</div>
-          <div id="choosePlayer" class="role-box">PLAYER</div>
+          <button id="chooseHost" class="role-box">Host</button>
+          <button id="choosePlayer" class="role-box">Player</button>
         </div>
       </div>
       <div id="screenHostWait" class="screen">
         <div class="host-layout">
           <div class="sidebar">
-            <div class="label">HOST</div>
-            <div id="hostQrBtn" class="qr-toggle">QR CODE<br>PRESS TO SHOW</div>
+            <div class="label">Host</div>
+            <button id="hostQrBtn" class="qr-toggle" aria-label="Show QR code">QR CODE</button>
           </div>
           <div class="content">
-            <div class="wide-btn">YOU</div>
-            <div id="hostWaitBtn" class="wide-btn">WAITING FOR AN OTHER PLAYER</div>
+            <p class="wide-btn">You</p>
+            <p id="hostStatus" class="wide-btn" role="status" aria-live="polite">Waiting for another player</p>
           </div>
         </div>
       </div>
       <div id="screenHostScan" class="screen">
         <div class="host-layout">
           <div class="sidebar">
-            <div class="label">HOST</div>
-            <div class="qr-toggle">QR CODE</div>
+            <div class="label">Host</div>
+            <button class="qr-toggle" disabled aria-disabled="true">QR CODE</button>
           </div>
           <div class="content">
-            <div class="wide-btn">YOU</div>
-            <div id="hostScanBtn" class="wide-btn">SCAN PLAYER CODE</div>
+            <p class="wide-btn">You</p>
+            <button id="hostScanBtn" class="wide-btn">Scan player code</button>
           </div>
         </div>
       </div>
       <div id="screenPlayerScan" class="screen">
         <div class="player-layout">
           <div class="player-scan">
-            <div id="playerScanBox" class="scan-box"></div>
-            <div>SCAN HOST QR CODE</div>
+            <div id="playerScanBox" class="scan-box" role="img" aria-label="Camera view for scanning"></div>
+            <p id="playerScanStatus" role="status" aria-live="polite">Scan host QR code</p>
           </div>
         </div>
       </div>
       <div id="screenPlayerReady" class="screen">
         <div class="player-layout">
           <div class="sidebar">
-            <div class="label">PLAYER</div>
-            <div id="playerShowQr" class="qr-toggle">QR CODE</div>
+            <div class="label">Player</div>
+            <button id="playerShowQr" class="qr-toggle" aria-label="Show your QR code">QR CODE</button>
           </div>
           <div class="player-scan">
-            <div class="scan-box"></div>
-            <div>SCAN HOST QR CODE</div>
+            <div class="scan-box" role="img" aria-label="Your QR code"></div>
+            <p role="status" aria-live="polite">Show this code to the host</p>
           </div>
         </div>
       </div>
@@ -512,11 +518,11 @@
         <button id="btnResetGame" disabled>Reset</button>
       </div>
     </div>
-    <canvas id="game"></canvas>
+      <canvas id="game" role="img" aria-label="Game area"></canvas>
 
     <div id="qrModal" class="qr-modal">
       <div class="qr-card">
-        <canvas id="qrCanvas" width="360" height="360"></canvas>
+          <canvas id="qrCanvas" width="360" height="360" role="img" aria-label="Connection QR code"></canvas>
         <div class="row qr-hint" style="justify-content:space-between">
           <span class="small muted">Scan with your camera, copy the text</span>
           <button id="qrClose">Close</button>
@@ -557,7 +563,7 @@
           <!-- Offer QR Section -->
           <div class="offer-section">
             <h4>Your Offer QR</h4>
-            <canvas id="quickConnectOfferQR" width="200" height="200"></canvas>
+              <canvas id="quickConnectOfferQR" width="200" height="200" role="img" aria-label="Offer QR code"></canvas>
           </div>
           
           <!-- Answer Scanning Section -->
@@ -629,19 +635,6 @@
 // Ensure QR library is loaded before proceeding
 if (typeof window.qrcode !== 'function') {
   console.error('QR library failed to load');
-  // Fallback QR implementation
-  window.qrcode = function(typeNumber, errorCorrectLevel) {
-    console.warn('Using fallback QR implementation');
-    return {
-      addData: function(data) { this.data = data; },
-      make: function() { this.made = true; },
-      getModuleCount: function() { return 21; },
-      isDark: function(row, col) { 
-        // Simple fallback pattern
-        return (row + col) % 2 === 0; 
-      }
-    };
-  };
 }
 
 // Cross-browser camera access compatibility
