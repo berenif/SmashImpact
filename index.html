@@ -9,27 +9,63 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>P2P LAN Webapp - Playable Tag</title>
   <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    body { margin: 0; background:#0f1220; color:#e8ecff; display:grid; grid-template-columns: 360px 1fr; height: 100vh; }
-    aside { border-right: 1px solid #2a2f4a; padding: 16px; overflow:auto; }
+    :root {
+      --color-bg: #0f1220;
+      --color-surface: #151936;
+      --color-border: #2a2f4a;
+      --color-text: #e8ecff;
+      --color-button-bg: #1a1f3f;
+      --color-focus: #00d084;
+      --color-ui-bg: #ffffff;
+      --color-ui-text: #000000;
+      --color-ui-border: #000000;
+      --space-1: 8px;
+      --space-2: 16px;
+      --space-3: 20px;
+      --space-4: 40px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    body { margin: 0; background:var(--color-bg); color:var(--color-text); display:grid; grid-template-columns: 360px 1fr; height: 100vh; }
+    aside { border-right: 1px solid var(--color-border); padding: var(--space-2); overflow:auto; }
     main { display:grid; grid-template-rows: auto 1fr; position:relative; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    h2 { font-size: 15px; margin: 16px 0 8px; }
-    .box { background:#151936; border:1px solid #2a2f4a; border-radius:12px; padding:12px; }
-    textarea, input { width:100%; background:#0f1129; color:#e8ecff; border:1px solid #2a2f4a; border-radius:8px; padding:8px; }
-    button { cursor:pointer; border:1px solid #2a2f4a; background:#1a1f3f; color:#e8ecff; border-radius:8px; padding:8px 10px; }
+    h1 { font-size: 18px; margin: 0 0 var(--space-2); }
+    h2 { font-size: 15px; margin: var(--space-2) 0 var(--space-1); }
+    .box { background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:var(--space-2); }
+    textarea, input { width:100%; background:#0f1129; color:var(--color-text); border:1px solid var(--color-border); border-radius:8px; padding:var(--space-1); }
+    button { cursor:pointer; border:1px solid var(--color-border); background:var(--color-button-bg); color:var(--color-text); border-radius:8px; padding:var(--space-1) var(--space-2); }
     button:disabled { opacity: .6; cursor: not-allowed; }
-    :focus-visible { outline:2px solid #00d084; outline-offset:2px; }
-    .row { display:flex; gap:8px; align-items:center; }
+    :focus-visible { outline:2px solid var(--color-focus); outline-offset:2px; }
+    .row { display:flex; gap:var(--space-1); align-items:center; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
     .small { font-size: 12px; opacity:.9; }
+    .sr-only {
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0 0 0 0);
+      white-space:nowrap;
+      border:0;
+    }
     canvas { width:100%; height:100%; background:#0b0e1a; display:block; }
-    .tag { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #2a2f4a; background:#121630; font-size:12px; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--color-border); background:#121630; font-size:12px; }
     .ok { color:#00d084; }
     .warn { color:#ffc24b; }
     .bad { color:#ff4d4f; }
     .muted { color:#aab2ff; }
-    .grid { display:grid; gap:10px; }
+    .grid { display:grid; gap:var(--space-1); }
+    .skip-link {
+      position:absolute;
+      left:var(--space-2);
+      top:-40px;
+      background:var(--color-button-bg);
+      color:var(--color-text);
+      padding:var(--space-1) var(--space-2);
+      z-index:100;
+    }
+    .skip-link:focus { top:var(--space-2); }
     .qr-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:50}
     .qr-modal.show{display:flex}
     .qr-card{background:#fff;border-radius:12px;padding:20px;max-width:400px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.3)}
@@ -336,36 +372,50 @@
       position:absolute;
       inset:0;
       z-index:10;
-      background:#fff;
-      color:#000;
+      background:var(--color-ui-bg);
+      color:var(--color-ui-text);
       display:flex;
       align-items:center;
       justify-content:center;
     }
     .ui-container .screen { display:none; width:100%; height:100%; }
     .ui-container .screen.active { display:flex; }
-    .role-selection { display:flex; gap:40px; margin:auto; }
+    .role-selection {
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-3);
+      margin:auto;
+      width:100%;
+      max-width:420px;
+    }
     .role-box {
-      width:200px; height:200px; border:2px solid #000;
+      width:100%;
+      max-width:200px;
+      height:200px;
+      border:2px solid var(--color-ui-border);
       display:flex; align-items:center; justify-content:center;
       cursor:pointer;
-      background:#fff;
+      background:var(--color-ui-bg);
       font: inherit;
+    }
+    @media (min-width:600px) {
+      .role-selection { flex-direction:row; }
+      .role-box { width:200px; }
     }
     .host-layout, .player-layout { display:flex; width:100%; height:100%; }
-    .sidebar { width:120px; padding:20px; display:flex; flex-direction:column; gap:20px; }
+    .sidebar { width:120px; padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3); }
     .sidebar .label { font-weight:bold; }
     .qr-toggle {
-      width:60px; height:60px; border:2px solid #000;
+      width:60px; height:60px; border:2px solid var(--color-ui-border);
       display:flex; align-items:center; justify-content:center;
       text-align:center; font-size:12px; cursor:pointer;
-      background:#fff;
+      background:var(--color-ui-bg);
       font: inherit;
     }
-    .content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
-    .wide-btn { width:60%; padding:20px; border:2px solid #000; background:#fff; text-align:center; }
-    .player-scan { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
-    .scan-box { width:200px; height:200px; border:2px solid #000; }
+    .content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-3); }
+    .wide-btn { width:60%; padding:var(--space-3); border:2px solid var(--color-ui-border); background:var(--color-ui-bg); text-align:center; }
+    .player-scan { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-3); }
+    .scan-box { width:200px; height:200px; border:2px solid var(--color-ui-border); }
   </style>
 </head>
 <body>
@@ -380,20 +430,20 @@
       <section class="box">
         <h2>Host (create offer)</h2>
         <div class="row">
-          <button id="btnHostStart">Create Offer</button>
-          <button id="btnQuickConnect">🚀 Quick Connect</button>
+          <button id="btnHostStart" type="button">Create Offer</button>
+          <button id="btnQuickConnect" type="button">🚀 Quick Connect</button>
         </div>
         <div class="row">
-          <button id="btnCopyOffer" disabled>Copy</button>
-          <button id="btnQrOffer" disabled>Show QR</button>
+          <button id="btnCopyOffer" type="button" disabled>Copy</button>
+          <button id="btnQrOffer" type="button" disabled>Show QR</button>
         </div>
         <div class="row">
           <label for="offerOut" class="sr-only">Generated offer</label>
           <input id="offerOut" placeholder="Offer will appear here" readonly />
         </div>
         <div class="row">
-          <button id="btnApplyAnswer" disabled>Apply Answer</button>
-          <button id="btnScanAnswer" disabled>Scan Answer</button>
+          <button id="btnApplyAnswer" type="button" disabled>Apply Answer</button>
+          <button id="btnScanAnswer" type="button" disabled>Scan Answer</button>
         </div>
         <div class="row">
           <label for="answerIn" class="sr-only">Answer from peer</label>
@@ -405,20 +455,20 @@
       <section class="box">
         <h2>Peer (join offer)</h2>
         <div class="row">
-          <button id="btnPeerStart">Ready to Join</button>
-          <button id="btnScanHost">📱 Scan Host</button>
+          <button id="btnPeerStart" type="button">Ready to Join</button>
+          <button id="btnScanHost" type="button">📱 Scan Host</button>
         </div>
         <div class="row">
           <label for="offerIn" class="sr-only">Offer from host</label>
           <input id="offerIn" placeholder="Paste or scan offer here" />
         </div>
         <div class="row">
-          <button id="btnApplyOffer" disabled>Apply Offer</button>
-          <button id="btnScanOffer" disabled>Scan Offer</button>
+          <button id="btnApplyOffer" type="button" disabled>Apply Offer</button>
+          <button id="btnScanOffer" type="button" disabled>Scan Offer</button>
         </div>
         <div class="row">
-          <button id="btnCopyAnswer" disabled>Copy</button>
-          <button id="btnQrAnswer" disabled>Show QR</button>
+          <button id="btnCopyAnswer" type="button" disabled>Copy</button>
+          <button id="btnQrAnswer" type="button" disabled>Show QR</button>
         </div>
         <div class="row">
         </div>
@@ -433,7 +483,7 @@
       <section class="box">
         <h2>Chat, debug</h2>
         <div class="row">
-          <button id="chatSend" disabled>Send</button>
+          <button id="chatSend" type="button" disabled>Send</button>
         </div>
         <pre id="log" class="small mono" style="white-space:pre-wrap"></pre>
       </section>
@@ -441,8 +491,8 @@
       <section class="box">
         <h2>Diagnostics</h2>
         <div class="row">
-          <button id="btnRunTests">Run checks</button>
-          <button id="btnTestScan">Test Scan Setup</button>
+          <button id="btnRunTests" type="button">Run checks</button>
+          <button id="btnTestScan" type="button">Test Scan Setup</button>
           <span class="small muted">Quick sanity tests log below</span>
         </div>
       </section>
@@ -456,20 +506,20 @@
     </div>
   </aside>
 
-  <main id="mainContent">
+  <main id="mainContent" role="main" tabindex="-1">
     <div id="uiContainer" class="ui-container">
       <div id="screenSelect" class="screen active">
-        <h2>Choose your role</h2>
-        <div class="role-selection">
-          <button id="chooseHost" class="role-box">Host</button>
-          <button id="choosePlayer" class="role-box">Player</button>
+        <h2 id="roleHeading">Choose your role</h2>
+        <div class="role-selection" role="group" aria-labelledby="roleHeading">
+          <button id="chooseHost" class="role-box" type="button" aria-label="Host a new game">Host</button>
+          <button id="choosePlayer" class="role-box" type="button" aria-label="Join as a player">Player</button>
         </div>
       </div>
       <div id="screenHostWait" class="screen">
         <div class="host-layout">
           <div class="sidebar">
             <div class="label">Host</div>
-            <button id="hostQrBtn" class="qr-toggle" aria-label="Show QR code">QR CODE</button>
+            <button id="hostQrBtn" class="qr-toggle" type="button" aria-label="Show QR code">QR CODE</button>
           </div>
           <div class="content">
             <p class="wide-btn">You</p>
@@ -481,11 +531,11 @@
         <div class="host-layout">
           <div class="sidebar">
             <div class="label">Host</div>
-            <button class="qr-toggle" disabled aria-disabled="true">QR CODE</button>
+            <button class="qr-toggle" type="button" disabled aria-disabled="true" aria-label="QR code unavailable">QR CODE</button>
           </div>
           <div class="content">
             <p class="wide-btn">You</p>
-            <button id="hostScanBtn" class="wide-btn">Scan player code</button>
+            <button id="hostScanBtn" class="wide-btn" type="button" aria-label="Scan the player's code">Scan player code</button>
           </div>
         </div>
       </div>
@@ -501,7 +551,7 @@
         <div class="player-layout">
           <div class="sidebar">
             <div class="label">Player</div>
-            <button id="playerShowQr" class="qr-toggle" aria-label="Show your QR code">QR CODE</button>
+            <button id="playerShowQr" class="qr-toggle" type="button" aria-label="Show your QR code">QR CODE</button>
           </div>
           <div class="player-scan">
             <div class="scan-box" role="img" aria-label="Your QR code"></div>
@@ -514,8 +564,8 @@
       <div>Game</div>
       <div class="small muted">You are <span id="meTag" class="tag">not joined</span>, move with WASD or arrows</div>
       <div class="row" style="margin-left:auto; gap:8px">
-        <button id="btnStartGame" disabled>Start</button>
-        <button id="btnResetGame" disabled>Reset</button>
+        <button id="btnStartGame" type="button" disabled>Start</button>
+        <button id="btnResetGame" type="button" disabled>Reset</button>
       </div>
     </div>
       <canvas id="game" role="img" aria-label="Game area"></canvas>
@@ -525,7 +575,7 @@
           <canvas id="qrCanvas" width="360" height="360" role="img" aria-label="Connection QR code"></canvas>
         <div class="row qr-hint" style="justify-content:space-between">
           <span class="small muted">Scan with your camera, copy the text</span>
-          <button id="qrClose">Close</button>
+          <button id="qrClose" type="button">Close</button>
         </div>
       </div>
     </div>
@@ -546,7 +596,7 @@
         </div>
         <div class="row qr-hint" style="justify-content:space-between">
           <span class="small muted">Point at QR. It will auto-fill.</span>
-          <button id="scanClose">Close</button>
+          <button id="scanClose" type="button">Close</button>
         </div>
       </div>
     </div>
@@ -606,7 +656,7 @@
         
         <div class="row qr-hint" style="justify-content:space-between">
           <span class="small muted">Connection will be established automatically</span>
-          <button id="quickConnectClose">Cancel</button>
+          <button id="quickConnectClose" type="button">Cancel</button>
         </div>
       </div>
     </div>
@@ -616,11 +666,11 @@
       <div class="qr-card" style="text-align:center">
         <h2>Select Role</h2>
         <div class="row" style="justify-content:center; gap:16px;">
-          <button id="chooseHost">Host</button>
-          <button id="choosePlayer">Player</button>
+          <button id="chooseHostModal" type="button" aria-label="Host a new game">Host</button>
+          <button id="choosePlayerModal" type="button" aria-label="Join as a player">Player</button>
         </div>
         <div class="row" style="justify-content:center; margin-top:16px;">
-          <button id="btnQuickConnectFromRole">🚀 Quick Connect</button>
+          <button id="btnQuickConnectFromRole" type="button">🚀 Quick Connect</button>
         </div>
       </div>
     </div>
@@ -753,6 +803,8 @@ setTimeout(loadModules, 200);
     }
     document.getElementById('chooseHost')?.addEventListener('click', () => show('hostWait'));
     document.getElementById('choosePlayer')?.addEventListener('click', () => show('playerScan'));
+    document.getElementById('chooseHostModal')?.addEventListener('click', () => show('hostWait'));
+    document.getElementById('choosePlayerModal')?.addEventListener('click', () => show('playerScan'));
     document.getElementById('hostWaitBtn')?.addEventListener('click', () => show('hostScan'));
     document.getElementById('playerScanBox')?.addEventListener('click', () => show('playerReady'));
   })();
