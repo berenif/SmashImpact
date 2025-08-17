@@ -521,6 +521,9 @@
     </div>
   </div>
 
+  <!-- Multiplayer synchronization -->
+  <script src="game-multiplayer.js"></script>
+  
   <script type="module">
     // Mobile joystick controller
     class JoystickController {
@@ -714,7 +717,17 @@
         this.running = false;
         this.paused = false;
         
-        // Game state
+        // Check for multiplayer
+        this.isMultiplayer = sessionStorage.getItem('p2pConnected') === 'true';
+        this.multiplayer = null;
+        
+        if (this.isMultiplayer) {
+          // Initialize multiplayer synchronization
+          this.multiplayer = new window.MultiplayerGame();
+          this.setupMultiplayer();
+        }
+        
+        // Game state (will be overridden by multiplayer if connected)
         this.player = {
           x: 0,
           y: 0,
@@ -747,6 +760,59 @@
         this.fpsTime = 0;
         
         this.init();
+      }
+
+      setupMultiplayer() {
+        // Set up callbacks
+        this.multiplayer.onAttack = () => {
+          // Visual feedback for attack
+          this.showAttackEffect();
+        };
+        
+        this.multiplayer.onHit = () => {
+          // Visual feedback for being hit
+          if ('vibrate' in navigator) {
+            navigator.vibrate([50, 20, 50]);
+          }
+        };
+        
+        this.multiplayer.onScoreChange = () => {
+          // Update score display
+          this.updateScoreDisplay();
+        };
+        
+        // Try to get connection from window (if passed from p2p-connect)
+        if (window.gameConnection) {
+          this.multiplayer.setConnection(
+            window.gameConnection.pc,
+            window.gameConnection.dataChannel
+          );
+        }
+      }
+
+      showAttackEffect() {
+        // Visual attack effect (will be rendered in next frame)
+        this.attackEffect = {
+          x: this.player.x,
+          y: this.player.y,
+          radius: 50,
+          alpha: 1
+        };
+      }
+
+      updateScoreDisplay() {
+        if (this.multiplayer) {
+          const state = this.multiplayer.getGameState();
+          const myRole = this.multiplayer.role;
+          
+          if (myRole === 'host') {
+            document.getElementById('scoreYou').textContent = state.players.host.score;
+            document.getElementById('scoreThem').textContent = state.players.player.score;
+          } else {
+            document.getElementById('scoreYou').textContent = state.players.player.score;
+            document.getElementById('scoreThem').textContent = state.players.host.score;
+          }
+        }
       }
 
       init() {
@@ -918,17 +984,46 @@
           }
         }
         
-        // Apply movement
-        const speed = this.player.boosting ? this.player.speed * 2 : this.player.speed;
-        this.player.vx = inputX * speed;
-        this.player.vy = inputY * speed;
-        
-        this.player.x += this.player.vx;
-        this.player.y += this.player.vy;
-        
-        // Keep player in bounds
-        this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
-        this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+        if (this.isMultiplayer && this.multiplayer) {
+          // Update multiplayer input
+          const boost = this.buttons.boost ? this.buttons.boost.isPressed() : false;
+          const attack = this.buttons.attack ? this.buttons.attack.isPressed() : false;
+          
+          this.multiplayer.updateLocalInput(inputX, inputY, boost, attack);
+          this.multiplayer.updateLocalPosition(deltaTime);
+          
+          // Get synced game state
+          const gameState = this.multiplayer.getGameState();
+          const myRole = this.multiplayer.role;
+          
+          // Update local references
+          if (myRole === 'host') {
+            this.player = gameState.players.host;
+            this.enemy = gameState.players.player;
+          } else {
+            this.player = gameState.players.player;
+            this.enemy = gameState.players.host;
+          }
+          
+          // Update latency display
+          const latency = this.multiplayer.getLatency();
+          const latencyEl = document.getElementById('connectionText');
+          if (latencyEl) {
+            latencyEl.textContent = `Connected (${latency}ms)`;
+          }
+        } else {
+          // Single player movement
+          const speed = this.player.boosting ? this.player.speed * 2 : this.player.speed;
+          this.player.vx = inputX * speed;
+          this.player.vy = inputY * speed;
+          
+          this.player.x += this.player.vx;
+          this.player.y += this.player.vy;
+          
+          // Keep player in bounds
+          this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
+          this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+        }
         
         // Simple enemy AI
         const enemySpeed = 2;
@@ -973,23 +1068,60 @@
           this.ctx.stroke();
         }
         
-        // Draw enemy
-        this.ctx.fillStyle = this.enemy.color;
-        this.ctx.beginPath();
-        this.ctx.arc(this.enemy.x, this.enemy.y, this.enemy.radius, 0, Math.PI * 2);
-        this.ctx.fill();
+        // Draw attack effect if active
+        if (this.attackEffect && this.attackEffect.alpha > 0) {
+          this.ctx.strokeStyle = `rgba(34, 211, 238, ${this.attackEffect.alpha})`;
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.arc(this.attackEffect.x, this.attackEffect.y, this.attackEffect.radius, 0, Math.PI * 2);
+          this.ctx.stroke();
+          
+          // Fade out
+          this.attackEffect.alpha -= 0.05;
+          this.attackEffect.radius += 2;
+        }
+        
+        // Draw enemy/other player
+        if (this.enemy) {
+          this.ctx.fillStyle = this.enemy.color || '#ef4444';
+          if (this.enemy.boosting) {
+            this.ctx.shadowBlur = 20;
+            this.ctx.shadowColor = this.enemy.color || '#ef4444';
+          }
+          this.ctx.beginPath();
+          this.ctx.arc(this.enemy.x, this.enemy.y, this.enemy.radius, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.shadowBlur = 0;
+          
+          // Draw name tag for multiplayer
+          if (this.isMultiplayer) {
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.font = '12px sans-serif';
+            this.ctx.textAlign = 'center';
+            const enemyName = this.multiplayer.role === 'host' ? 'Player' : 'Host';
+            this.ctx.fillText(enemyName, this.enemy.x, this.enemy.y - this.enemy.radius - 10);
+          }
+        }
         
         // Draw player
-        this.ctx.fillStyle = this.player.color;
+        this.ctx.fillStyle = this.player.color || '#6366f1';
         if (this.player.boosting) {
           // Boost effect
           this.ctx.shadowBlur = 20;
-          this.ctx.shadowColor = this.player.color;
+          this.ctx.shadowColor = this.player.color || '#6366f1';
         }
         this.ctx.beginPath();
         this.ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.shadowBlur = 0;
+        
+        // Draw name tag for multiplayer
+        if (this.isMultiplayer) {
+          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          this.ctx.font = '12px sans-serif';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('You', this.player.x, this.player.y - this.player.radius - 10);
+        }
         
         // Draw player direction indicator
         if (Math.abs(this.player.vx) > 0.1 || Math.abs(this.player.vy) > 0.1) {

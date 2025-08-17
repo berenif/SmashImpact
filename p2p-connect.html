@@ -1609,6 +1609,16 @@
         case 'gameStart':
           // Player receives game start command from host
           if (currentRole === 'player') {
+            // Store connection for game to use
+            sessionStorage.setItem('webrtcConnected', 'true');
+            
+            // Store connection objects globally
+            window.gameConnection = {
+              pc: pc,
+              dataChannel: dataChannel,
+              role: currentRole
+            };
+            
             showStatus('Game starting!', 'success');
             setTimeout(() => {
               window.location.href = 'game-mobile.html';
@@ -1770,6 +1780,16 @@
         showStatus('Connection not ready', 'error');
         return;
       }
+      
+      // Store connection in session for game to use
+      sessionStorage.setItem('webrtcConnected', 'true');
+      
+      // Store connection objects globally for the game to access
+      window.gameConnection = {
+        pc: pc,
+        dataChannel: dataChannel,
+        role: currentRole
+      };
       
       // Send game start signal to player
       dataChannel.send(JSON.stringify({ 
