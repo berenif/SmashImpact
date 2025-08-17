@@ -25,7 +25,11 @@
       --space-4: 40px;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
     }
-    body { margin: 0; background:var(--color-bg); color:var(--color-text); display:grid; grid-template-columns: 360px 1fr; height: 100vh; }
+    body { margin: 0; background:var(--color-bg); color:var(--color-text); display:grid; grid-template-columns: 360px 1fr; height: 100vh; transition: all 0.3s ease; }
+    body.game-only { grid-template-columns: 0 1fr; }
+    body.game-only aside { display: none; }
+    body.game-only .game-header { display: flex; }
+    body.game-only .connection-ui { display: none; }
     aside { border-right: 1px solid var(--color-border); padding: var(--space-2); overflow:auto; }
     main { display:grid; grid-template-rows: auto 1fr; position:relative; }
     h1 { font-size: 18px; margin: 0 0 var(--space-2); }
@@ -50,6 +54,72 @@
       border:0;
     }
     canvas { width:100%; height:100%; background:#0b0e1a; display:block; }
+    
+    /* Game header styles */
+    .game-header {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 18, 32, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-2);
+      z-index: 100;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .game-header .left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .game-header .right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .game-score {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .score-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+    
+    .score-item .label {
+      font-size: 12px;
+      opacity: 0.7;
+      text-transform: uppercase;
+    }
+    
+    .toggle-ui-btn {
+      padding: 6px 12px;
+      background: var(--color-button-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      color: var(--color-text);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .toggle-ui-btn:hover {
+      background: var(--color-surface);
+    }
+    
+    body.game-only main {
+      padding-top: 60px;
+    }
     .tag { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--color-border); background:#121630; font-size:12px; }
     .ok { color:#00d084; }
     .warn { color:#ffc24b; }
@@ -420,7 +490,33 @@
 </head>
 <body>
   <a href="#mainContent" class="skip-link">Skip to main content</a>
-  <aside aria-label="Connection controls">
+  
+  <!-- Game-only header (hidden by default) -->
+  <div class="game-header">
+    <div class="left">
+      <div class="game-score">
+        <div class="score-item">
+          <span class="label">You</span>
+          <span id="gameScoreMe">0</span>
+        </div>
+        <div class="score-item">
+          <span class="label">vs</span>
+        </div>
+        <div class="score-item">
+          <span class="label">Them</span>
+          <span id="gameScoreThem">0</span>
+        </div>
+      </div>
+      <div class="tag ok" id="gameStatus">Connected</div>
+    </div>
+    <div class="right">
+      <span class="tag" id="gameTimer">00:00</span>
+      <span class="tag muted" id="gameLatency">0ms</span>
+      <button class="toggle-ui-btn" onclick="toggleGameMode()">Show Controls</button>
+    </div>
+  </div>
+  
+  <aside aria-label="Connection controls" class="connection-ui">
     <h1>P2P over LAN, pure browser</h1>
     <div class="small muted box" style="margin-bottom:10px">
       Two roles. Host creates an offer, peer pastes it and returns an answer. No server, copy paste or QR only. Same Wi‑Fi is ideal.
@@ -789,6 +885,98 @@ function loadModules() {
 setTimeout(loadModules, 200);
 </script>
 <script>
+  // Game mode toggle functions
+  window.toggleGameMode = function() {
+    document.body.classList.toggle('game-only');
+    const btn = document.querySelector('.toggle-ui-btn');
+    if (document.body.classList.contains('game-only')) {
+      btn.textContent = 'Show Controls';
+    } else {
+      btn.textContent = 'Hide Controls';
+    }
+  };
+  
+  window.enterGameOnlyMode = function() {
+    document.body.classList.add('game-only');
+    updateGameHeader();
+    // Start updating the header periodically
+    if (!window.gameHeaderInterval) {
+      window.gameHeaderInterval = setInterval(updateGameHeader, 1000);
+    }
+  };
+  
+  window.exitGameOnlyMode = function() {
+    document.body.classList.remove('game-only');
+    if (window.gameHeaderInterval) {
+      clearInterval(window.gameHeaderInterval);
+      window.gameHeaderInterval = null;
+    }
+  };
+  
+  window.updateGameHeader = function() {
+    // Update scores from game state
+    const scoreMe = document.getElementById('gameScoreMe');
+    const scoreThem = document.getElementById('gameScoreThem');
+    const gameTimer = document.getElementById('gameTimer');
+    const gameLatency = document.getElementById('gameLatency');
+    const gameStatus = document.getElementById('gameStatus');
+    
+    // These will be updated by the game module
+    if (scoreMe && window.gameState?.me) {
+      scoreMe.textContent = window.gameState.me.score || 0;
+    }
+    if (scoreThem && window.gameState?.them) {
+      scoreThem.textContent = window.gameState.them.score || 0;
+    }
+    
+    // Update timer
+    if (gameTimer && window.gameState?.roundStart) {
+      const elapsed = Math.floor((Date.now() - window.gameState.roundStart) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      gameTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Update latency
+    const latencyEl = document.getElementById('latency');
+    if (gameLatency && latencyEl) {
+      gameLatency.textContent = latencyEl.textContent;
+    }
+    
+    // Update connection status
+    const statusEl = document.getElementById('status');
+    if (gameStatus && statusEl) {
+      const statusText = statusEl.textContent;
+      gameStatus.textContent = statusText.includes('Connected') ? 'Connected' : 
+                              statusText.includes('Connecting') ? 'Connecting' : 'Disconnected';
+      gameStatus.className = 'tag ' + (gameStatus.textContent === 'Connected' ? 'ok' : 
+                                       gameStatus.textContent === 'Connecting' ? 'warn' : 'bad');
+    }
+  };
+  
+  // Check URL parameters for game-only mode
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('gameOnly') === 'true' || urlParams.get('mode') === 'game') {
+    // Wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => enterGameOnlyMode(), 500);
+    });
+  }
+  
+  // Check if launched from index.html connection
+  if (window.sessionStorage.getItem('p2pConnected') === 'true') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        enterGameOnlyMode();
+        // Auto-start the game if connected
+        const startBtn = document.getElementById('btnStartGame');
+        if (startBtn && !startBtn.disabled) {
+          startBtn.click();
+        }
+      }, 1000);
+    });
+  }
+  
   (function() {
     const screens = {
       select: document.getElementById('screenSelect'),

@@ -686,7 +686,15 @@
                 isConnected ? 'bg-white text-black hover:bg-white/90' : 'bg-white/10 text-white/60 cursor-not-allowed'
               }`,
               disabled: !isConnected,
-              onClick: () => isConnected && (window.location.href = 'game.html')
+              onClick: () => {
+                if (isConnected) {
+                  // Store connection state for game page
+                  window.sessionStorage.setItem('p2pConnected', 'true');
+                  window.sessionStorage.setItem('connectionRole', webrtcRef.current?.role || 'unknown');
+                  // Launch game in game-only mode
+                  window.location.href = 'game.html?mode=game';
+                }
+              }
             }, 'Start Game')
           )
         )

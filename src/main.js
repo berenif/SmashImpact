@@ -823,3 +823,23 @@ btnRunTests.onclick = () => {
         try { const obj = { type:'x', state:{ n:1 } }; const s = JSON.stringify(obj); ok('Object literal serializes', /\{"type":"x","state":\{"n":1\}\}/.test(s)); } catch(e){ ok('Object literal serializes', false); }
         log(results.join('\n'));
 };
+
+// Expose game state to window for UI updates
+window.gameState = {
+  me: me,
+  them: them,
+  game: game,
+  roundStart: null,
+  get connected() { return net.pc && net.pc.connectionState === 'connected'; }
+};
+
+// Update game state periodically
+setInterval(() => {
+  if (window.gameState) {
+    window.gameState.roundStart = game.roundStart;
+    // Trigger header update if in game-only mode
+    if (document.body.classList.contains('game-only') && window.updateGameHeader) {
+      window.updateGameHeader();
+    }
+  }
+}, 100);
