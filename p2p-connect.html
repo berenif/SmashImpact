@@ -503,6 +503,157 @@
       line-height: 1.4;
     }
 
+    /* Step indicators */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .step-indicator.small {
+      margin-bottom: 15px;
+    }
+
+    .step-indicator.small .step-number {
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+    }
+
+    .step-indicator.small h3 {
+      font-size: 18px;
+    }
+
+    .step-number {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .step-indicator h2, .step-indicator h3 {
+      margin: 0;
+      flex: 1;
+    }
+
+    /* Waiting room styles */
+    .waiting-room-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .connection-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--surface-light);
+      border-radius: 20px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .connection-badge.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--success);
+    }
+
+    .players-list {
+      background: var(--surface-light);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .player-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
+    }
+
+    .player-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .player-item.host {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .player-icon {
+      font-size: 24px;
+    }
+
+    .player-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .player-status {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .player-status.ready {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+
+    .player-status.waiting {
+      background: rgba(251, 191, 36, 0.2);
+      color: var(--warning);
+    }
+
+    /* Waiting animation */
+    .waiting-animation {
+      position: relative;
+      height: 100px;
+      margin: 30px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: 3px solid var(--primary);
+      border-radius: 50%;
+      opacity: 0;
+      animation: pulseRing 3s linear infinite;
+    }
+
+    @keyframes pulseRing {
+      0% {
+        transform: scale(0.5);
+        opacity: 0;
+      }
+      50% {
+        opacity: 0.5;
+      }
+      100% {
+        transform: scale(2);
+        opacity: 0;
+      }
+    }
+
     /* Hidden */
     .hidden {
       display: none !important;
@@ -597,7 +748,10 @@
 
       <!-- Host QR display -->
       <div class="connection-card hidden" id="hostQR">
-        <h2 style="margin-bottom: 20px;">Step 1: Share This Code</h2>
+        <div class="step-indicator">
+          <span class="step-number">1</span>
+          <h2>Share Connection Code</h2>
+        </div>
         <div class="qr-container">
           <canvas id="qrCanvas"></canvas>
         </div>
@@ -622,7 +776,10 @@
         
         <!-- Add section for receiving answer -->
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
-          <h3 style="margin-bottom: 15px; font-size: 18px;">Step 2: Receive Player Answer</h3>
+          <div class="step-indicator small">
+            <span class="step-number">2</span>
+            <h3>Receive Player Answer</h3>
+          </div>
           <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
             After player scans your code, they'll share an answer code. Paste it here:
           </p>
@@ -707,15 +864,87 @@
         </p>
       </div>
 
-      <!-- Connected -->
-      <div class="connection-card hidden" id="connected">
-        <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
-        <h2>Connected!</h2>
-        <p style="color: var(--text-muted); margin-top: 12px;">
-          Connection established successfully
-        </p>
-        <button class="btn btn-success" onclick="startGame()">
-          Start Game
+      <!-- Host Waiting Room -->
+      <div class="connection-card hidden" id="hostWaitingRoom">
+        <div class="waiting-room-header">
+          <div style="font-size: 48px; margin-bottom: 20px;">🎮</div>
+          <h2>Game Lobby</h2>
+          <div class="connection-badge success">
+            <span class="status-dot connected"></span>
+            <span>Connected</span>
+          </div>
+        </div>
+        
+        <div class="players-list">
+          <h3 style="margin-bottom: 16px; font-size: 16px; color: var(--text-muted);">Players Ready:</h3>
+          <div class="player-item host">
+            <span class="player-icon">👑</span>
+            <span class="player-name">You (Host)</span>
+            <span class="player-status ready">Ready</span>
+          </div>
+          <div class="player-item" id="connectedPlayer">
+            <span class="player-icon">🎮</span>
+            <span class="player-name">Player 2</span>
+            <span class="player-status ready">Ready</span>
+          </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 16px; background: var(--surface-light); border-radius: var(--radius-sm);">
+          <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;">
+            As the host, you control when the game starts.
+          </p>
+          <button class="btn btn-success" onclick="hostStartGame()" style="width: 100%;">
+            <span style="font-size: 18px;">🚀 Start Game</span>
+          </button>
+        </div>
+        
+        <button class="btn btn-secondary" style="margin-top: 16px; width: 100%;" onclick="disconnectGame()">
+          Disconnect
+        </button>
+      </div>
+
+      <!-- Player Waiting Room -->
+      <div class="connection-card hidden" id="playerWaitingRoom">
+        <div class="waiting-room-header">
+          <div style="font-size: 48px; margin-bottom: 20px;">⏳</div>
+          <h2>Waiting for Host</h2>
+          <div class="connection-badge success">
+            <span class="status-dot connected"></span>
+            <span>Connected</span>
+          </div>
+        </div>
+        
+        <div class="players-list">
+          <h3 style="margin-bottom: 16px; font-size: 16px; color: var(--text-muted);">Players in Lobby:</h3>
+          <div class="player-item">
+            <span class="player-icon">👑</span>
+            <span class="player-name">Host</span>
+            <span class="player-status ready">Ready</span>
+          </div>
+          <div class="player-item">
+            <span class="player-icon">🎮</span>
+            <span class="player-name">You (Player)</span>
+            <span class="player-status ready">Ready</span>
+          </div>
+        </div>
+        
+        <div class="waiting-animation">
+          <div class="pulse-ring"></div>
+          <div class="pulse-ring" style="animation-delay: 0.5s;"></div>
+          <div class="pulse-ring" style="animation-delay: 1s;"></div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 16px; background: var(--surface-light); border-radius: var(--radius-sm); text-align: center;">
+          <p style="font-size: 16px; color: var(--text); margin-bottom: 8px;">
+            Waiting for host to start the game...
+          </p>
+          <p style="font-size: 14px; color: var(--text-muted);">
+            The host will begin the match when ready
+          </p>
+        </div>
+        
+        <button class="btn btn-secondary" style="margin-top: 16px; width: 100%;" onclick="disconnectGame()">
+          Leave Lobby
         </button>
       </div>
 
@@ -781,12 +1010,17 @@
       document.getElementById('hostQR').classList.add('hidden');
       document.getElementById('scanner').classList.add('hidden');
       document.getElementById('connecting').classList.add('hidden');
-      document.getElementById('connected').classList.add('hidden');
+      document.getElementById('hostWaitingRoom').classList.add('hidden');
+      document.getElementById('playerWaitingRoom').classList.add('hidden');
       
-      // Clear any player answer display
+      // Clear any dynamic elements
       const playerAnswer = document.getElementById('playerAnswer');
       if (playerAnswer) {
         playerAnswer.remove();
+      }
+      const playerManualInput = document.getElementById('playerManualInput');
+      if (playerManualInput) {
+        playerManualInput.remove();
       }
       
       // Show role selection
@@ -1316,29 +1550,77 @@
     function onConnected() {
       isConnected = true;
       document.getElementById('connecting').classList.add('hidden');
-      document.getElementById('connected').classList.remove('hidden');
+      
+      // Hide any player answer display
+      const playerAnswer = document.getElementById('playerAnswer');
+      if (playerAnswer) {
+        playerAnswer.classList.add('hidden');
+      }
+      
+      // Show appropriate waiting room based on role
+      if (currentRole === 'host') {
+        document.getElementById('hostWaitingRoom').classList.remove('hidden');
+        showStatus('Player connected! You can start the game when ready.', 'success');
+      } else {
+        document.getElementById('playerWaitingRoom').classList.remove('hidden');
+        showStatus('Connected to host! Waiting for game to start...', 'success');
+      }
+      
       updateStep(3);
       
       // Store connection state
       sessionStorage.setItem('p2pConnected', 'true');
       sessionStorage.setItem('connectionRole', currentRole);
       
-      // Send test message
+      // Send initial handshake
       if (dataChannel && dataChannel.readyState === 'open') {
-        dataChannel.send(JSON.stringify({ type: 'ping' }));
+        dataChannel.send(JSON.stringify({ 
+          type: 'handshake',
+          role: currentRole,
+          timestamp: Date.now()
+        }));
       }
     }
 
     // Handle messages
     function handleMessage(message) {
       switch (message.type) {
+        case 'handshake':
+          console.log('Handshake received from', message.role);
+          // Update UI to show other player info
+          if (currentRole === 'host') {
+            const playerElement = document.getElementById('connectedPlayer');
+            if (playerElement) {
+              playerElement.style.opacity = '1';
+            }
+          }
+          break;
+          
         case 'ping':
           if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify({ type: 'pong' }));
           }
           break;
+          
         case 'pong':
           console.log('Pong received');
+          break;
+          
+        case 'gameStart':
+          // Player receives game start command from host
+          if (currentRole === 'player') {
+            showStatus('Game starting!', 'success');
+            setTimeout(() => {
+              window.location.href = 'game-mobile.html';
+            }, 1000);
+          }
+          break;
+          
+        case 'playerDisconnected':
+          showStatus('Other player disconnected', 'error');
+          setTimeout(() => {
+            disconnectGame();
+          }, 2000);
           break;
       }
     }
@@ -1477,9 +1759,71 @@
       }
     }
 
-    // Start game
-    function startGame() {
-      window.location.href = 'game-mobile.html';
+    // Host starts the game
+    function hostStartGame() {
+      if (currentRole !== 'host') {
+        showStatus('Only the host can start the game', 'error');
+        return;
+      }
+      
+      if (!isConnected || !dataChannel || dataChannel.readyState !== 'open') {
+        showStatus('Connection not ready', 'error');
+        return;
+      }
+      
+      // Send game start signal to player
+      dataChannel.send(JSON.stringify({ 
+        type: 'gameStart',
+        timestamp: Date.now()
+      }));
+      
+      showStatus('Starting game...', 'success');
+      
+      // Navigate to game after short delay
+      setTimeout(() => {
+        window.location.href = 'game-mobile.html';
+      }, 500);
+    }
+    
+    // Disconnect from game
+    function disconnectGame() {
+      // Send disconnect message if connected
+      if (dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(JSON.stringify({ 
+          type: 'playerDisconnected',
+          role: currentRole
+        }));
+      }
+      
+      // Reset everything
+      resetConnection();
+      
+      // Hide all screens
+      document.getElementById('hostWaitingRoom').classList.add('hidden');
+      document.getElementById('playerWaitingRoom').classList.add('hidden');
+      document.getElementById('connecting').classList.add('hidden');
+      document.getElementById('hostQR').classList.add('hidden');
+      document.getElementById('scanner').classList.add('hidden');
+      
+      // Clear any dynamic elements
+      const playerAnswer = document.getElementById('playerAnswer');
+      if (playerAnswer) {
+        playerAnswer.remove();
+      }
+      const playerManualInput = document.getElementById('playerManualInput');
+      if (playerManualInput) {
+        playerManualInput.remove();
+      }
+      
+      // Return to role selection
+      document.getElementById('roleSelection').classList.remove('hidden');
+      updateStep(1);
+      
+      // Clear session storage
+      sessionStorage.removeItem('p2pConnected');
+      sessionStorage.removeItem('connectionRole');
+      
+      showStatus('Disconnected from game', 'info');
     }
 
     // Cleanup on page unload
