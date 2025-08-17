@@ -13,10 +13,10 @@ export const me = { x: 200, y: 200, color: '#2bd27e', score: 0, name: 'you', stu
 export const them = { x: 600, y: 200, color: '#ff6262', score: 0, name: 'peer', tx: 600, ty: 200, lastUpdate: 0 };
 
 export let role = null;
-export let game = { started: false, it: 'me', tLeft: ROUND_TIME, lastTick: now(), lastTagAt: 0, mode: 'multiplayer', obstacleLayout: 'simple' };
+export let game = { started: false, it: 'me', tLeft: ROUND_TIME, lastTick: now(), lastTagAt: 0, mode: 'multiplayer', obstacleLayout: 'none' }; // Force multiplayer mode
 
-// AI player for solo mode
-export let aiPlayer = null;
+// AI player for solo mode - DISABLED
+export let aiPlayer = null; // Keep this null to prevent AI from running
 
 export function resetForHostStart() {
 	me.x = 200; me.y = 200; them.x = 1400; them.y = 700; them.tx = them.x; them.ty = them.y;
@@ -133,28 +133,30 @@ export function hostTick(dt, nowFn, onState){
 	
 	const canTag = (nowFn() - game.lastTagAt) > TAG_COOLDOWN;
 	
-	if (game.mode === 'solo' && aiPlayer) {
-		// Update AI
-		aiPlayer.update(me.x, me.y, dt, nowFn());
-		
-		// Check for tags in solo mode
-		if (canTag) {
-			const dx = me.x - aiPlayer.x, dy = me.y - aiPlayer.y;
-			const touching = Math.hypot(dx, dy) <= R * 2;
-			if (touching) {
-				if (game.it === 'me') {
-					me.score++;
-					game.it = 'ai';
-					game.lastTagAt = nowFn();
-				} else if (game.it === 'ai') {
-					aiPlayer.score++;
-					game.it = 'me';
-					game.lastTagAt = nowFn();
-				}
-				checkWinSolo();
-			}
-		}
-	} else if (game.mode === 'multiplayer') {
+	// Disable solo AI for now
+	// if (game.mode === 'solo' && aiPlayer) {
+	// 	// Update AI
+	// 	aiPlayer.update(me.x, me.y, dt, nowFn());
+	// 	
+	// 	// Check for tags in solo mode
+	// 	if (canTag) {
+	// 		const dx = me.x - aiPlayer.x, dy = me.y - aiPlayer.y;
+	// 		const touching = Math.hypot(dx, dy) <= R * 2;
+	// 		if (touching) {
+	// 			if (game.it === 'me') {
+	// 				me.score++;
+	// 				game.it = 'ai';
+	// 				game.lastTagAt = nowFn();
+	// 			} else if (game.it === 'ai') {
+	// 				aiPlayer.score++;
+	// 				game.it = 'me';
+	// 				game.lastTagAt = nowFn();
+	// 			}
+	// 			checkWinSolo();
+	// 		}
+	// 	}
+	// } else if (game.mode === 'multiplayer') {
+	if (true) { // Always use multiplayer logic
 		// Original multiplayer logic
 		if (canTag) {
 			const dx = me.x - them.x, dy = me.y - them.y;

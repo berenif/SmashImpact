@@ -159,19 +159,20 @@ function draw(){
 		line(0 - camX, y - camY, world.w - camX, y - camY); 
 	}
 	
-	// Draw obstacles
-	drawObstacles(ctx, camX, camY);
+	// Draw obstacles - DISABLED for now
+	// drawObstacles(ctx, camX, camY);
 	
 	// Draw players
 	drawPlayer(me, camX, camY, game.it==='me');
 	
-	if (game.mode === 'solo' && aiPlayer) {
-		// Draw AI player
-		aiPlayer.draw(ctx, camX, camY, game.it==='ai');
-	} else {
+	// Always draw peer player, never AI
+	// if (game.mode === 'solo' && aiPlayer) {
+	// 	// Draw AI player
+	// 	aiPlayer.draw(ctx, camX, camY, game.it==='ai');
+	// } else {
 		// Draw peer player
 		drawPlayer(them, camX, camY, game.it==='peer');
-	}
+	// }
 	
 	// Draw UI text
 	ctx.fillStyle='#e8ecff'; 
@@ -214,11 +215,12 @@ function loop(ts){
 	const dt = Math.min(0.05, (ts - lastTS)/1000); 
 	lastTS = ts; 
 	
-	if (game.mode === 'solo') {
-		// Solo mode - no network communication
-		moveLocal(keys, dt, null, now()); 
-		hostTick(dt, now, null);
-	} else {
+	// Always use multiplayer mode for now - disable solo AI
+	// if (game.mode === 'solo') {
+	// 	// Solo mode - no network communication
+	// 	moveLocal(keys, dt, null, now()); 
+	// 	hostTick(dt, now, null);
+	// } else {
 		// Multiplayer mode
 		moveLocal(keys, dt, sendThrottled, now()); 
 		updateRemote(dt); 
@@ -231,7 +233,7 @@ function loop(ts){
 				net.send({ type:'state', state }); 
 			} 
 		} 
-	}
+	// }
 	
 	draw(); 
 	requestAnimationFrame(loop); 
