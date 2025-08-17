@@ -505,12 +505,12 @@
 
       <!-- Host QR display -->
       <div class="connection-card hidden" id="hostQR">
-        <h2 style="margin-bottom: 20px;">Share This Code</h2>
+        <h2 style="margin-bottom: 20px;">Step 1: Share This Code</h2>
         <div class="qr-container">
           <canvas id="qrCanvas"></canvas>
         </div>
         <div class="qr-info">
-          Show this QR code to the other player or copy the code below
+          Show this QR code to the player or copy the code below
         </div>
         <div class="manual-input">
           <div style="position: relative;">
@@ -527,12 +527,36 @@
             >Copy</button>
           </div>
         </div>
+        
+        <!-- Add section for receiving answer -->
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+          <h3 style="margin-bottom: 15px; font-size: 18px;">Step 2: Receive Player Answer</h3>
+          <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+            After player scans your code, they'll share an answer code. Paste it here:
+          </p>
+          <div style="position: relative;">
+            <textarea 
+              class="input" 
+              id="hostAnswerInput" 
+              placeholder="Paste player's answer code here..."
+              style="width: 100%; min-height: 80px; font-family: monospace; font-size: 12px; resize: vertical; padding-right: 80px;"
+            ></textarea>
+            <button 
+              class="btn btn-primary" 
+              onclick="applyAnswer()"
+              style="position: absolute; right: 8px; top: 8px; padding: 8px 16px;"
+            >Apply</button>
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 12px;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="startHostScanner()">
+              📷 Scan Answer QR
+            </button>
+          </div>
+        </div>
+        
         <div style="display: flex; gap: 12px; margin-top: 20px;">
           <button class="btn btn-secondary" style="flex: 1;" onclick="regenerateCode()">
             🔄 New Code
-          </button>
-          <button class="btn btn-secondary" style="flex: 1;" onclick="switchToScanner()">
-            📷 Scan Instead
           </button>
         </div>
       </div>
@@ -571,6 +595,12 @@
             >Connect</button>
           </div>
         </div>
+        <button 
+          id="scannerBackBtn"
+          class="btn btn-secondary hidden" 
+          style="margin-top: 20px; width: 100%;"
+          onclick="backFromScanner()"
+        >← Back</button>
       </div>
 
       <!-- Connection status -->
@@ -619,6 +649,7 @@
     let isConnected = false;
     let scanning = false;
     let scannerStream = null;
+    let scanningForAnswer = false;
 
     // Reset connection on page load/refresh
     window.addEventListener('load', () => {
@@ -663,6 +694,13 @@
       localOffer = null;
       isConnected = false;
       scanning = false;
+      scanningForAnswer = false;
+      
+      // Clear any input fields
+      const hostAnswerInput = document.getElementById('hostAnswerInput');
+      if (hostAnswerInput) hostAnswerInput.value = '';
+      const manualCode = document.getElementById('manualCode');
+      if (manualCode) manualCode.value = '';
     }
 
     // Create WebRTC offer (host)
@@ -736,14 +774,80 @@
 
     // Wait for answer (host)
     function waitForAnswer() {
-      // In a real implementation, this would poll a signaling server
-      // For now, we'll use the manual input method
+      // Host is now waiting for player to provide answer
+      // Answer will be applied via applyAnswer() function
+      showStatus('Waiting for player answer code...', 'info');
+    }
+    
+    // Apply answer from player (host side)
+    async function applyAnswer() {
+      const answerCode = document.getElementById('hostAnswerInput').value.trim();
+      if (!answerCode) {
+        showStatus('Please paste the answer code', 'error');
+        return;
+      }
+      
+      try {
+        const answerData = JSON.parse(atob(answerCode));
+        await pc.setRemoteDescription(answerData);
+        
+        // Hide the QR display and show connecting
+        document.getElementById('hostQR').classList.add('hidden');
+        document.getElementById('connecting').classList.remove('hidden');
+        
+        showStatus('Connecting to player...', 'info');
+        
+        // Check connection state
+        pc.onconnectionstatechange = () => {
+          console.log('Connection state:', pc.connectionState);
+          if (pc.connectionState === 'connected') {
+            onConnected();
+          } else if (pc.connectionState === 'failed') {
+            showStatus('Connection failed', 'error');
+            document.getElementById('connecting').classList.add('hidden');
+            document.getElementById('hostQR').classList.remove('hidden');
+          }
+        };
+      } catch (error) {
+        showStatus('Invalid answer code: ' + error.message, 'error');
+      }
+    }
+    
+    // Start scanner for host to scan answer
+    function startHostScanner() {
+      // Hide host QR temporarily and show scanner
+      document.getElementById('hostQR').classList.add('hidden');
+      document.getElementById('scannerTitle').textContent = 'Scan Player Answer QR';
+      document.getElementById('scanner').classList.remove('hidden');
+      document.getElementById('scannerBackBtn').classList.remove('hidden');
+      
+      // Set a flag to indicate we're scanning for answer
+      scanningForAnswer = true;
+      startScanner();
     }
 
     // Show scanner (player)
     function showScanner() {
       document.getElementById('scanner').classList.remove('hidden');
+      document.getElementById('scannerBackBtn').classList.add('hidden');
+      scanningForAnswer = false;
       startScanner();
+    }
+    
+    // Back from scanner
+    function backFromScanner() {
+      stopScanner();
+      document.getElementById('scanner').classList.add('hidden');
+      
+      if (scanningForAnswer) {
+        // Go back to host QR display
+        document.getElementById('hostQR').classList.remove('hidden');
+        scanningForAnswer = false;
+      } else {
+        // Go back to role selection
+        document.getElementById('roleSelection').classList.remove('hidden');
+        updateStep(1);
+      }
     }
 
     // Start QR scanner
@@ -800,8 +904,20 @@
       stopScanner();
       
       try {
-        const offerData = JSON.parse(atob(code));
-        await connectToHost(offerData);
+        const data = JSON.parse(atob(code));
+        
+        // Check if we're scanning for answer (host) or offer (player)
+        if (scanningForAnswer) {
+          // Host scanning player's answer
+          document.getElementById('scanner').classList.add('hidden');
+          document.getElementById('hostQR').classList.remove('hidden');
+          document.getElementById('hostAnswerInput').value = code;
+          scanningForAnswer = false;
+          await applyAnswer();
+        } else {
+          // Player scanning host's offer
+          await connectToHost(data);
+        }
       } catch (error) {
         showStatus('Invalid QR code', 'error');
         scanning = true;
@@ -851,11 +967,115 @@
 
     // Send answer to host
     function sendAnswerToHost() {
-      // In a real implementation, this would send to signaling server
-      // For demo, we'll show the answer code
+      // Generate answer code for host to scan
       const answerData = btoa(JSON.stringify(pc.localDescription));
-      console.log('Answer:', answerData);
-      showStatus('Establishing connection...', 'info');
+      
+      // Hide connecting screen and show answer QR
+      document.getElementById('connecting').classList.add('hidden');
+      showAnswerCode(answerData);
+      showStatus('Share this answer code with the host', 'info');
+    }
+    
+    // Show answer code for player to share with host
+    function showAnswerCode(answerData) {
+      // Create or reuse answer display element
+      let answerDisplay = document.getElementById('playerAnswer');
+      if (!answerDisplay) {
+        answerDisplay = document.createElement('div');
+        answerDisplay.id = 'playerAnswer';
+        answerDisplay.className = 'connection-card';
+        document.querySelector('.main').appendChild(answerDisplay);
+      }
+      
+      answerDisplay.innerHTML = `
+        <h2 style="margin-bottom: 20px;">Share Answer with Host</h2>
+        <div class="qr-container">
+          <canvas id="answerQrCanvas"></canvas>
+        </div>
+        <div class="qr-info">
+          Host needs to scan this QR or paste the code below
+        </div>
+        <div class="manual-input">
+          <div style="position: relative;">
+            <textarea 
+              id="answerCode" 
+              readonly
+              style="width: 100%; min-height: 80px; font-family: monospace; font-size: 12px; resize: vertical; padding-right: 80px;"
+            >${answerData}</textarea>
+            <button 
+              class="btn btn-primary" 
+              onclick="copyAnswerCode()"
+              style="position: absolute; right: 8px; top: 8px; padding: 8px 16px;"
+            >Copy</button>
+          </div>
+        </div>
+        <div style="margin-top: 20px; text-align: center;">
+          <p style="color: var(--text-muted); font-size: 14px;">
+            Waiting for host to apply this answer code...
+          </p>
+        </div>
+      `;
+      
+      answerDisplay.classList.remove('hidden');
+      
+      // Generate QR code for answer
+      generateQRCode('answerQrCanvas', answerData);
+    }
+    
+    // Copy answer code
+    function copyAnswerCode() {
+      const textarea = document.getElementById('answerCode');
+      textarea.select();
+      textarea.setSelectionRange(0, 99999);
+      
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textarea.value).then(() => {
+            showStatus('✓ Answer code copied to clipboard', 'success');
+          }).catch(() => {
+            document.execCommand('copy');
+            showStatus('✓ Answer code copied to clipboard', 'success');
+          });
+        } else {
+          document.execCommand('copy');
+          showStatus('✓ Answer code copied to clipboard', 'success');
+        }
+      } catch (err) {
+        showStatus('Failed to copy code', 'error');
+      }
+    }
+    
+    // Generate QR code on canvas
+    function generateQRCode(canvasId, data) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !data) return;
+      
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(data);
+        qr.make();
+        
+        const size = 200;
+        canvas.width = size;
+        canvas.height = size;
+        
+        const ctx = canvas.getContext('2d');
+        const cellSize = size / qr.getModuleCount();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        
+        ctx.fillStyle = '#000000';
+        for (let row = 0; row < qr.getModuleCount(); row++) {
+          for (let col = 0; col < qr.getModuleCount(); col++) {
+            if (qr.isDark(row, col)) {
+              ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('QR generation error:', e);
+      }
     }
 
     // Setup data channel
@@ -911,6 +1131,9 @@
       const code = document.getElementById('manualCode').value.trim();
       if (code) {
         handleScannedCode(code);
+        document.getElementById('manualCode').value = ''; // Clear after use
+      } else {
+        showStatus('Please paste a connection code', 'error');
       }
     }
 
