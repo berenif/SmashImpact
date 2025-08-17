@@ -3,66 +3,579 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="0; url=menu.html">
-  <title>Redirecting to Smash Impact...</title>
+  <title>Smash Impact - Enter the Mystical Arena</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0814">
+  <meta name="description" content="Enter a mystical dungeon arena where warriors clash in epic P2P battles">
+  
   <style>
-    body {
+    * {
       margin: 0;
       padding: 0;
-      background: #0a0e27;
-      color: #e2e8f0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --stone-dark: #1a1618;
+      --stone-medium: #2d2a2e;
+      --stone-light: #3e3a3f;
+      --flame-orange: #ff6b35;
+      --flame-yellow: #ffd23f;
+      --flame-core: #fff3e0;
+      --mystic-blue: #4a6fa5;
+      --mystic-purple: #6b5b95;
+      --text-primary: #e8dcc4;
+      --text-secondary: #b8a590;
+      --shadow-dark: rgba(0, 0, 0, 0.8);
+      --glow-warm: rgba(255, 107, 53, 0.4);
+      --glow-cold: rgba(74, 111, 165, 0.3);
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--stone-dark);
+      color: var(--text-primary);
+      overflow-x: hidden;
+      position: relative;
+      min-height: 100vh;
+    }
+
+    /* Dungeon Background */
+    .dungeon-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      background: 
+        radial-gradient(ellipse at top, var(--mystic-blue) 0%, transparent 40%),
+        radial-gradient(ellipse at bottom, var(--mystic-purple) 0%, transparent 40%),
+        linear-gradient(180deg, var(--stone-dark) 0%, #0a0814 100%);
+    }
+
+    /* Stone Texture Overlay */
+    .stone-texture {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      opacity: 0.3;
+      background-image: 
+        repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.01) 35px, rgba(255,255,255,.01) 70px),
+        repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(0,0,0,.03) 35px, rgba(0,0,0,.03) 70px);
+      mix-blend-mode: overlay;
+    }
+
+    /* Floating Particles */
+    .particles {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .ember {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: var(--flame-orange);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--flame-orange);
+      animation: float-up 15s infinite linear;
+    }
+
+    @keyframes float-up {
+      0% {
+        transform: translateY(100vh) translateX(0);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-100vh) translateX(100px);
+        opacity: 0;
+      }
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      padding: 20px 40px;
+      background: linear-gradient(180deg, rgba(26, 22, 24, 0.95) 0%, transparent 100%);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      animation: slideDown 0.8s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      background: linear-gradient(135deg, var(--flame-yellow), var(--flame-orange));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 30px var(--glow-warm);
+      animation: flicker 3s infinite alternate;
+    }
+
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.9; }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 30px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .nav-links a:hover {
+      color: var(--flame-yellow);
+      text-shadow: 0 0 10px var(--glow-warm);
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      padding: 120px 20px 80px;
+      position: relative;
+    }
+
+    .hero-content {
       text-align: center;
+      max-width: 800px;
+      animation: fadeInUp 1.2s ease-out;
     }
-    .container {
-      padding: 20px;
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    h1 {
-      font-size: 24px;
-      margin-bottom: 10px;
-    }
-    p {
-      color: #94a3b8;
+
+    .hero-title {
+      font-size: clamp(2.5rem, 8vw, 5rem);
       margin-bottom: 20px;
+      background: linear-gradient(135deg, var(--flame-core) 0%, var(--flame-yellow) 50%, var(--flame-orange) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 4px 20px var(--glow-warm));
+      animation: pulse-glow 2s ease-in-out infinite alternate;
     }
-    a {
-      color: #6366f1;
-      text-decoration: none;
+
+    @keyframes pulse-glow {
+      from { filter: drop-shadow(0 4px 20px var(--glow-warm)); }
+      to { filter: drop-shadow(0 4px 40px var(--flame-orange)); }
+    }
+
+    .hero-subtitle {
+      font-size: 1.4rem;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      text-shadow: 2px 2px 4px var(--shadow-dark);
+    }
+
+    /* Lantern Buttons */
+    .cta-group {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 40px;
+    }
+
+    .lantern-btn {
+      padding: 18px 40px;
+      font-size: 1.1rem;
       font-weight: 600;
+      border: 2px solid var(--flame-orange);
+      background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 210, 63, 0.1));
+      color: var(--flame-yellow);
+      text-decoration: none;
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 
+        inset 0 0 20px rgba(255, 107, 53, 0.2),
+        0 4px 15px rgba(0, 0, 0, 0.5);
     }
-    a:hover {
-      text-decoration: underline;
+
+    .lantern-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        inset 0 0 30px rgba(255, 107, 53, 0.4),
+        0 6px 25px rgba(255, 107, 53, 0.3),
+        0 0 50px rgba(255, 107, 53, 0.2);
     }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      margin: 20px auto;
-      border: 3px solid rgba(99, 102, 241, 0.3);
-      border-radius: 50%;
-      border-top-color: #6366f1;
-      animation: spin 0.8s linear infinite;
+
+    .lantern-btn::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, var(--flame-yellow) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      animation: rotate 10s linear infinite;
     }
-    @keyframes spin {
+
+    .lantern-btn:hover::before {
+      opacity: 0.1;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
+    }
+
+    .secondary-btn {
+      background: transparent;
+      border-color: var(--mystic-blue);
+      color: var(--text-primary);
+      box-shadow: 
+        inset 0 0 20px rgba(74, 111, 165, 0.2),
+        0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .secondary-btn:hover {
+      box-shadow: 
+        inset 0 0 30px rgba(74, 111, 165, 0.4),
+        0 6px 25px rgba(74, 111, 165, 0.3);
+    }
+
+    /* Features Section */
+    .features {
+      padding: 100px 20px;
+      background: linear-gradient(180deg, transparent, rgba(26, 22, 24, 0.5), transparent);
+    }
+
+    .features-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 60px;
+      color: var(--flame-yellow);
+      text-shadow: 0 0 20px var(--glow-warm);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+
+    .feature-card {
+      background: linear-gradient(135deg, var(--stone-medium), var(--stone-light));
+      border: 2px solid rgba(255, 107, 53, 0.2);
+      border-radius: 12px;
+      padding: 30px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 
+        inset 0 0 30px rgba(0, 0, 0, 0.5),
+        0 8px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(45deg, var(--flame-orange), transparent, var(--mystic-blue));
+      border-radius: 12px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: -1;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 
+        inset 0 0 40px rgba(255, 107, 53, 0.1),
+        0 12px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .feature-card:hover::before {
+      opacity: 0.3;
+    }
+
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 20px;
+      background: radial-gradient(circle, var(--flame-yellow), var(--flame-orange));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 30px var(--glow-warm);
+    }
+
+    .feature-title {
+      font-size: 1.4rem;
+      margin-bottom: 15px;
+      color: var(--flame-yellow);
+    }
+
+    .feature-description {
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Candle Animation */
+    .candle {
+      position: absolute;
+      width: 20px;
+      height: 40px;
+      background: linear-gradient(180deg, var(--flame-yellow), var(--flame-orange));
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      animation: flicker-candle 2s infinite alternate;
+    }
+
+    @keyframes flicker-candle {
+      0%, 100% {
+        transform: scale(1) rotate(-2deg);
+        filter: brightness(1);
+      }
+      50% {
+        transform: scale(1.05) rotate(2deg);
+        filter: brightness(1.2);
+      }
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 20px;
+      background: var(--stone-dark);
+      border-top: 1px solid rgba(255, 107, 53, 0.2);
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+      
+      .hero-title {
+        font-size: 2.5rem;
+      }
+      
+      .cta-group {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .lantern-btn {
+        width: 100%;
+        max-width: 300px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="spinner"></div>
-    <h1>Loading Smash Impact</h1>
-    <p>Redirecting to the new mobile-optimized version...</p>
-    <p>If you're not redirected, <a href="menu.html">click here</a></p>
-  </div>
+  <!-- Dungeon Background -->
+  <div class="dungeon-bg"></div>
+  <div class="stone-texture"></div>
+  
+  <!-- Floating Particles -->
+  <div class="particles" id="particles"></div>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-container">
+      <div class="logo">⚔️ SMASH IMPACT</div>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#gameplay">Gameplay</a></li>
+        <li><a href="#connect">Connect</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">Enter the Mystical Arena</h1>
+      <p class="hero-subtitle">Where ancient warriors clash in epic P2P battles beneath flickering torchlight</p>
+      
+      <div class="cta-group">
+        <a href="menu.html" class="lantern-btn">
+          🔥 Enter Dungeon
+        </a>
+        <a href="connect.html" class="lantern-btn secondary-btn">
+          ⚡ Quick Battle
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <div class="features-container">
+      <h2 class="section-title">⚔️ Forge Your Legend ⚔️</h2>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🗡️</div>
+          <h3 class="feature-title">P2P Combat</h3>
+          <p class="feature-description">
+            Direct peer-to-peer battles with no server delays. Feel every strike, 
+            dodge, and counter in real-time combat.
+          </p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3 class="feature-title">Strategic Gameplay</h3>
+          <p class="feature-description">
+            Master timing, positioning, and resource management. Every decision 
+            matters in the heat of battle.
+          </p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">Instant Matches</h3>
+          <p class="feature-description">
+            Jump into action within seconds. No lengthy queues or complicated 
+            matchmaking - just pure combat.
+          </p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🏆</div>
+          <h3 class="feature-title">Skill-Based Victory</h3>
+          <p class="feature-description">
+            No pay-to-win mechanics. Your skill, reflexes, and strategy determine 
+            your fate in the arena.
+          </p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🌟</div>
+          <h3 class="feature-title">Progressive Mastery</h3>
+          <p class="feature-description">
+            Unlock new techniques, combos, and abilities as you prove yourself 
+            worthy in countless battles.
+          </p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🎮</div>
+          <h3 class="feature-title">Cross-Platform</h3>
+          <p class="feature-description">
+            Battle on any device. Your progress and glory follow you wherever 
+            the arena calls.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2024 Smash Impact. Forge your legend in the mystical arena.</p>
+  </footer>
+
   <script>
-    // Fallback redirect
-    setTimeout(() => {
-      window.location.href = 'menu.html';
-    }, 100);
+    // Create floating ember particles
+    function createEmber() {
+      const particles = document.getElementById('particles');
+      const ember = document.createElement('div');
+      ember.className = 'ember';
+      ember.style.left = Math.random() * 100 + '%';
+      ember.style.animationDuration = (Math.random() * 10 + 10) + 's';
+      ember.style.animationDelay = Math.random() * 5 + 's';
+      particles.appendChild(ember);
+      
+      // Remove ember after animation
+      setTimeout(() => {
+        ember.remove();
+      }, 20000);
+    }
+
+    // Create initial embers
+    for (let i = 0; i < 20; i++) {
+      setTimeout(() => createEmber(), i * 500);
+    }
+
+    // Continue creating embers
+    setInterval(createEmber, 2000);
+
+    // Parallax effect on scroll
+    window.addEventListener('scroll', () => {
+      const scrolled = window.pageYOffset;
+      const parallax = document.querySelector('.dungeon-bg');
+      parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
+    });
+
+    // Add glow effect to buttons on mouse move
+    document.querySelectorAll('.lantern-btn').forEach(btn => {
+      btn.addEventListener('mousemove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        btn.style.background = `
+          radial-gradient(circle at ${x}px ${y}px, 
+            rgba(255, 210, 63, 0.3), 
+            rgba(255, 107, 53, 0.1))
+        `;
+      });
+      
+      btn.addEventListener('mouseleave', () => {
+        btn.style.background = '';
+      });
+    });
   </script>
 </body>
 </html>
