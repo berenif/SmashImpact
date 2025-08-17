@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Game Mode</title>
+  <style>
+    body {
+      font-family: system-ui;
+      padding: 20px;
+      background: #0f1220;
+      color: white;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .info {
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    code {
+      background: rgba(255,255,255,0.2);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Game Mode Test Page</h1>
+    
+    <div class="info">
+      <h2>Test the Game-Only Interface</h2>
+      <p>Click the buttons below to test different launch modes:</p>
+    </div>
+
+    <div>
+      <button onclick="launchNormal()">
+        Launch Normal Game
+      </button>
+      <p>Opens game.html with full UI</p>
+    </div>
+
+    <div>
+      <button onclick="launchGameOnly()">
+        Launch Game-Only Mode
+      </button>
+      <p>Opens game.html with <code>?mode=game</code> parameter</p>
+    </div>
+
+    <div>
+      <button onclick="launchWithSession()">
+        Launch as Connected
+      </button>
+      <p>Simulates launching from P2P connection</p>
+    </div>
+
+    <div class="info">
+      <h3>What to Look For:</h3>
+      <ul>
+        <li>✅ Game-only mode should hide the sidebar</li>
+        <li>✅ A minimal header should appear at the top</li>
+        <li>✅ Score display (You vs Them)</li>
+        <li>✅ Timer and connection status</li>
+        <li>✅ Toggle button to show/hide controls</li>
+      </ul>
+    </div>
+
+    <div class="info">
+      <h3>Cache Issues?</h3>
+      <p>If you don't see changes:</p>
+      <ol>
+        <li>Hard refresh: <code>Ctrl+Shift+R</code> (Windows/Linux) or <code>Cmd+Shift+R</code> (Mac)</li>
+        <li>Open DevTools → Network tab → Check "Disable cache"</li>
+        <li>Try incognito/private window</li>
+        <li>Add timestamp: <code>?v=${Date.now()}</code> to URL</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    function launchNormal() {
+      window.open('game.html', '_blank');
+    }
+
+    function launchGameOnly() {
+      window.open('game.html?mode=game', '_blank');
+    }
+
+    function launchWithSession() {
+      // Set session storage
+      sessionStorage.setItem('p2pConnected', 'true');
+      sessionStorage.setItem('connectionRole', 'host');
+      // Open in same window to preserve session
+      window.location.href = 'game.html?mode=game';
+    }
+  </script>
+</body>
+</html>
