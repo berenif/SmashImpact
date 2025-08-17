@@ -1196,13 +1196,13 @@
           const gameState = this.multiplayer.getGameState();
           const myRole = this.multiplayer.role;
           
-          // Update local references
+          // Copy player data to avoid reference mutations (BUGFIX)
           if (myRole === 'host') {
-            this.player = gameState.players.host;
-            this.enemy = gameState.players.player;
+            this.player = { ...gameState.players.host };
+            this.enemy = { ...gameState.players.player };
           } else {
-            this.player = gameState.players.player;
-            this.enemy = gameState.players.host;
+            this.player = { ...gameState.players.player };
+            this.enemy = { ...gameState.players.host };
           }
           
           // Update latency display
@@ -1359,8 +1359,14 @@
       animate(currentTime = 0) {
         if (!this.running) return;
         
-        // Calculate delta time
-        const deltaTime = currentTime - this.lastTime;
+        // Calculate delta time with spike protection (BUGFIX)
+        let deltaTime = currentTime - this.lastTime;
+        
+        // Cap deltaTime to prevent huge jumps (max 100ms)
+        if (this.lastTime === 0 || deltaTime > 100) {
+          deltaTime = 16.67; // Assume 60fps for first frame or lag spikes
+        }
+        
         this.lastTime = currentTime;
         
         // Update FPS

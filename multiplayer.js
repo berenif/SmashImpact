@@ -49,6 +49,10 @@ class MultiplayerGame {
       attack: false
     };
     
+    // Attack cooldown tracking (SECURITY FIX)
+    this.lastAttackTime = 0;
+    this.ATTACK_COOLDOWN = 500; // 500ms between attacks
+    
     // Network stats
     this.latency = 0;
     this.lastPingTime = 0;
@@ -277,6 +281,11 @@ class MultiplayerGame {
         this.latency = Date.now() - message.timestamp;
         break;
         
+      case 'hitConfirmed':
+        // Host has confirmed a hit (SECURITY FIX)
+        this.handleHitConfirmed(message.data);
+        break;
+        
       case 'fullStateSync':
         this.handleFullStateSync(message.data);
         break;
@@ -424,43 +433,100 @@ class MultiplayerGame {
     }
   }
   
-  // Handle attack from remote player
+  // Handle attack - HOST AUTHORITATIVE (SECURITY FIX)
   handleAttack(data) {
-    // Don't process our own attacks
-    if (data.role === this.role) return;
-    
-    const attacker = data.role === 'host' ? 
+    // HOST-AUTHORITATIVE: Only host validates and applies hits
+    if (this.role === 'host') {
+      // Host validates the attack
+      const attacker = data.role === 'host' ? 
+        this.gameState.players.host : 
+        this.gameState.players.player;
+      
+      const target = data.role === 'host' ? 
+        this.gameState.players.player : 
+        this.gameState.players.host;
+      
+      // Validate attack position (prevent teleport attacks)
+      const posDiff = Math.sqrt(
+        Math.pow(attacker.x - data.x, 2) + 
+        Math.pow(attacker.y - data.y, 2)
+      );
+      
+      // Reject if attacker position doesn't match (with some tolerance for lag)
+      if (posDiff > 100) {
+        console.warn('Attack position mismatch, rejecting');
+        return;
+      }
+      
+      // Use the attacker's position from the attack data
+      const attackerX = data.x || attacker.x;
+      const attackerY = data.y || attacker.y;
+      
+      // Check if attack hits
+      const dx = target.x - attackerX;
+      const dy = target.y - attackerY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      const attackRange = 50 + target.radius;
+      
+      if (distance < attackRange) {
+        // Hit detected by host
+        target.health = Math.max(0, target.health - 10);
+        
+        // Notify both players of the hit
+        this.sendMessage({
+          type: 'hitConfirmed',
+          data: {
+            attacker: data.role,
+            target: data.role === 'host' ? 'player' : 'host',
+            damage: 10,
+            health: target.health
+          }
+        });
+        
+        // Apply feedback if we were hit
+        if (data.role !== this.role) {
+          this.onHit();
+        }
+        
+        // Update scores and check for round end
+        if (target.health <= 0) {
+          attacker.score++;
+          this.onScoreChange();
+          
+          // Reset round after a short delay
+          setTimeout(() => {
+            this.resetRound();
+          }, 500);
+        }
+      }
+    }
+    // Players just send attack requests to host, no local validation
+  }
+  
+  // Handle confirmed hit from host (SECURITY FIX)
+  handleHitConfirmed(data) {
+    // Apply the damage as confirmed by host
+    const target = data.target === 'host' ? 
       this.gameState.players.host : 
       this.gameState.players.player;
     
-    const target = data.role === 'host' ? 
-      this.gameState.players.player : 
-      this.gameState.players.host;
+    target.health = data.health;
     
-    // Use the attacker's position from the attack data (compensated for latency)
-    const attackerX = data.x || attacker.x;
-    const attackerY = data.y || attacker.y;
-    
-    // Check if attack hits
-    const dx = target.x - attackerX;
-    const dy = target.y - attackerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    const attackRange = 50 + target.radius;
-    
-    if (distance < attackRange) {
-      // Hit detected
-      target.health = Math.max(0, target.health - 10);
-      
-      // Visual/haptic feedback for being hit
+    // Trigger hit feedback if we were hit
+    if (data.target === this.role) {
       this.onHit();
+    }
+    
+    // Check for round end
+    if (target.health <= 0) {
+      const attacker = data.attacker === 'host' ? 
+        this.gameState.players.host : 
+        this.gameState.players.player;
+      attacker.score++;
+      this.onScoreChange();
       
-      // Update scores and check for round end
-      if (target.health <= 0) {
-        attacker.score++;
-        this.onScoreChange();
-        
-        // Reset round after a short delay
+      if (this.role === 'host') {
         setTimeout(() => {
           this.resetRound();
         }, 500);
@@ -499,8 +565,16 @@ class MultiplayerGame {
     myPlayer.boosting = boost;
   }
   
-  // Perform attack
+  // Perform attack with rate limiting (SECURITY FIX)
   performAttack() {
+    // Check attack cooldown
+    const now = Date.now();
+    if (now - this.lastAttackTime < this.ATTACK_COOLDOWN) {
+      return; // Still on cooldown
+    }
+    
+    this.lastAttackTime = now;
+    
     const myPlayer = this.role === 'host' ? 
       this.gameState.players.host : 
       this.gameState.players.player;
@@ -515,12 +589,22 @@ class MultiplayerGame {
         role: this.role,
         x: myPlayer.x,
         y: myPlayer.y,
-        timestamp: Date.now()
+        timestamp: now
       }
     });
     
     // Visual feedback
     this.onAttack();
+    
+    // If we're the host, process our own attack immediately (HOST-AUTHORITATIVE)
+    if (this.role === 'host') {
+      this.handleAttack({
+        role: 'host',
+        x: myPlayer.x,
+        y: myPlayer.y,
+        timestamp: now
+      });
+    }
     
     // Reset attacking state after animation
     setTimeout(() => {
@@ -685,10 +769,44 @@ class MultiplayerGame {
     }
   }
   
-  // Handle game state update (deprecated, use fullStateSync)
+  // Handle game state update with validation (SECURITY FIX)
   handleGameStateUpdate(data) {
+    // Only process if we're the player (host is authoritative)
+    if (this.role !== 'player') return;
+    
+    // Validate the game state for security
+    if (!this.validateGameState(data)) {
+      console.warn('Invalid game state received, ignoring');
+      return;
+    }
+    
     // For backward compatibility
     this.handleFullStateSync(data);
+  }
+  
+  // Validate game state for security (SECURITY FIX)
+  validateGameState(state) {
+    if (!state || typeof state !== 'object') return false;
+    if (!state.players || !state.players.host || !state.players.player) return false;
+    
+    // Validate player data
+    for (const player of [state.players.host, state.players.player]) {
+      // Check required fields exist and are numbers
+      if (typeof player.x !== 'number' || typeof player.y !== 'number') return false;
+      if (typeof player.health !== 'number' || typeof player.score !== 'number') return false;
+      
+      // Validate ranges
+      if (player.health < 0 || player.health > 100) return false;
+      if (player.score < 0 || player.score > 999) return false;
+      
+      // Validate position bounds (assuming max canvas size)
+      if (player.x < 0 || player.x > 2000 || player.y < 0 || player.y > 2000) return false;
+      
+      // Validate velocity bounds (prevent teleportation)
+      if (Math.abs(player.vx) > 50 || Math.abs(player.vy) > 50) return false;
+    }
+    
+    return true;
   }
   
   // Callbacks (to be overridden)
