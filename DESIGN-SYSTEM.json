@@ -1,0 +1,27 @@
+{
+  "colors": {
+    "background": "#121212",
+    "primary": "#4CAF50",
+    "secondary": "#E91E63",
+    "accent": "#FFC107",
+    "text": "#FFFFFF"
+  },
+  "typography": {
+    "fontFamily": "Arial, sans-serif",
+    "baseSize": "16px",
+    "headingSize": "24px"
+  },
+  "spacing": {
+    "unit": 8,
+    "buttonPadding": "12px 16px"
+  },
+  "animation": {
+    "duration": "150ms",
+    "timingFunction": "cubic-bezier(0.4, 0, 0.2, 1)"
+  },
+  "audio": {
+    "tag": "sounds/tag.wav",
+    "countdown": "sounds/countdown.wav",
+    "victory": "sounds/victory.wav"
+  }
+}
