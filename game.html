@@ -523,6 +523,8 @@
 
   <!-- Multiplayer synchronization -->
   <script src="multiplayer.js"></script>
+  <!-- Visual effects system -->
+  <script src="visual-effects.js"></script>
   
   <script type="module">
     // Mobile joystick controller
@@ -762,6 +764,9 @@
         this.running = false;
         this.paused = false;
         
+        // Initialize visual effects
+        this.vfx = new window.VisualEffects(canvas, this.ctx);
+        
         // Check for multiplayer
         this.isMultiplayer = sessionStorage.getItem('p2pConnected') === 'true';
         this.multiplayer = null;
@@ -781,14 +786,17 @@
           radius: 20,
           color: '#6366f1',
           speed: 5,
-          boosting: false
+          boosting: false,
+          lastBoostParticle: 0,
+          trailIndex: -1
         };
         
         this.enemy = {
           x: 0,
           y: 0,
           radius: 20,
-          color: '#ef4444'
+          color: '#ef4444',
+          trailIndex: -1
         };
         
         this.score = { you: 0, them: 0 };
@@ -1086,6 +1094,13 @@
       }
 
       attack() {
+        // Create visual attack effect
+        this.vfx.createImpact(this.player.x, this.player.y, {
+          color: '#22d3ee',
+          particleCount: 25,
+          spread: 360
+        });
+        
         // Attack animation/effect
         const attackRadius = 50;
         this.ctx.strokeStyle = '#22d3ee';
@@ -1100,6 +1115,25 @@
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         if (distance < attackRadius + this.enemy.radius) {
+          // Hit confirmed - create explosion effect
+          this.vfx.createExplosion(this.enemy.x, this.enemy.y, {
+            color: '#ff6b6b',
+            secondaryColor: '#ffd93d',
+            particleCount: 40,
+            force: 10,
+            shakeIntensity: 8
+          });
+          
+          // Show damage number
+          const damage = Math.floor(Math.random() * 20) + 10;
+          const isCritical = Math.random() < 0.2;
+          this.vfx.createDamageNumber(
+            this.enemy.x, 
+            this.enemy.y - this.enemy.radius - 10, 
+            damage,
+            { isCritical }
+          );
+          
           this.score.you++;
           document.getElementById('scoreYou').textContent = this.score.you;
           
@@ -1190,6 +1224,23 @@
           this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
           this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
         }
+        
+        // Create boost trail effect
+        if (this.player.boosting || (this.buttons.boost && this.buttons.boost.isPressed())) {
+          const now = performance.now();
+          if (now - this.player.lastBoostParticle > 30) {
+            this.vfx.createBoostTrail(
+              this.player.x, 
+              this.player.y, 
+              this.player.color,
+              { x: this.player.vx, y: this.player.vy }
+            );
+            this.player.lastBoostParticle = now;
+          }
+        }
+        
+        // Update visual effects
+        this.vfx.update(deltaTime);
         
         // Simple enemy AI
         const enemySpeed = 2;
