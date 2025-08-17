@@ -1,12 +1,15 @@
 // Service Worker for P2P WebRTC Game
-const CACHE_NAME = 'p2p-game-v2';
+const CACHE_NAME = 'p2p-game-v3';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/game.html',
   '/menu.html',
+  '/connect.html',
+  '/game.html',
+  '/multiplayer.js',
   '/vendor/qrcode.js',
-  '/vendor/jsqr.js'
+  '/vendor/jsqr.js',
+  '/manifest.json'
 ];
 
 // Install event - cache resources
@@ -83,7 +86,7 @@ self.addEventListener('fetch', (event) => {
       .catch(() => {
         // Offline fallback
         if (event.request.destination === 'document') {
-          return caches.match('/index.html');
+          return caches.match('/menu.html');
         }
       })
   );

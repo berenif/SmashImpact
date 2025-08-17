@@ -534,24 +534,54 @@
         this.startPos = { x: 0, y: 0 };
         this.currentPos = { x: 0, y: 0 };
         this.vector = { x: 0, y: 0 };
-        this.radius = element.offsetWidth / 2;
-        this.knobRadius = knob.offsetWidth / 2;
-        this.maxDistance = this.radius - this.knobRadius;
+        
+        // Calculate radius after a small delay to ensure elements are rendered
+        this.radius = 60; // Default value
+        this.knobRadius = 20; // Default value
+        this.maxDistance = 40; // Default value
+        
+        // Store bound event handlers for cleanup
+        this.boundHandleStart = this.handleStart.bind(this);
+        this.boundHandleMove = this.handleMove.bind(this);
+        this.boundHandleEnd = this.handleEnd.bind(this);
+        this.boundHandleMouseStart = this.handleMouseStart.bind(this);
+        this.boundHandleMouseMove = this.handleMouseMove.bind(this);
+        this.boundHandleMouseEnd = this.handleMouseEnd.bind(this);
+        
+        // Recalculate once element is ready
+        requestAnimationFrame(() => {
+          if (element && element.offsetWidth) {
+            this.radius = element.offsetWidth / 2;
+            this.knobRadius = knob ? knob.offsetWidth / 2 : 20;
+            this.maxDistance = this.radius - this.knobRadius;
+          }
+        });
         
         this.init();
       }
 
       init() {
         // Touch events
-        this.element.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
-        this.element.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
-        this.element.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
-        this.element.addEventListener('touchcancel', this.handleEnd.bind(this), { passive: false });
+        this.element.addEventListener('touchstart', this.boundHandleStart, { passive: false });
+        this.element.addEventListener('touchmove', this.boundHandleMove, { passive: false });
+        this.element.addEventListener('touchend', this.boundHandleEnd, { passive: false });
+        this.element.addEventListener('touchcancel', this.boundHandleEnd, { passive: false });
         
         // Mouse events for testing
-        this.element.addEventListener('mousedown', this.handleMouseStart.bind(this));
-        document.addEventListener('mousemove', this.handleMouseMove.bind(this));
-        document.addEventListener('mouseup', this.handleMouseEnd.bind(this));
+        this.element.addEventListener('mousedown', this.boundHandleMouseStart);
+        document.addEventListener('mousemove', this.boundHandleMouseMove);
+        document.addEventListener('mouseup', this.boundHandleMouseEnd);
+      }
+      
+      destroy() {
+        // Remove all event listeners
+        this.element.removeEventListener('touchstart', this.boundHandleStart);
+        this.element.removeEventListener('touchmove', this.boundHandleMove);
+        this.element.removeEventListener('touchend', this.boundHandleEnd);
+        this.element.removeEventListener('touchcancel', this.boundHandleEnd);
+        this.element.removeEventListener('mousedown', this.boundHandleMouseStart);
+        document.removeEventListener('mousemove', this.boundHandleMouseMove);
+        document.removeEventListener('mouseup', this.boundHandleMouseEnd);
       }
 
       handleStart(e) {
@@ -662,19 +692,34 @@
         this.element = element;
         this.action = action;
         this.pressed = false;
+        
+        // Store bound handlers
+        this.boundHandlePress = this.handlePress.bind(this);
+        this.boundHandleRelease = this.handleRelease.bind(this);
+        
         this.init();
       }
 
       init() {
         // Touch events
-        this.element.addEventListener('touchstart', this.handlePress.bind(this), { passive: false });
-        this.element.addEventListener('touchend', this.handleRelease.bind(this), { passive: false });
-        this.element.addEventListener('touchcancel', this.handleRelease.bind(this), { passive: false });
+        this.element.addEventListener('touchstart', this.boundHandlePress, { passive: false });
+        this.element.addEventListener('touchend', this.boundHandleRelease, { passive: false });
+        this.element.addEventListener('touchcancel', this.boundHandleRelease, { passive: false });
         
         // Mouse events
-        this.element.addEventListener('mousedown', this.handlePress.bind(this));
-        this.element.addEventListener('mouseup', this.handleRelease.bind(this));
-        this.element.addEventListener('mouseleave', this.handleRelease.bind(this));
+        this.element.addEventListener('mousedown', this.boundHandlePress);
+        this.element.addEventListener('mouseup', this.boundHandleRelease);
+        this.element.addEventListener('mouseleave', this.boundHandleRelease);
+      }
+      
+      destroy() {
+        // Remove all event listeners
+        this.element.removeEventListener('touchstart', this.boundHandlePress);
+        this.element.removeEventListener('touchend', this.boundHandleRelease);
+        this.element.removeEventListener('touchcancel', this.boundHandleRelease);
+        this.element.removeEventListener('mousedown', this.boundHandlePress);
+        this.element.removeEventListener('mouseup', this.boundHandleRelease);
+        this.element.removeEventListener('mouseleave', this.boundHandleRelease);
       }
 
       handlePress(e) {
@@ -759,6 +804,15 @@
         this.frameCount = 0;
         this.fpsTime = 0;
         
+        // Store cleanup references
+        this.animationId = null;
+        this.connectionCheckInterval = null;
+        this.connectionCheckTimeout = null;
+        this.resizeHandler = () => this.resizeCanvas();
+        this.orientationHandler = () => {
+          setTimeout(() => this.resizeCanvas(), 100);
+        };
+        
         this.init();
       }
 
@@ -781,13 +835,39 @@
           this.updateScoreDisplay();
         };
         
-        // Try to get connection from window (if passed from p2p-connect)
-        if (window.gameConnection) {
-          this.multiplayer.setConnection(
-            window.gameConnection.pc,
-            window.gameConnection.dataChannel
-          );
-        }
+        // The multiplayer instance will handle connection setup via BroadcastChannel
+        // No need to manually pass connection here anymore
+        console.log('Multiplayer game initialized, waiting for connection...');
+        
+        // Update UI to show connection status
+        const connectionDot = document.getElementById('connectionDot');
+        const connectionText = document.getElementById('connectionText');
+        
+        // Check connection status periodically
+        this.connectionCheckInterval = setInterval(() => {
+          if (this.multiplayer && this.multiplayer.dataChannel) {
+            connectionDot.style.background = '#10b981';
+            connectionText.textContent = 'Connected';
+            clearInterval(this.connectionCheckInterval);
+            this.connectionCheckInterval = null;
+          } else {
+            connectionDot.style.background = '#f59e0b';
+            connectionText.textContent = 'Connecting...';
+          }
+        }, 500);
+        
+        // Timeout after 5 seconds
+        this.connectionCheckTimeout = setTimeout(() => {
+          if (!this.multiplayer.dataChannel) {
+            connectionDot.style.background = '#ef4444';
+            connectionText.textContent = 'Connection Failed';
+            if (this.connectionCheckInterval) {
+              clearInterval(this.connectionCheckInterval);
+              this.connectionCheckInterval = null;
+            }
+          }
+          this.connectionCheckTimeout = null;
+        }, 5000);
       }
 
       showAttackEffect() {
@@ -818,10 +898,8 @@
       init() {
         // Setup canvas
         this.resizeCanvas();
-        window.addEventListener('resize', () => this.resizeCanvas());
-        window.addEventListener('orientationchange', () => {
-          setTimeout(() => this.resizeCanvas(), 100);
-        });
+        window.addEventListener('resize', this.resizeHandler);
+        window.addEventListener('orientationchange', this.orientationHandler);
         
         // Initialize controls
         const deviceType = sessionStorage.getItem('deviceType') || 'mobile';
@@ -835,19 +913,82 @@
         this.reset();
         this.start();
       }
+      
+      destroy() {
+        // Stop animation loop
+        if (this.animationId) {
+          cancelAnimationFrame(this.animationId);
+          this.animationId = null;
+        }
+        
+        // Clear intervals and timeouts
+        if (this.connectionCheckInterval) {
+          clearInterval(this.connectionCheckInterval);
+          this.connectionCheckInterval = null;
+        }
+        if (this.connectionCheckTimeout) {
+          clearTimeout(this.connectionCheckTimeout);
+          this.connectionCheckTimeout = null;
+        }
+        
+        // Remove event listeners
+        window.removeEventListener('resize', this.resizeHandler);
+        window.removeEventListener('orientationchange', this.orientationHandler);
+        
+        // Cleanup controls
+        if (this.joystick) {
+          this.joystick.destroy();
+          this.joystick = null;
+        }
+        if (this.buttons.attack) {
+          this.buttons.attack.destroy();
+        }
+        if (this.buttons.boost) {
+          this.buttons.boost.destroy();
+        }
+        
+        // Cleanup keyboard listeners if present
+        if (this.keydownHandler) {
+          document.removeEventListener('keydown', this.keydownHandler);
+        }
+        if (this.keyupHandler) {
+          document.removeEventListener('keyup', this.keyupHandler);
+        }
+      }
 
       initMobileControls() {
         // Initialize joystick
         const joystickEl = document.getElementById('joystick');
         const joystickKnob = document.getElementById('joystickKnob');
-        this.joystick = new JoystickController(joystickEl, joystickKnob);
+        
+        if (joystickEl && joystickKnob) {
+          this.joystick = new JoystickController(joystickEl, joystickKnob);
+        } else {
+          console.error('Joystick elements not found');
+        }
         
         // Initialize action buttons
-        this.buttons.attack = new ActionButton(document.getElementById('btnAttack'), 'attack');
-        this.buttons.boost = new ActionButton(document.getElementById('btnBoost'), 'boost');
+        const attackBtn = document.getElementById('btnAttack');
+        const boostBtn = document.getElementById('btnBoost');
+        
+        if (attackBtn) {
+          this.buttons.attack = new ActionButton(attackBtn, 'attack');
+        }
+        if (boostBtn) {
+          this.buttons.boost = new ActionButton(boostBtn, 'boost');
+        }
         
         // Show mobile controls
-        document.getElementById('mobileControls').style.display = 'block';
+        const mobileControls = document.getElementById('mobileControls');
+        if (mobileControls) {
+          mobileControls.style.display = 'block';
+        }
+        
+        // Hide desktop controls
+        const desktopControls = document.querySelector('.desktop-controls');
+        if (desktopControls) {
+          desktopControls.style.display = 'none';
+        }
       }
 
       initDesktopControls() {
@@ -1162,8 +1303,8 @@
         this.update(deltaTime);
         this.render();
         
-        // Next frame
-        requestAnimationFrame((time) => this.animate(time));
+        // Continue animation loop
+        this.animationId = requestAnimationFrame(this.animate.bind(this));
       }
     }
 

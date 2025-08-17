@@ -5,6 +5,7 @@ class MultiplayerGame {
     this.dataChannel = null;
     this.role = null;
     this.isConnected = false;
+    this.connectionId = null;
     this.gameState = {
       players: {
         host: {
@@ -60,28 +61,91 @@ class MultiplayerGame {
     // Check if we have connection info from p2p-connect
     this.role = sessionStorage.getItem('connectionRole');
     this.isConnected = sessionStorage.getItem('p2pConnected') === 'true';
+    this.connectionId = sessionStorage.getItem('connectionId');
     
-    if (this.isConnected) {
+    if (this.isConnected && this.connectionId) {
       this.setupConnection();
     }
   }
   
   setupConnection() {
-    // Re-establish the WebRTC connection using stored data
-    // In a real implementation, we'd pass the connection from p2p-connect
-    // For now, we'll set up message handlers
-    
-    // Listen for messages from the game's WebRTC connection
+    // Try to receive connection via BroadcastChannel
+    if (window.BroadcastChannel) {
+      const channel = new BroadcastChannel('game_connection');
+      
+      // Request the connection from connect.html if it's still open
+      channel.postMessage({
+        type: 'request_connection',
+        connectionId: this.connectionId
+      });
+      
+      channel.onmessage = (event) => {
+        if (event.data.type === 'connection_handoff' && 
+            event.data.connectionId === this.connectionId) {
+          // We received the connection!
+          this.pc = event.data.pc;
+          this.dataChannel = event.data.dataChannel;
+          this.role = event.data.role;
+          
+          // Set up data channel handlers
+          if (this.dataChannel) {
+            this.dataChannel.onmessage = (msgEvent) => {
+              try {
+                const message = JSON.parse(msgEvent.data);
+                this.handleMessage(message);
+              } catch (e) {
+                console.error('Failed to parse message:', e);
+              }
+            };
+            
+            this.dataChannel.onerror = (error) => {
+              console.error('Data channel error:', error);
+              this.isConnected = false;
+            };
+            
+            this.dataChannel.onclose = () => {
+              console.log('Data channel closed');
+              this.isConnected = false;
+            };
+          }
+          
+          // Initialize player positions
+          this.initializePositions();
+          
+          // Start sync loops
+          this.startSyncLoop();
+          this.startPingLoop();
+          
+          // Close the broadcast channel
+          channel.close();
+        }
+      };
+      
+      // Timeout fallback - if we don't get connection in 2 seconds
+      setTimeout(() => {
+        if (!this.dataChannel) {
+          console.warn('Connection handoff timeout - falling back to message passing');
+          // Set up message passing fallback
+          this.setupMessagePassingFallback();
+        }
+        channel.close();
+      }, 2000);
+    } else {
+      // Fallback for browsers without BroadcastChannel
+      this.setupMessagePassingFallback();
+    }
+  }
+  
+  setupMessagePassingFallback() {
+    // Listen for messages from the game's WebRTC connection via postMessage
     window.addEventListener('message', (event) => {
       if (event.data.type === 'webrtc-message') {
         this.handleMessage(event.data.message);
       }
     });
     
-    // Start sync loop
+    // Start sync loops anyway
     this.startSyncLoop();
-    
-    // Start ping loop for latency measurement
     this.startPingLoop();
   }
   
@@ -321,23 +385,48 @@ class MultiplayerGame {
     }
   }
   
+  // Initialize player positions
+  initializePositions() {
+    const canvas = document.getElementById('gameCanvas');
+    if (!canvas) {
+      // Try again after DOM is ready
+      setTimeout(() => this.initializePositions(), 100);
+      return;
+    }
+    
+    const width = canvas.width || 800;
+    const height = canvas.height || 600;
+    
+    // Set initial positions
+    this.gameState.players.host.x = width / 3;
+    this.gameState.players.host.y = height / 2;
+    this.gameState.players.player.x = (width * 2) / 3;
+    this.gameState.players.player.y = height / 2;
+    
+    // Reset velocities
+    this.gameState.players.host.vx = 0;
+    this.gameState.players.host.vy = 0;
+    this.gameState.players.player.vx = 0;
+    this.gameState.players.player.vy = 0;
+    
+    // Reset health
+    this.gameState.players.host.health = 100;
+    this.gameState.players.player.health = 100;
+  }
+  
   // Reset round
   resetRound() {
     const canvas = document.getElementById('gameCanvas');
     if (!canvas) return;
     
-    // Reset positions
-    this.gameState.players.host.x = canvas.width / 3;
-    this.gameState.players.host.y = canvas.height / 2;
-    this.gameState.players.host.vx = 0;
-    this.gameState.players.host.vy = 0;
-    this.gameState.players.host.health = 100;
+    const width = canvas.width || 800;
+    const height = canvas.height || 600;
     
-    this.gameState.players.player.x = (canvas.width * 2) / 3;
-    this.gameState.players.player.y = canvas.height / 2;
-    this.gameState.players.player.vx = 0;
-    this.gameState.players.player.vy = 0;
-    this.gameState.players.player.health = 100;
+    // Reset positions
+    this.gameState.players.host.x = width / 3;
+    this.gameState.players.host.y = height / 2;
+    this.gameState.players.player.x = (width * 2) / 3;
+    this.gameState.players.player.y = height / 2;
     
     this.gameState.roundStart = Date.now();
     

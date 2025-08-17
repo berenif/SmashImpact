@@ -1607,17 +1607,29 @@
           break;
           
         case 'gameStart':
-          // Player receives game start command from host
+          // Host started the game
           if (currentRole === 'player') {
-            // Store connection for game to use
+            // Store connection info
+            sessionStorage.setItem('p2pConnected', 'true');
+            sessionStorage.setItem('connectionRole', 'player');
             sessionStorage.setItem('webrtcConnected', 'true');
             
-            // Store connection objects globally
-            window.gameConnection = {
-              pc: pc,
-              dataChannel: dataChannel,
-              role: currentRole
-            };
+            // Create a unique connection ID
+            const connectionId = 'conn_' + Date.now();
+            sessionStorage.setItem('connectionId', connectionId);
+            
+            // Store connection using BroadcastChannel
+            if (window.BroadcastChannel) {
+              const channel = new BroadcastChannel('game_connection');
+              channel.postMessage({
+                type: 'connection_handoff',
+                connectionId: connectionId,
+                role: 'player',
+                pc: pc,
+                dataChannel: dataChannel
+              });
+              channel.close();
+            }
             
             showStatus('Game starting!', 'success');
             setTimeout(() => {
@@ -1771,33 +1783,40 @@
 
     // Host starts the game
     function hostStartGame() {
-      if (currentRole !== 'host') {
-        showStatus('Only the host can start the game', 'error');
-        return;
-      }
-      
-      if (!isConnected || !dataChannel || dataChannel.readyState !== 'open') {
+      if (!dataChannel || dataChannel.readyState !== 'open') {
         showStatus('Connection not ready', 'error');
         return;
       }
       
-      // Store connection in session for game to use
+      // Send game start message to player
+      dataChannel.send(JSON.stringify({ type: 'gameStart' }));
+      
+      // Store connection info in session for game to use
+      sessionStorage.setItem('p2pConnected', 'true');
+      sessionStorage.setItem('connectionRole', 'host');
       sessionStorage.setItem('webrtcConnected', 'true');
       
-      // Store connection objects globally for the game to access
-      window.gameConnection = {
-        pc: pc,
-        dataChannel: dataChannel,
-        role: currentRole
-      };
+      // Store connection state for reconnection
+      // We can't pass the actual RTCPeerConnection and DataChannel objects
+      // through sessionStorage, so we'll need to maintain them differently
       
-      // Send game start signal to player
-      dataChannel.send(JSON.stringify({ 
-        type: 'gameStart',
-        timestamp: Date.now()
-      }));
+      // Create a unique connection ID
+      const connectionId = 'conn_' + Date.now();
+      sessionStorage.setItem('connectionId', connectionId);
       
-      showStatus('Starting game...', 'success');
+      // Store connection in a way that persists across page navigation
+      // We'll use BroadcastChannel API for this
+      if (window.BroadcastChannel) {
+        const channel = new BroadcastChannel('game_connection');
+        channel.postMessage({
+          type: 'connection_handoff',
+          connectionId: connectionId,
+          role: 'host',
+          pc: pc,
+          dataChannel: dataChannel
+        });
+        channel.close();
+      }
       
       // Navigate to game after short delay
       setTimeout(() => {
