@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f1220">
+  <meta name="description" content="P2P WebRTC Game - Connect directly with QR codes">
+  <link rel="manifest" href="manifest.json">
   <title>P2P Connect - WebRTC Game</title>
   
   <!-- React via CDN -->
@@ -22,6 +25,7 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #0f1220;
       color: white;
+      overflow-x: hidden;
     }
     
     /* Animations */
@@ -45,15 +49,24 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     
     .orb1 { animation: float1 22s ease-in-out infinite; }
     .orb2 { animation: float2 24s ease-in-out infinite 1s; }
     .orb3 { animation: float3 26s ease-in-out infinite 0.5s; }
     .qr-float { animation: qrFloat 8s ease-in-out infinite; }
     .scanning { animation: pulse 2s ease-in-out infinite; }
+    .slide-in { animation: slideIn 0.3s ease-out; }
+    .spinner { animation: spin 1s linear infinite; }
     
     @media (prefers-reduced-motion: reduce) {
-      .orb1, .orb2, .orb3, .qr-float, .scanning { animation: none; }
+      .orb1, .orb2, .orb3, .qr-float, .scanning, .slide-in, .spinner { animation: none; }
     }
     
     /* Custom styles */
@@ -61,6 +74,14 @@
     .border-light { border-color: rgba(255, 255, 255, 0.1); }
     .bg-surface { background-color: rgba(255, 255, 255, 0.05); }
     .text-muted { color: rgba(255, 255, 255, 0.7); }
+    
+    /* Glass morphism */
+    .glass {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
     
     /* Video styles */
     video {
@@ -77,145 +98,453 @@
       border-radius: 0.75rem;
       pointer-events: none;
     }
+    
+    /* Toast notifications */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    /* Loading spinner */
+    .loader {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    
+    /* Connection status indicator */
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    .status-dot.connecting { background: #fbbf24; }
+    .status-dot.connected { background: #10b981; }
+    .status-dot.disconnected { background: #ef4444; }
+    .status-dot.error { background: #ef4444; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="module">
-    const { createElement: h, useState, useEffect, useRef } = React;
+    const { createElement: h, useState, useEffect, useRef, useCallback } = React;
     const { createRoot } = ReactDOM;
 
-    // WebRTC connection manager
+    // Configuration
+    const CONFIG = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ],
+      iceTimeout: 10000, // 10 seconds for ICE gathering
+      connectionTimeout: 30000, // 30 seconds for connection
+      pingInterval: 5000, // Ping every 5 seconds
+      reconnectAttempts: 3
+    };
+
+    // Connection states
+    const ConnectionState = {
+      IDLE: 'idle',
+      GENERATING: 'generating',
+      WAITING: 'waiting',
+      CONNECTING: 'connecting',
+      CONNECTED: 'connected',
+      FAILED: 'failed',
+      DISCONNECTED: 'disconnected'
+    };
+
+    // Enhanced WebRTC connection manager
     class WebRTCConnection {
-      constructor() {
+      constructor(onStateChange, onMessage) {
         this.pc = null;
         this.dc = null;
         this.role = null;
+        this.state = ConnectionState.IDLE;
+        this.onStateChange = onStateChange;
+        this.onMessage = onMessage;
+        this.pingTimer = null;
+        this.connectionTimer = null;
+        this.lastPingTime = null;
+        this.rtt = null;
+      }
+
+      updateState(newState) {
+        this.state = newState;
+        this.onStateChange(newState);
       }
 
       async createOffer() {
-        this.role = 'host';
-        this.pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-          ]
-        });
-
-        this.dc = this.pc.createDataChannel('game', { ordered: true });
-        
-        const offer = await this.pc.createOffer();
-        await this.pc.setLocalDescription(offer);
-        
-        // Wait for ICE gathering
-        await new Promise(resolve => {
-          if (this.pc.iceGatheringState === 'complete') {
-            resolve();
-          } else {
-            const checkState = () => {
-              if (this.pc.iceGatheringState === 'complete') {
-                this.pc.removeEventListener('icegatheringstatechange', checkState);
-                resolve();
-              }
-            };
-            this.pc.addEventListener('icegatheringstatechange', checkState);
+        try {
+          this.updateState(ConnectionState.GENERATING);
+          this.role = 'host';
+          
+          this.pc = new RTCPeerConnection({ iceServers: CONFIG.iceServers });
+          this.setupPeerConnection();
+          
+          this.dc = this.pc.createDataChannel('game', { 
+            ordered: true,
+            maxRetransmits: 3
+          });
+          this.setupDataChannel(this.dc);
+          
+          const offer = await this.pc.createOffer();
+          await this.pc.setLocalDescription(offer);
+          
+          // Wait for ICE gathering with timeout
+          const iceComplete = await this.waitForIceGathering();
+          if (!iceComplete) {
+            throw new Error('ICE gathering timeout');
           }
-        });
-
-        return btoa(JSON.stringify(this.pc.localDescription));
+          
+          this.updateState(ConnectionState.WAITING);
+          return btoa(JSON.stringify(this.pc.localDescription));
+        } catch (error) {
+          console.error('Failed to create offer:', error);
+          this.updateState(ConnectionState.FAILED);
+          throw error;
+        }
       }
 
       async acceptOffer(offerData) {
-        this.role = 'player';
-        const offer = JSON.parse(atob(offerData));
-        
-        this.pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-          ]
-        });
+        try {
+          this.updateState(ConnectionState.CONNECTING);
+          this.role = 'player';
+          
+          const offer = JSON.parse(atob(offerData));
+          
+          this.pc = new RTCPeerConnection({ iceServers: CONFIG.iceServers });
+          this.setupPeerConnection();
+          
+          this.pc.ondatachannel = (e) => {
+            this.dc = e.channel;
+            this.setupDataChannel(this.dc);
+          };
 
-        this.pc.ondatachannel = (e) => {
-          this.dc = e.channel;
+          await this.pc.setRemoteDescription(offer);
+          const answer = await this.pc.createAnswer();
+          await this.pc.setLocalDescription(answer);
+
+          // Wait for ICE gathering with timeout
+          const iceComplete = await this.waitForIceGathering();
+          if (!iceComplete) {
+            throw new Error('ICE gathering timeout');
+          }
+
+          this.startConnectionTimer();
+          return btoa(JSON.stringify(this.pc.localDescription));
+        } catch (error) {
+          console.error('Failed to accept offer:', error);
+          this.updateState(ConnectionState.FAILED);
+          throw error;
+        }
+      }
+
+      async acceptAnswer(answerData) {
+        try {
+          this.updateState(ConnectionState.CONNECTING);
+          const answer = JSON.parse(atob(answerData));
+          await this.pc.setRemoteDescription(answer);
+          this.startConnectionTimer();
+        } catch (error) {
+          console.error('Failed to accept answer:', error);
+          this.updateState(ConnectionState.FAILED);
+          throw error;
+        }
+      }
+
+      setupPeerConnection() {
+        this.pc.oniceconnectionstatechange = () => {
+          console.log('ICE connection state:', this.pc.iceConnectionState);
+          
+          switch (this.pc.iceConnectionState) {
+            case 'connected':
+            case 'completed':
+              this.handleConnected();
+              break;
+            case 'disconnected':
+              this.updateState(ConnectionState.DISCONNECTED);
+              break;
+            case 'failed':
+              this.updateState(ConnectionState.FAILED);
+              break;
+          }
         };
 
-        await this.pc.setRemoteDescription(offer);
-        const answer = await this.pc.createAnswer();
-        await this.pc.setLocalDescription(answer);
+        this.pc.onconnectionstatechange = () => {
+          console.log('Connection state:', this.pc.connectionState);
+        };
+      }
 
-        // Wait for ICE gathering
-        await new Promise(resolve => {
+      setupDataChannel(channel) {
+        channel.onopen = () => {
+          console.log('Data channel opened');
+          this.handleConnected();
+        };
+
+        channel.onclose = () => {
+          console.log('Data channel closed');
+          this.updateState(ConnectionState.DISCONNECTED);
+          this.stopPingTimer();
+        };
+
+        channel.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'ping') {
+              this.send({ type: 'pong', timestamp: data.timestamp });
+            } else if (data.type === 'pong') {
+              this.rtt = Date.now() - data.timestamp;
+              console.log('RTT:', this.rtt, 'ms');
+            } else {
+              this.onMessage(data);
+            }
+          } catch (e) {
+            console.error('Failed to parse message:', e);
+          }
+        };
+
+        channel.onerror = (error) => {
+          console.error('Data channel error:', error);
+        };
+      }
+
+      handleConnected() {
+        clearTimeout(this.connectionTimer);
+        this.updateState(ConnectionState.CONNECTED);
+        this.startPingTimer();
+      }
+
+      startConnectionTimer() {
+        this.connectionTimer = setTimeout(() => {
+          if (this.state === ConnectionState.CONNECTING) {
+            console.error('Connection timeout');
+            this.updateState(ConnectionState.FAILED);
+            this.cleanup();
+          }
+        }, CONFIG.connectionTimeout);
+      }
+
+      startPingTimer() {
+        this.pingTimer = setInterval(() => {
+          if (this.dc && this.dc.readyState === 'open') {
+            this.send({ type: 'ping', timestamp: Date.now() });
+          }
+        }, CONFIG.pingInterval);
+      }
+
+      stopPingTimer() {
+        if (this.pingTimer) {
+          clearInterval(this.pingTimer);
+          this.pingTimer = null;
+        }
+      }
+
+      async waitForIceGathering() {
+        return new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            resolve(false);
+          }, CONFIG.iceTimeout);
+
           if (this.pc.iceGatheringState === 'complete') {
-            resolve();
+            clearTimeout(timeout);
+            resolve(true);
           } else {
             const checkState = () => {
               if (this.pc.iceGatheringState === 'complete') {
                 this.pc.removeEventListener('icegatheringstatechange', checkState);
-                resolve();
+                clearTimeout(timeout);
+                resolve(true);
               }
             };
             this.pc.addEventListener('icegatheringstatechange', checkState);
           }
         });
-
-        return btoa(JSON.stringify(this.pc.localDescription));
       }
 
-      async acceptAnswer(answerData) {
-        const answer = JSON.parse(atob(answerData));
-        await this.pc.setRemoteDescription(answer);
+      send(data) {
+        if (this.dc && this.dc.readyState === 'open') {
+          this.dc.send(JSON.stringify(data));
+        }
+      }
+
+      cleanup() {
+        this.stopPingTimer();
+        clearTimeout(this.connectionTimer);
+        
+        if (this.dc) {
+          try { this.dc.close(); } catch (e) {}
+          this.dc = null;
+        }
+        
+        if (this.pc) {
+          try { this.pc.close(); } catch (e) {}
+          this.pc = null;
+        }
+        
+        this.updateState(ConnectionState.IDLE);
+      }
+
+      getStats() {
+        return {
+          state: this.state,
+          role: this.role,
+          rtt: this.rtt,
+          iceConnectionState: this.pc?.iceConnectionState,
+          connectionState: this.pc?.connectionState,
+          dataChannelState: this.dc?.readyState
+        };
       }
     }
 
+    // Toast notification component
+    function Toast({ message, type = 'info' }) {
+      const [visible, setVisible] = useState(true);
+
+      useEffect(() => {
+        const timer = setTimeout(() => setVisible(false), 3000);
+        return () => clearTimeout(timer);
+      }, []);
+
+      if (!visible) return null;
+
+      const bgColor = type === 'error' ? 'bg-red-500' : 
+                     type === 'success' ? 'bg-green-500' : 'bg-gray-800';
+
+      return h('div', { 
+        className: `toast ${bgColor}`,
+        role: 'alert'
+      }, message);
+    }
+
     // Main App Component
-    function P2PConnectMockups() {
+    function P2PConnectApp() {
       const [tab, setTab] = useState('host');
-      const [hostState, setHostState] = useState('waiting');
-      const [playerState, setPlayerState] = useState('scanHost');
+      const [connectionState, setConnectionState] = useState(ConnectionState.IDLE);
       const [connectionData, setConnectionData] = useState(null);
       const [scanResult, setScanResult] = useState(null);
-      const [webrtc] = useState(() => new WebRTCConnection());
-      const bothReady = hostState === 'ready' && playerState === 'ready';
+      const [toasts, setToasts] = useState([]);
+      const [showManualInput, setShowManualInput] = useState(false);
+      const [manualCode, setManualCode] = useState('');
+      const [stats, setStats] = useState(null);
+      
+      const webrtcRef = useRef(null);
 
-      // Generate offer when showing QR
+      // Initialize WebRTC connection
       useEffect(() => {
-        if (hostState === 'showQR' && !connectionData) {
-          webrtc.createOffer().then(offer => {
-            setConnectionData(offer);
-          });
+        webrtcRef.current = new WebRTCConnection(
+          (state) => setConnectionState(state),
+          (message) => handleMessage(message)
+        );
+
+        return () => {
+          if (webrtcRef.current) {
+            webrtcRef.current.cleanup();
+          }
+        };
+      }, []);
+
+      // Update stats periodically
+      useEffect(() => {
+        const interval = setInterval(() => {
+          if (webrtcRef.current) {
+            setStats(webrtcRef.current.getStats());
+          }
+        }, 1000);
+
+        return () => clearInterval(interval);
+      }, []);
+
+      const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 3500);
+      }, []);
+
+      const handleMessage = useCallback((message) => {
+        console.log('Received message:', message);
+        addToast('Message received from peer', 'info');
+      }, [addToast]);
+
+      const generateOffer = async () => {
+        try {
+          const offer = await webrtcRef.current.createOffer();
+          setConnectionData(offer);
+          addToast('Connection offer generated', 'success');
+        } catch (error) {
+          addToast('Failed to generate offer: ' + error.message, 'error');
         }
-      }, [hostState, connectionData, webrtc]);
+      };
 
-      // Handle scan result
-      useEffect(() => {
-        if (scanResult && tab === 'player') {
-          webrtc.acceptOffer(scanResult).then(answer => {
+      const handleScanResult = async (data) => {
+        try {
+          if (tab === 'player' && connectionState === ConnectionState.IDLE) {
+            const answer = await webrtcRef.current.acceptOffer(data);
             setConnectionData(answer);
-            setPlayerState('ready');
-          }).catch(err => {
-            console.error('Failed to accept offer:', err);
-          });
-        } else if (scanResult && tab === 'host') {
-          webrtc.acceptAnswer(scanResult).then(() => {
-            setHostState('ready');
-          }).catch(err => {
-            console.error('Failed to accept answer:', err);
-          });
+            addToast('Connected to host, show answer QR', 'success');
+          } else if (tab === 'host' && connectionState === ConnectionState.WAITING) {
+            await webrtcRef.current.acceptAnswer(data);
+            addToast('Connection established!', 'success');
+          }
+        } catch (error) {
+          addToast('Failed to process QR code: ' + error.message, 'error');
         }
-      }, [scanResult, tab, webrtc]);
+      };
+
+      const handleManualInput = async () => {
+        if (manualCode.trim()) {
+          await handleScanResult(manualCode.trim());
+          setManualCode('');
+          setShowManualInput(false);
+        }
+      };
+
+      const copyToClipboard = async (text) => {
+        try {
+          await navigator.clipboard.writeText(text);
+          addToast('Copied to clipboard', 'success');
+        } catch (error) {
+          addToast('Failed to copy', 'error');
+        }
+      };
+
+      const isConnected = connectionState === ConnectionState.CONNECTED;
 
       return h('div', { className: 'min-h-screen text-white bg-dark relative' },
         // Background
         h(AnimatedBackground),
         
+        // Toasts
+        h('div', { className: 'fixed bottom-20 left-0 right-0 z-50 flex flex-col items-center gap-2' },
+          toasts.map(toast => 
+            h(Toast, { key: toast.id, message: toast.message, type: toast.type })
+          )
+        ),
+        
         // Header
-        h('header', { className: 'relative z-10 border-b border-light' },
+        h('header', { className: 'relative z-10 border-b border-light glass' },
           h('div', { className: 'mx-auto max-w-6xl px-4 py-4 flex items-center justify-between' },
             h('div', { className: 'flex items-center gap-3' },
               h('div', { className: 'w-7 h-7 rounded-md bg-surface grid place-items-center font-bold' }, 'P2P'),
-              h('span', { className: 'text-sm text-muted' }, 'WebRTC Game Connect')
+              h('span', { className: 'text-sm text-muted' }, 'WebRTC Game'),
+              h(ConnectionIndicator, { state: connectionState })
             ),
             h('nav', { className: 'flex items-center gap-2' },
               h('button', {
@@ -233,11 +562,11 @@
               h('a', {
                 href: 'game.html',
                 className: 'px-3 py-1.5 rounded-xl text-sm border bg-surface text-white/80 border-light hover:bg-white/10 transition'
-              }, '🎮 Full Game'),
-              h('a', {
-                href: 'menu.html',
+              }, '🎮 Game'),
+              h('button', {
+                onClick: () => setStats(webrtcRef.current?.getStats()),
                 className: 'px-3 py-1.5 rounded-xl text-sm border bg-surface text-white/80 border-light hover:bg-white/10 transition'
-              }, '📋 All Demos')
+              }, '📊 Stats')
             )
           )
         ),
@@ -245,208 +574,342 @@
         // Hero section
         h('section', { className: 'relative z-10 mx-auto max-w-6xl px-4 py-8' },
           h('h1', { className: 'text-3xl md:text-4xl font-semibold tracking-tight' }, 
-            'WebRTC P2P Connection'),
+            'P2P WebRTC Connection'),
           h('p', { className: 'mt-2 text-muted max-w-2xl' }, 
-            'Connect two browsers directly using QR codes. No server needed after initial connection.')
+            'Connect directly via QR codes or text. No server needed after initial connection.'),
+          stats && h('div', { className: 'mt-4 text-xs text-muted' },
+            `Status: ${stats.state} | Role: ${stats.role || 'none'} | RTT: ${stats.rtt || 'N/A'}ms`
+          )
         ),
         
         // Main content
         h('main', { className: 'relative z-10 mx-auto max-w-6xl px-4 pb-28' },
           tab === 'host' ? 
-            h('div', { className: 'grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6' },
-              h(LeftRail, { 
-                title: 'Host', 
-                subtitle: 'Create a game room',
-                onShowQR: () => setHostState('showQR'),
-                onScanPlayer: () => setHostState('scanPlayer')
+            h('div', { className: 'space-y-6' },
+              // Quick actions
+              h('div', { className: 'flex gap-4 flex-wrap' },
+                h('button', {
+                  onClick: generateOffer,
+                  disabled: connectionState !== ConnectionState.IDLE,
+                  className: 'px-6 py-3 bg-white text-black rounded-xl hover:bg-white/90 transition disabled:opacity-50 disabled:cursor-not-allowed'
+                }, '🎯 Generate Connection Code'),
+                h('button', {
+                  onClick: () => setShowManualInput(!showManualInput),
+                  disabled: connectionState !== ConnectionState.WAITING,
+                  className: 'px-6 py-3 bg-surface border border-light rounded-xl hover:bg-white/10 transition disabled:opacity-50'
+                }, '📋 Paste Answer Code'),
+                h('button', {
+                  onClick: () => webrtcRef.current?.cleanup(),
+                  disabled: connectionState === ConnectionState.IDLE,
+                  className: 'px-6 py-3 bg-red-500/20 border border-red-500/50 rounded-xl hover:bg-red-500/30 transition disabled:opacity-50'
+                }, '🔄 Reset Connection')
+              ),
+              
+              // Connection display
+              connectionState === ConnectionState.WAITING && connectionData && 
+                h(ConnectionDisplay, { 
+                  data: connectionData,
+                  onCopy: copyToClipboard,
+                  title: 'Share this with Player'
+                }),
+              
+              // Manual input
+              showManualInput && h(ManualInput, {
+                value: manualCode,
+                onChange: setManualCode,
+                onSubmit: handleManualInput,
+                placeholder: 'Paste player answer code here'
               }),
-              h('div', { className: 'space-y-6' },
-                h(StatePicker, {
-                  label: 'Host state',
-                  value: hostState,
-                  onChange: setHostState,
-                  options: [
-                    { value: 'waiting', label: 'Waiting' },
-                    { value: 'showQR', label: 'Show QR' },
-                    { value: 'scanPlayer', label: 'Scan Answer' },
-                    { value: 'ready', label: 'Connected' }
-                  ]
+              
+              // Scanner
+              connectionState === ConnectionState.WAITING && 
+                h(QRScanner, { 
+                  label: 'Or scan player answer QR',
+                  onScan: handleScanResult
                 }),
-                hostState === 'waiting' && h(HostWaiting),
-                hostState === 'showQR' && h(HostShowQR, { data: connectionData }),
-                hostState === 'scanPlayer' && h(QRScanner, { 
-                  label: 'Scan player answer QR',
-                  onScan: setScanResult 
-                }),
-                hostState === 'ready' && h(HostReady)
-              )
+              
+              // Status
+              h(ConnectionStatus, { state: connectionState, role: 'host' })
             ) :
-            h('div', { className: 'grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6' },
-              h(LeftRail, { 
-                title: 'Player', 
-                subtitle: 'Join a game room',
-                onShowQR: () => playerState === 'ready' && setPlayerState('ready'),
-                onScanPlayer: () => setPlayerState('scanHost')
-              }),
-              h('div', { className: 'space-y-6' },
-                h(StatePicker, {
-                  label: 'Player state',
-                  value: playerState,
-                  onChange: setPlayerState,
-                  options: [
-                    { value: 'scanHost', label: 'Scan Host QR' },
-                    { value: 'ready', label: 'Connected' }
-                  ]
-                }),
-                playerState === 'scanHost' && h(QRScanner, { 
+            // Player tab
+            h('div', { className: 'space-y-6' },
+              // Quick actions
+              h('div', { className: 'flex gap-4 flex-wrap' },
+                h('button', {
+                  onClick: () => setShowManualInput(!showManualInput),
+                  disabled: connectionState !== ConnectionState.IDLE,
+                  className: 'px-6 py-3 bg-surface border border-light rounded-xl hover:bg-white/10 transition disabled:opacity-50'
+                }, '📋 Paste Host Code'),
+                h('button', {
+                  onClick: () => webrtcRef.current?.cleanup(),
+                  disabled: connectionState === ConnectionState.IDLE,
+                  className: 'px-6 py-3 bg-red-500/20 border border-red-500/50 rounded-xl hover:bg-red-500/30 transition disabled:opacity-50'
+                }, '🔄 Reset Connection')
+              ),
+              
+              // Scanner
+              connectionState === ConnectionState.IDLE && 
+                h(QRScanner, { 
                   label: 'Scan host QR code to connect',
-                  onScan: setScanResult 
+                  onScan: handleScanResult
                 }),
-                playerState === 'ready' && h(PlayerReady, { data: connectionData })
-              )
+              
+              // Manual input
+              showManualInput && connectionState === ConnectionState.IDLE && h(ManualInput, {
+                value: manualCode,
+                onChange: setManualCode,
+                onSubmit: handleManualInput,
+                placeholder: 'Paste host connection code here'
+              }),
+              
+              // Answer display
+              connectionState === ConnectionState.CONNECTING && connectionData && 
+                h(ConnectionDisplay, { 
+                  data: connectionData,
+                  onCopy: copyToClipboard,
+                  title: 'Share this answer with Host'
+                }),
+              
+              // Status
+              h(ConnectionStatus, { state: connectionState, role: 'player' })
             )
         ),
         
         // Footer
-        h('footer', { className: 'fixed bottom-0 inset-x-0 bg-black/60 backdrop-blur border-t border-light' },
-          h('div', { className: 'mx-auto max-w-6xl px-4 py-3 flex items-center gap-4' },
-            h(StepDots, { 
-              steps: ['Choose role', 'Exchange QR', 'Connected'],
-              activeIndex: bothReady ? 2 : 1
-            }),
-            h('div', { className: 'ml-auto flex items-center gap-3' },
-              h('span', { className: 'text-sm text-muted hidden sm:block' }, 'Connection status'),
-              h('span', { 
-                className: `px-2 py-1 rounded-md text-xs ${
-                  bothReady ? 'bg-emerald-400 text-black' : 'bg-white/10 text-white/80'
-                }`
-              }, bothReady ? 'P2P Connected' : 'Waiting for connection'),
-              h('button', {
-                className: `px-4 py-2 rounded-xl text-sm font-medium transition ${
-                  bothReady ? 'bg-white text-black hover:bg-white/90' : 'bg-white/10 text-white/60 cursor-not-allowed'
-                }`,
-                disabled: !bothReady,
-                onClick: () => bothReady && (window.location.href = 'game.html')
-              }, 'Start Game')
-            )
+        h('footer', { className: 'fixed bottom-0 inset-x-0 glass border-t border-light' },
+          h('div', { className: 'mx-auto max-w-6xl px-4 py-3 flex items-center justify-between' },
+            h('div', { className: 'text-sm text-muted' },
+              isConnected ? '✅ Connected - Ready to play!' : '⏳ Not connected'
+            ),
+            h('button', {
+              className: `px-4 py-2 rounded-xl text-sm font-medium transition ${
+                isConnected ? 'bg-white text-black hover:bg-white/90' : 'bg-white/10 text-white/60 cursor-not-allowed'
+              }`,
+              disabled: !isConnected,
+              onClick: () => isConnected && (window.location.href = 'game.html')
+            }, 'Start Game')
           )
         )
       );
     }
 
-    // QR Scanner Component
+    // Connection indicator component
+    function ConnectionIndicator({ state }) {
+      const getStatusClass = () => {
+        switch (state) {
+          case ConnectionState.CONNECTED: return 'connected';
+          case ConnectionState.CONNECTING: 
+          case ConnectionState.GENERATING:
+          case ConnectionState.WAITING: return 'connecting';
+          case ConnectionState.FAILED:
+          case ConnectionState.DISCONNECTED: return 'error';
+          default: return 'disconnected';
+        }
+      };
+
+      return h('div', { className: 'flex items-center gap-2' },
+        h('span', { className: `status-dot ${getStatusClass()}` }),
+        h('span', { className: 'text-xs text-muted' }, state)
+      );
+    }
+
+    // Connection status component
+    function ConnectionStatus({ state, role }) {
+      const getMessage = () => {
+        switch (state) {
+          case ConnectionState.IDLE:
+            return role === 'host' ? 'Click "Generate Connection Code" to start' : 'Scan host QR or paste code';
+          case ConnectionState.GENERATING:
+            return 'Generating connection code...';
+          case ConnectionState.WAITING:
+            return 'Waiting for player to connect...';
+          case ConnectionState.CONNECTING:
+            return 'Establishing connection...';
+          case ConnectionState.CONNECTED:
+            return '🎉 Connected successfully!';
+          case ConnectionState.FAILED:
+            return '❌ Connection failed. Please try again.';
+          case ConnectionState.DISCONNECTED:
+            return '🔌 Connection lost. Please reconnect.';
+          default:
+            return 'Unknown state';
+        }
+      };
+
+      return h('div', { className: 'rounded-2xl border border-light bg-surface p-6 text-center' },
+        h('div', { className: 'text-2xl mb-2' },
+          state === ConnectionState.CONNECTING ? h('div', { className: 'loader spinner mx-auto' }) :
+          state === ConnectionState.CONNECTED ? '✅' :
+          state === ConnectionState.FAILED ? '❌' :
+          '📡'
+        ),
+        h('p', { className: 'text-lg' }, getMessage())
+      );
+    }
+
+    // Connection display component
+    function ConnectionDisplay({ data, onCopy, title }) {
+      return h('div', { className: 'rounded-2xl border border-light bg-surface p-6' },
+        h('h3', { className: 'text-lg font-semibold mb-4' }, title),
+        h('div', { className: 'flex flex-col md:flex-row gap-6 items-center' },
+          h(QRCode, { size: 256, data: data }),
+          h('div', { className: 'flex-1 space-y-4' },
+            h('div', { className: 'p-3 bg-black/30 rounded-lg' },
+              h('p', { className: 'text-xs text-muted mb-2' }, 'Connection Code:'),
+              h('p', { 
+                className: 'text-xs font-mono break-all',
+                style: { maxHeight: '100px', overflow: 'auto' }
+              }, data.substring(0, 100) + '...')
+            ),
+            h('button', {
+              onClick: () => onCopy(data),
+              className: 'w-full px-4 py-2 bg-white text-black rounded-xl hover:bg-white/90 transition'
+            }, '📋 Copy Full Code')
+          )
+        )
+      );
+    }
+
+    // Manual input component
+    function ManualInput({ value, onChange, onSubmit, placeholder }) {
+      return h('div', { className: 'rounded-2xl border border-light bg-surface p-6' },
+        h('div', { className: 'space-y-4' },
+          h('textarea', {
+            value: value,
+            onChange: (e) => onChange(e.target.value),
+            placeholder: placeholder,
+            className: 'w-full h-32 px-4 py-2 bg-black/30 border border-light rounded-lg text-white placeholder-white/50 font-mono text-sm',
+            style: { resize: 'vertical' }
+          }),
+          h('button', {
+            onClick: onSubmit,
+            disabled: !value.trim(),
+            className: 'w-full px-4 py-2 bg-white text-black rounded-xl hover:bg-white/90 transition disabled:opacity-50'
+          }, 'Apply Code')
+        )
+      );
+    }
+
+    // QR Scanner Component (improved)
     function QRScanner({ label, onScan }) {
       const videoRef = useRef(null);
       const canvasRef = useRef(null);
       const [scanning, setScanning] = useState(false);
       const [error, setError] = useState(null);
       const streamRef = useRef(null);
+      const animationRef = useRef(null);
 
       const startScanning = async () => {
         try {
           setError(null);
           setScanning(true);
           
-          // Try different camera constraints for better compatibility
+          // Request camera with fallbacks
           let stream;
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ 
-              video: { 
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-              } 
-            });
-          } catch (e) {
-            // Fallback to simpler constraints
-            stream = await navigator.mediaDevices.getUserMedia({ 
-              video: true 
-            });
+          const constraints = [
+            { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { video: true }
+          ];
+          
+          for (const constraint of constraints) {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia(constraint);
+              break;
+            } catch (e) {
+              console.log('Constraint failed:', constraint, e);
+            }
+          }
+          
+          if (!stream) {
+            throw new Error('Could not access camera');
           }
           
           streamRef.current = stream;
           
-          // Wait for video element to be ready
-          await new Promise((resolve) => {
-            const checkVideo = () => {
-              if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.onloadedmetadata = () => {
-                  videoRef.current.play();
-                  resolve();
-                };
-              } else {
-                setTimeout(checkVideo, 100);
-              }
-            };
-            checkVideo();
-          });
-          
-          // Start scanning after video is playing
-          setTimeout(() => scanQRCode(), 500);
+          // Setup video
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await new Promise((resolve) => {
+              videoRef.current.onloadedmetadata = () => {
+                videoRef.current.play();
+                resolve();
+              };
+            });
+            
+            // Start scanning
+            setTimeout(() => startScanLoop(), 500);
+          }
         } catch (err) {
           setScanning(false);
-          let errorMsg = 'Camera access denied. Please allow camera access to scan QR codes.';
-          if (err.name === 'NotFoundError') {
-            errorMsg = 'No camera found on this device.';
-          } else if (err.name === 'NotAllowedError') {
-            errorMsg = 'Camera permission denied. Please allow camera access and refresh.';
-          } else if (err.name === 'NotReadableError') {
-            errorMsg = 'Camera is already in use by another application.';
-          }
+          const errorMsg = err.name === 'NotFoundError' ? 'No camera found' :
+                          err.name === 'NotAllowedError' ? 'Camera permission denied' :
+                          err.name === 'NotReadableError' ? 'Camera already in use' :
+                          'Camera access failed';
           setError(errorMsg);
           console.error('Camera error:', err);
         }
       };
 
+      const startScanLoop = () => {
+        const scan = () => {
+          if (!streamRef.current || !videoRef.current || !canvasRef.current) {
+            return;
+          }
+
+          const video = videoRef.current;
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext('2d');
+
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              
+              if (typeof jsQR !== 'undefined') {
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                  inversionAttempts: 'dontInvert'
+                });
+                
+                if (code && code.data) {
+                  console.log('QR Code detected');
+                  stopScanning();
+                  onScan(code.data);
+                  return;
+                }
+              }
+            } catch (e) {
+              console.error('Scan error:', e);
+            }
+          }
+
+          animationRef.current = requestAnimationFrame(scan);
+        };
+        
+        scan();
+      };
+
       const stopScanning = () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+        
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
+        
         setScanning(false);
       };
 
-      const scanQRCode = () => {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        
-        if (!video || !canvas || !streamRef.current) {
-          return;
-        }
-
-        const ctx = canvas.getContext('2d');
-
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          try {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            if (typeof jsQR !== 'undefined') {
-              const code = jsQR(imageData.data, imageData.width, imageData.height);
-              
-              if (code && code.data) {
-                console.log('QR Code detected:', code.data);
-                stopScanning();
-                onScan(code.data);
-                return;
-              }
-            }
-          } catch (e) {
-            console.error('QR scanning error:', e);
-          }
-        }
-
-        if (scanning) {
-          requestAnimationFrame(scanQRCode);
-        }
-      };
-
       useEffect(() => {
-        return () => stopScanning();
+        return () => {
+          stopScanning();
+        };
       }, []);
 
       return h('div', { className: 'rounded-2xl border border-light bg-surface p-4' },
@@ -469,8 +932,7 @@
                 autoPlay: true,
                 playsInline: true,
                 muted: true,
-                className: 'w-full h-full object-cover',
-                style: { display: 'block' }
+                className: 'w-full h-full object-cover'
               }),
               h('canvas', {
                 ref: canvasRef,
@@ -478,82 +940,18 @@
               }),
               h('div', { className: 'scan-overlay scanning' }),
               h('div', { className: 'absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-lg text-xs text-white' },
-                '📷 Scanning for QR code...'
+                '📷 Scanning...'
               ),
               h('button', {
                 onClick: stopScanning,
                 className: 'absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition'
-              }, 'Stop Scanning')
+              }, 'Stop')
             )
         )
       );
     }
 
-    // Components
-    function AnimatedBackground() {
-      return h('div', { className: 'pointer-events-none absolute inset-0 overflow-hidden' },
-        h('div', { 
-          className: 'orb1 absolute -top-24 -left-24 w-[40vw] h-[40vw] rounded-full blur-3xl',
-          style: { background: 'radial-gradient(circle at center, rgba(99,102,241,0.25), rgba(99,102,241,0) 60%)' }
-        }),
-        h('div', { 
-          className: 'orb2 absolute -bottom-24 -right-24 w-[42vw] h-[42vw] rounded-full blur-3xl',
-          style: { background: 'radial-gradient(circle at center, rgba(34,211,238,0.22), rgba(34,211,238,0) 60%)' }
-        }),
-        h('div', { 
-          className: 'orb3 absolute top-1/3 left-1/4 w-[28vw] h-[28vw] rounded-full blur-3xl',
-          style: { background: 'radial-gradient(circle at center, rgba(236,72,153,0.18), rgba(236,72,153,0) 60%)' }
-        })
-      );
-    }
-
-    function LeftRail({ title, subtitle, onShowQR, onScanPlayer }) {
-      return h('aside', { className: 'rounded-2xl border border-light bg-surface p-4' },
-        h('div', { className: 'text-xs uppercase tracking-wider text-white/60' }, title),
-        h('div', { className: 'mt-1 text-sm text-white/80' }, subtitle),
-        h('div', { className: 'mt-4 grid gap-2' },
-          h('button', { 
-            onClick: onShowQR,
-            className: 'h-12 rounded-xl border border-light bg-surface hover:bg-white/10 text-left px-3 transition' 
-          },
-            h('div', { className: 'text-xs text-white/60' }, 'Step 1'),
-            h('div', { className: 'text-sm' }, 'Show QR Code')
-          ),
-          h('button', { 
-            onClick: onScanPlayer,
-            className: 'h-12 rounded-xl border border-light bg-surface hover:bg-white/10 text-left px-3 transition' 
-          },
-            h('div', { className: 'text-xs text-white/60' }, 'Step 2'),
-            h('div', { className: 'text-sm' }, 'Scan Response')
-          )
-        )
-      );
-    }
-
-    function StatePicker({ label, value, onChange, options }) {
-      return h('div', { className: 'flex flex-wrap items-center gap-2' },
-        h('span', { className: 'text-sm text-muted mr-1' }, label + ':'),
-        ...options.map(o => 
-          h('button', {
-            key: o.value,
-            onClick: () => onChange(o.value),
-            className: `px-3 py-1.5 rounded-xl text-sm border transition ${
-              value === o.value ? 'bg-white text-black border-white' : 'bg-surface text-white/80 border-light hover:bg-white/10'
-            }`
-          }, o.label)
-        )
-      );
-    }
-
-    function ScreenCard({ title, children }) {
-      return h('div', { className: 'rounded-2xl border border-light bg-surface p-4' },
-        h('div', { className: 'text-xs uppercase tracking-wider text-white/60 mb-2' }, title),
-        h('div', { className: 'rounded-2xl border border-light bg-black/30 p-4 min-h-[280px] grid place-items-center' },
-          children
-        )
-      );
-    }
-
+    // QR Code component
     function QRCode({ size = 192, data = null }) {
       const canvasRef = useRef(null);
       
@@ -590,7 +988,7 @@
       }, [size, data]);
       
       return h('div', {
-        className: 'bg-white rounded-lg p-2 shadow-inner qr-float',
+        className: 'bg-white rounded-lg p-2 shadow-inner qr-float inline-block',
         style: { width: size, height: size }
       },
         data ? 
@@ -601,76 +999,26 @@
             style: { display: 'block' }
           }) :
           h('div', { className: 'w-full h-full flex items-center justify-center text-black' },
-            h('div', { className: 'text-center' },
-              h('div', { className: 'text-2xl mb-2' }, '⏳'),
-              h('div', { className: 'text-sm' }, 'Generating...')
-            )
+            h('div', { className: 'loader spinner' })
           )
       );
     }
 
-    function Pill({ text, muted = false }) {
-      return h('div', {
-        className: `w-full h-12 rounded-xl border grid place-items-center text-sm ${
-          muted ? 'bg-surface text-white/60 border-light' : 'bg-white text-black border-white'
-        }`
-      }, text);
-    }
-
-    function StepDots({ steps, activeIndex }) {
-      return h('ol', { className: 'flex items-center gap-3' },
-        ...steps.map((s, i) =>
-          h('li', { key: s, className: 'flex items-center gap-2' },
-            h('span', { className: `w-2.5 h-2.5 rounded-full ${i <= activeIndex ? 'bg-white' : 'bg-white/30'}` }),
-            h('span', { className: `text-xs ${i === activeIndex ? 'text-white' : 'text-white/60'}` }, s),
-            i < steps.length - 1 && h('span', { className: 'w-6 h-px bg-white/20' })
-          )
-        )
-      );
-    }
-
-    // Screen components
-    function HostWaiting() {
-      return h(ScreenCard, { title: 'Waiting Room' },
-        h('div', { className: 'w-full max-w-xl space-y-4' },
-          h(Pill, { text: '👤 You (Host)' }),
-          h(Pill, { text: '⏳ Waiting for player...', muted: true }),
-          h('p', { className: 'text-sm text-muted text-center mt-4' }, 
-            'Click "Show QR" to generate a connection code')
-        )
-      );
-    }
-
-    function HostShowQR({ data }) {
-      return h('div', { className: 'w-full grid place-items-center gap-4' },
-        h(QRCode, { size: 280, data: data }),
-        h('div', { className: 'text-center space-y-2' },
-          h('div', { className: 'text-sm text-white/80' }, 'Player should scan this code'),
-          h('div', { className: 'text-xs text-muted' }, 'Then you scan their response')
-        )
-      );
-    }
-
-    function HostReady() {
-      return h(ScreenCard, { title: 'Connected!' },
-        h('div', { className: 'w-full max-w-xl space-y-4' },
-          h(Pill, { text: '✅ You (Host)' }),
-          h(Pill, { text: '✅ Player Connected' }),
-          h('p', { className: 'text-sm text-emerald-400 text-center mt-4' }, 
-            'WebRTC connection established!')
-        )
-      );
-    }
-
-    function PlayerReady({ data }) {
-      return h(ScreenCard, { title: 'Show this to Host' },
-        h('div', { className: 'w-full grid place-items-center gap-4' },
-          data ? 
-            h(QRCode, { size: 280, data: data }) :
-            h(Pill, { text: '✅ Connected to host' }),
-          h('p', { className: 'text-sm text-emerald-400 text-center' }, 
-            'Connection answer generated. Host should scan this.')
-        )
+    // Animated background
+    function AnimatedBackground() {
+      return h('div', { className: 'pointer-events-none absolute inset-0 overflow-hidden' },
+        h('div', { 
+          className: 'orb1 absolute -top-24 -left-24 w-[40vw] h-[40vw] rounded-full blur-3xl',
+          style: { background: 'radial-gradient(circle at center, rgba(99,102,241,0.25), rgba(99,102,241,0) 60%)' }
+        }),
+        h('div', { 
+          className: 'orb2 absolute -bottom-24 -right-24 w-[42vw] h-[42vw] rounded-full blur-3xl',
+          style: { background: 'radial-gradient(circle at center, rgba(34,211,238,0.22), rgba(34,211,238,0) 60%)' }
+        }),
+        h('div', { 
+          className: 'orb3 absolute top-1/3 left-1/4 w-[28vw] h-[28vw] rounded-full blur-3xl',
+          style: { background: 'radial-gradient(circle at center, rgba(236,72,153,0.18), rgba(236,72,153,0) 60%)' }
+        })
       );
     }
 
@@ -680,13 +1028,18 @@
       if (container) {
         try {
           const root = createRoot(container);
-          root.render(h(P2PConnectMockups));
+          root.render(h(P2PConnectApp));
         } catch (error) {
           console.error('Failed to render:', error);
-          container.innerHTML = '<div style="padding: 20px;">Error loading app. Please refresh.</div>';
+          container.innerHTML = '<div style="padding: 20px; color: white;">Error loading app. Please refresh.</div>';
         }
       }
     });
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(e => console.log('SW registration failed'));
+    }
   </script>
 </body>
 </html>
