@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P2P Connect Mockup - LAN Game</title>
+  
+  <!-- React and dependencies via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Framer Motion -->
+  <script src="https://unpkg.com/framer-motion@11.0.3/dist/framer-motion.js"></script>
+  
+  <!-- Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    /* Custom styles for the mockup */
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    
+    /* Ensure Tailwind processes our custom colors */
+    .bg-\[#0f1220\] { background-color: #0f1220; }
+    
+    /* Focus styles */
+    *:focus-visible {
+      outline: 2px solid #00d4ff;
+      outline-offset: 2px;
+    }
+    
+    /* Smooth transitions */
+    * {
+      transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { motion, useReducedMotion } = window["framer-motion"];
+
+    // High-contrast, gradient glow, product-first mockups for a P2P QR connect flow
+    // Screens covered: Host Waiting, Host Show QR, Host Scan Player, Host Ready, Player Scan Host, Player Ready
+
+    function P2PConnectMockups() {
+      const [tab, setTab] = useState("host");
+      const [hostState, setHostState] = useState("waiting");
+      const [playerState, setPlayerState] = useState("scanHost");
+      const bothReady = hostState === "ready" && playerState === "ready";
+
+      return (
+        <div className="min-h-screen text-white bg-[#0f1220] relative">
+          {/* Subtle animated background, respects reduced motion */}
+          <AnimatedBackground />
+
+          {/* Top bar */}
+          <header className="relative z-10 border-b border-white/10">
+            <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-md bg-white/10 grid place-items-center font-bold">P2P</div>
+                <span className="text-sm text-white/70">LAN Game Connect</span>
+              </div>
+              <nav className="flex items-center gap-2" role="tablist" aria-label="Screen set">
+                {[
+                  { id: "host", label: "Host UI" },
+                  { id: "player", label: "Player UI" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    role="tab"
+                    aria-selected={tab === t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`px-3 py-1.5 rounded-xl text-sm border transition outline-offset-2 focus:ring-2 focus:ring-cyan-400 focus:outline-none ${
+                      tab === t.id
+                        ? "bg-white text-black border-white"
+                        : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </header>
+
+          {/* Hero headline */}
+          <section className="relative z-10 mx-auto max-w-6xl px-4 py-8">
+            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Connect two browsers on the same network, then start the match</h1>
+            <p className="mt-2 text-white/70 max-w-2xl">Fast QR pairing, clear steps, and a single primary action. Accessible, with visible focus states.</p>
+          </section>
+
+          {/* Controls and screens */}
+          <main className="relative z-10 mx-auto max-w-6xl px-4 pb-28">
+            {tab === "host" && (
+              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+                <LeftRail title="Host" subtitle="Press to show code or scan a player" />
+                <div className="space-y-6">
+                  <StatePicker
+                    label="Host state"
+                    value={hostState}
+                    onChange={(v) => setHostState(v)}
+                    options={[
+                      { value: "waiting", label: "Waiting" },
+                      { value: "showQR", label: "Show QR" },
+                      { value: "scanPlayer", label: "Scan Player Code" },
+                      { value: "ready", label: "Ready" },
+                    ]}
+                  />
+                  {hostState === "waiting" && <HostWaiting />}
+                  {hostState === "showQR" && <HostShowQR />}
+                  {hostState === "scanPlayer" && <HostScanPlayer />}
+                  {hostState === "ready" && <HostReady />}
+                </div>
+              </div>
+            )}
+
+            {tab === "player" && (
+              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+                <LeftRail title="Player" subtitle="Scan the host code to join" />
+                <div className="space-y-6">
+                  <StatePicker
+                    label="Player state"
+                    value={playerState}
+                    onChange={(v) => setPlayerState(v)}
+                    options={[
+                      { value: "scanHost", label: "Scan Host QR" },
+                      { value: "ready", label: "Ready" },
+                    ]}
+                  />
+                  {playerState === "scanHost" && <PlayerScanHost />}
+                  {playerState === "ready" && <PlayerReady />}
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Persistent action bar */}
+          <footer className="fixed bottom-0 inset-x-0 bg-black/60 backdrop-blur border-t border-white/10">
+            <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-4">
+              <StepDots steps={["Choose host", "Scan QR", "Start game"]} activeIndex={bothReady ? 2 : 1} />
+              <div className="ml-auto flex items-center gap-3">
+                <span className="text-sm text-white/70 hidden sm:block">Ready status</span>
+                <span className={`px-2 py-1 rounded-md text-xs ${bothReady ? "bg-emerald-400 text-black" : "bg-white/10 text-white/80"}`} aria-live="polite">
+                  {bothReady ? "Both connected" : "Waiting for devices"}
+                </span>
+                <button
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-400 ${
+                    bothReady
+                      ? "bg-white text-black hover:bg-white/90"
+                      : "bg-white/10 text-white/60 cursor-not-allowed"
+                  }`}
+                  aria-disabled={!bothReady}
+                >
+                  Start match
+                </button>
+              </div>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    function AnimatedBackground() {
+      const reduce = useReducedMotion();
+      if (reduce) {
+        return (
+          <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(50%_50%_at_50%_30%,_black_40%,_transparent_75%)]">
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/15 via-fuchsia-500/10 to-cyan-500/15 blur-3xl" />
+          </div>
+        );
+      }
+      return (
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          {/* Soft orbs that drift slowly */}
+          <motion.div
+            className="absolute -top-24 -left-24 w-[40vw] h-[40vw] rounded-full blur-3xl"
+            style={{ background: "radial-gradient(circle at center, rgba(99,102,241,0.25), rgba(99,102,241,0) 60%)" }}
+            animate={{ x: [0, 20, 0], y: [0, -10, 0], rotate: [0, 10, 0] }}
+            transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute -bottom-24 -right-24 w-[42vw] h-[42vw] rounded-full blur-3xl"
+            style={{ background: "radial-gradient(circle at center, rgba(34,211,238,0.22), rgba(34,211,238,0) 60%)" }}
+            animate={{ x: [0, -16, 0], y: [0, 14, 0], rotate: [0, -8, 0] }}
+            transition={{ duration: 24, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          />
+          <motion.div
+            className="absolute top-1/3 left-1/4 w-[28vw] h-[28vw] rounded-full blur-3xl"
+            style={{ background: "radial-gradient(circle at center, rgba(236,72,153,0.18), rgba(236,72,153,0) 60%)" }}
+            animate={{ y: [0, 12, 0] }}
+            transition={{ duration: 26, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+          />
+          {/* Light mask to keep the center readable */}
+          <div className="absolute inset-0 [mask-image:radial-gradient(50%_50%_at_50%_30%,_black_40%,_transparent_75%)]">
+            <div className="absolute inset-0 bg-black/20" />
+          </div>
+        </div>
+      );
+    }
+
+    function LeftRail({ title, subtitle }) {
+      return (
+        <aside className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-xs uppercase tracking-wider text-white/60">{title}</div>
+          <div className="mt-1 text-sm text-white/80">{subtitle}</div>
+          <div className="mt-4 grid gap-2">
+            <button className="h-12 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-400 text-left px-3">
+              <div className="text-xs text-white/60">QR Code</div>
+              <div className="text-sm">Press to show</div>
+            </button>
+            <button className="h-12 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-400 text-left px-3">
+              <div className="text-xs text-white/60">Alternative</div>
+              <div className="text-sm">Paste code</div>
+            </button>
+          </div>
+        </aside>
+      );
+    }
+
+    function StatePicker({ label, value, onChange, options }) {
+      return (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={label}>
+          <span className="text-sm text-white/70 mr-1">{label}:</span>
+          {options.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => onChange(o.value)}
+              className={`px-3 py-1.5 rounded-xl text-sm border transition focus:outline-none focus:ring-2 focus:ring-cyan-400 ${
+                value === o.value
+                  ? "bg-white text-black border-white"
+                  : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10"
+              }`}
+              aria-pressed={value === o.value}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    function ScreenCard({ title, children }) {
+      return (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-xs uppercase tracking-wider text-white/60 mb-2">{title}</div>
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-4 min-h-[280px] grid place-items-center">
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    function PlaceholderQR({ size = 192 }) {
+      const reduce = useReducedMotion();
+      return (
+        <motion.div
+          role="img"
+          aria-label="QR code placeholder"
+          className="bg-white rounded-lg p-2 shadow-inner"
+          style={{ width: size, height: size }}
+          animate={reduce ? undefined : { y: [0, -4, 0] }}
+          transition={reduce ? undefined : { duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {/* simple fake QR pattern */}
+          <div className="grid grid-cols-6 gap-1 h-full">
+            {Array.from({ length: 36 }).map((_, i) => (
+              <div key={i} className={`${(i + Math.floor(i / 6)) % 2 === 0 ? "bg-black" : "bg-white"}`} />
+            ))}
+          </div>
+        </motion.div>
+      );
+    }
+
+    function CameraFrame({ label = "Scan code", compact = false }) {
+      const reduce = useReducedMotion();
+      return (
+        <motion.div
+          className={`w-full ${compact ? "h-56" : "h-80"} rounded-2xl border border-white/20 bg-gradient-to-b from-white/5 to-white/0 grid place-items-center relative overflow-hidden`}
+          animate={reduce ? undefined : { y: [0, 3, 0] }}
+          transition={reduce ? undefined : { duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <div className="absolute inset-8 border-2 border-white/70 rounded-xl pointer-events-none"></div>
+          <span className="absolute -bottom-5 translate-y-full text-sm text-white/80">{label}</span>
+        </motion.div>
+      );
+    }
+
+    /* Host screens */
+    function HostWaiting() {
+      return (
+        <ScreenCard title="Lobby">
+          <div className="w-full max-w-xl space-y-4">
+            <Pill text="You" />
+            <Pill text="Waiting for another player" muted />
+          </div>
+        </ScreenCard>
+      );
+    }
+
+    function HostShowQR() {
+      return (
+        <div className="w-full grid place-items-center gap-4">
+          <PlaceholderQR size={220} />
+          <div className="text-sm text-white/80">Show this code to the player</div>
+        </div>
+      );
+    }
+
+    function HostScanPlayer() {
+      return (
+        <ScreenCard title="Scan player code">
+          <div className="w-full max-w-xl space-y-4 grid place-items-center">
+            <CameraFrame label="Scan player QR" />
+          </div>
+        </ScreenCard>
+      );
+    }
+
+    function HostReady() {
+      return (
+        <ScreenCard title="Ready">
+          <div className="w-full max-w-xl space-y-4">
+            <Pill text="You" />
+            <Pill text="Player 2" />
+          </div>
+        </ScreenCard>
+      );
+    }
+
+    /* Player screens */
+    function PlayerScanHost() {
+      return (
+        <div className="w-full grid place-items-center gap-4">
+          <CameraFrame label="Scan host QR code" />
+        </div>
+      );
+    }
+
+    function PlayerReady() {
+      return (
+        <ScreenCard title="Ready">
+          <div className="w-full max-w-sm">
+            <Pill text="Connected to host" />
+          </div>
+        </ScreenCard>
+      );
+    }
+
+    function Pill({ text, muted = false }) {
+      return (
+        <div
+          className={`w-full h-12 rounded-xl border grid place-items-center text-sm ${
+            muted
+              ? "bg-white/5 text-white/60 border-white/10"
+              : "bg-white text-black border-white"
+          }`}
+          role="status"
+          aria-label={text}
+        >
+          {text}
+        </div>
+      );
+    }
+
+    function StepDots({ steps, activeIndex }) {
+      return (
+        <ol className="flex items-center gap-3" aria-label="Progress">
+                {steps.map((s, i) => (
+        <li key={s} className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${i <= activeIndex ? "bg-white" : "bg-white/30"}`} />
+              <span className={`text-xs ${i === activeIndex ? "text-white" : "text-white/60"}`}>{s}</span>
+              {i < steps.length - 1 && <span className="w-6 h-px bg-white/20" />}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<P2PConnectMockups />);
+  </script>
+</body>
+</html>
