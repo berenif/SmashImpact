@@ -1618,21 +1618,14 @@
             const connectionId = 'conn_' + Date.now();
             sessionStorage.setItem('connectionId', connectionId);
             
-            // Store connection using BroadcastChannel
-            if (window.BroadcastChannel) {
-              const channel = new BroadcastChannel('game_connection');
-              channel.postMessage({
-                type: 'connection_handoff',
-                connectionId: connectionId,
-                role: 'player',
-                pc: pc,
-                dataChannel: dataChannel
-              });
-              channel.close();
-            }
+            // Store the connection globally so it persists
+            window.gamePC = pc;
+            window.gameDataChannel = dataChannel;
+            window.gameRole = 'player';
             
             showStatus('Game starting!', 'success');
             setTimeout(() => {
+              // Open game in same window to preserve connection
               window.location.href = 'game.html';
             }, 1000);
           }
@@ -1796,30 +1789,20 @@
       sessionStorage.setItem('connectionRole', 'host');
       sessionStorage.setItem('webrtcConnected', 'true');
       
-      // Store connection state for reconnection
-      // We can't pass the actual RTCPeerConnection and DataChannel objects
-      // through sessionStorage, so we'll need to maintain them differently
-      
       // Create a unique connection ID
       const connectionId = 'conn_' + Date.now();
       sessionStorage.setItem('connectionId', connectionId);
       
-      // Store connection in a way that persists across page navigation
-      // We'll use BroadcastChannel API for this
-      if (window.BroadcastChannel) {
-        const channel = new BroadcastChannel('game_connection');
-        channel.postMessage({
-          type: 'connection_handoff',
-          connectionId: connectionId,
-          role: 'host',
-          pc: pc,
-          dataChannel: dataChannel
-        });
-        channel.close();
-      }
+      // Store the connection globally so it persists
+      window.gamePC = pc;
+      window.gameDataChannel = dataChannel;
+      window.gameRole = 'host';
+      
+      showStatus('Starting game...', 'success');
       
       // Navigate to game after short delay
       setTimeout(() => {
+        // Open game in same window to preserve connection
         window.location.href = 'game.html';
       }, 500);
     }

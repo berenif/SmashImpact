@@ -1064,12 +1064,17 @@
       handleAction(action, pressed) {
         switch (action) {
           case 'attack':
-            if (pressed) {
+            if (pressed && !this.isMultiplayer) {
+              // Only handle attack locally in single player
               this.attack();
             }
+            // In multiplayer, attack is handled in the update loop
             break;
           case 'boost':
-            this.player.boosting = pressed;
+            if (!this.isMultiplayer) {
+              this.player.boosting = pressed;
+            }
+            // In multiplayer, boost is handled in the update loop
             break;
         }
       }
@@ -1127,8 +1132,22 @@
         
         if (this.isMultiplayer && this.multiplayer) {
           // Update multiplayer input
-          const boost = this.buttons.boost ? this.buttons.boost.isPressed() : false;
-          const attack = this.buttons.attack ? this.buttons.attack.isPressed() : false;
+          let boost = false;
+          let attack = false;
+          
+          // Get button states from mobile controls
+          if (this.buttons.boost) {
+            boost = this.buttons.boost.isPressed();
+          }
+          if (this.buttons.attack) {
+            attack = this.buttons.attack.isPressed();
+          }
+          
+          // Get keyboard states for desktop
+          if (this.keys) {
+            boost = boost || this.keys['shift'];
+            attack = attack || this.keys[' '];
+          }
           
           this.multiplayer.updateLocalInput(inputX, inputY, boost, attack);
           this.multiplayer.updateLocalPosition(deltaTime);

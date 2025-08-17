@@ -63,76 +63,120 @@ class MultiplayerGame {
     this.isConnected = sessionStorage.getItem('p2pConnected') === 'true';
     this.connectionId = sessionStorage.getItem('connectionId');
     
-    if (this.isConnected && this.connectionId) {
+    console.log('MultiplayerGame init:', {
+      role: this.role,
+      isConnected: this.isConnected,
+      connectionId: this.connectionId
+    });
+    
+    if (this.isConnected) {
       this.setupConnection();
     }
   }
   
   setupConnection() {
-    // Try to receive connection via BroadcastChannel
-    if (window.BroadcastChannel) {
-      const channel = new BroadcastChannel('game_connection');
+    console.log('Setting up connection, checking for window.gamePC and window.gameDataChannel');
+    console.log('window.gamePC:', window.gamePC);
+    console.log('window.gameDataChannel:', window.gameDataChannel);
+    console.log('window.gameRole:', window.gameRole);
+    
+    // Try to get connection from window globals (preserved from connect.html)
+    if (window.gamePC && window.gameDataChannel) {
+      console.log('Found game connection in window');
+      this.pc = window.gamePC;
+      this.dataChannel = window.gameDataChannel;
+      this.role = window.gameRole || this.role;
       
-      // Request the connection from connect.html if it's still open
-      channel.postMessage({
-        type: 'request_connection',
-        connectionId: this.connectionId
-      });
-      
-      channel.onmessage = (event) => {
-        if (event.data.type === 'connection_handoff' && 
-            event.data.connectionId === this.connectionId) {
-          // We received the connection!
-          this.pc = event.data.pc;
-          this.dataChannel = event.data.dataChannel;
-          this.role = event.data.role;
-          
-          // Set up data channel handlers
-          if (this.dataChannel) {
-            this.dataChannel.onmessage = (msgEvent) => {
-              try {
-                const message = JSON.parse(msgEvent.data);
-                this.handleMessage(message);
-              } catch (e) {
-                console.error('Failed to parse message:', e);
-              }
-            };
-            
-            this.dataChannel.onerror = (error) => {
-              console.error('Data channel error:', error);
-              this.isConnected = false;
-            };
-            
-            this.dataChannel.onclose = () => {
-              console.log('Data channel closed');
-              this.isConnected = false;
-            };
+      // Set up data channel handlers
+      if (this.dataChannel) {
+        console.log('Data channel state:', this.dataChannel.readyState);
+        
+        this.dataChannel.onmessage = (msgEvent) => {
+          try {
+            const message = JSON.parse(msgEvent.data);
+            console.log('Received message:', message.type);
+            this.handleMessage(message);
+          } catch (e) {
+            console.error('Failed to parse message:', e);
           }
-          
-          // Initialize player positions
-          this.initializePositions();
-          
-          // Start sync loops
-          this.startSyncLoop();
-          this.startPingLoop();
-          
-          // Close the broadcast channel
-          channel.close();
-        }
-      };
+        };
+        
+        this.dataChannel.onerror = (error) => {
+          console.error('Data channel error:', error);
+          this.isConnected = false;
+        };
+        
+        this.dataChannel.onclose = () => {
+          console.log('Data channel closed');
+          this.isConnected = false;
+        };
+        
+        this.isConnected = this.dataChannel.readyState === 'open';
+        console.log('Connection established, isConnected:', this.isConnected);
+      }
       
-      // Timeout fallback - if we don't get connection in 2 seconds
-      setTimeout(() => {
-        if (!this.dataChannel) {
-          console.warn('Connection handoff timeout - falling back to message passing');
-          // Set up message passing fallback
-          this.setupMessagePassingFallback();
-        }
-        channel.close();
-      }, 2000);
+      // Initialize player positions
+      this.initializePositions();
+      
+      // Start sync loops only if connection is open
+      if (this.isConnected) {
+        this.startSyncLoop();
+        this.startPingLoop();
+      } else {
+        // Wait for connection to be ready
+        const checkConnection = setInterval(() => {
+          if (this.dataChannel && this.dataChannel.readyState === 'open') {
+            this.isConnected = true;
+            this.startSyncLoop();
+            this.startPingLoop();
+            clearInterval(checkConnection);
+            console.log('Connection ready, started sync loops');
+          }
+        }, 100);
+      }
     } else {
-      // Fallback for browsers without BroadcastChannel
-      this.setupMessagePassingFallback();
+      console.warn('No game connection found in window, trying fallback');
+      // Try opener window if we were opened in a new window/tab
+      if (window.opener && window.opener.gamePC && window.opener.gameDataChannel) {
+        console.log('Found game connection in opener window');
+        this.pc = window.opener.gamePC;
+        this.dataChannel = window.opener.gameDataChannel;
+        this.role = window.opener.gameRole || this.role;
+        
+        // Set up data channel handlers
+        if (this.dataChannel) {
+          this.dataChannel.onmessage = (msgEvent) => {
+            try {
+              const message = JSON.parse(msgEvent.data);
+              this.handleMessage(message);
+            } catch (e) {
+              console.error('Failed to parse message:', e);
+            }
+          };
+          
+          this.dataChannel.onerror = (error) => {
+            console.error('Data channel error:', error);
+            this.isConnected = false;
+          };
+          
+          this.dataChannel.onclose = () => {
+            console.log('Data channel closed');
+            this.isConnected = false;
+          };
+          
+          this.isConnected = true;
+        }
+        
+        // Initialize player positions
+        this.initializePositions();
+        
+        // Start sync loops
+        this.startSyncLoop();
+        this.startPingLoop();
+      } else {
+        console.error('No WebRTC connection found - game may not work in multiplayer mode');
+        this.setupMessagePassingFallback();
+      }
     }
   }
   
@@ -153,9 +197,9 @@ class MultiplayerGame {
   sendMessage(message) {
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       this.dataChannel.send(JSON.stringify(message));
-    } else if (window.gameDataChannel) {
-      // Fallback to global data channel if available
-      window.gameDataChannel.send(JSON.stringify(message));
+    } else {
+      console.warn('Cannot send message, data channel not open. State:', 
+        this.dataChannel ? this.dataChannel.readyState : 'no channel');
     }
   }
   
@@ -194,7 +238,11 @@ class MultiplayerGame {
   
   // Start synchronization loop
   startSyncLoop() {
-    setInterval(() => {
+    this.syncInterval = setInterval(() => {
+      if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+        return; // Skip if connection not ready
+      }
+      
       const now = Date.now();
       
       // Send local player state to remote
@@ -207,11 +255,13 @@ class MultiplayerGame {
   
   // Start ping loop for latency measurement
   startPingLoop() {
-    setInterval(() => {
-      this.sendMessage({ 
-        type: 'ping', 
-        timestamp: Date.now() 
-      });
+    this.pingInterval = setInterval(() => {
+      if (this.dataChannel && this.dataChannel.readyState === 'open') {
+        this.sendMessage({ 
+          type: 'ping', 
+          timestamp: Date.now() 
+        });
+      }
     }, 1000);
   }
   
