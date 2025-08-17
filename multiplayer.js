@@ -54,7 +54,7 @@ class MultiplayerGame {
     this.lastPingTime = 0;
     
     // Sync settings
-    this.SYNC_RATE = 60; // 60 Hz
+    this.SYNC_RATE = 30; // 30 Hz - reduced for better performance
     this.lastSyncTime = 0;
     
     this.init();
@@ -83,6 +83,9 @@ class MultiplayerGame {
     console.log('window.gameDataChannel:', window.gameDataChannel);
     console.log('window.gameRole:', window.gameRole);
     
+    // Clean up any existing intervals first
+    this.cleanup();
+    
     // Try to get connection from window globals (preserved from connect.html)
     if (window.gamePC && window.gameDataChannel) {
       console.log('Found game connection in window');
@@ -107,11 +110,13 @@ class MultiplayerGame {
         this.dataChannel.onerror = (error) => {
           console.error('Data channel error:', error);
           this.isConnected = false;
+          this.cleanup();
         };
         
         this.dataChannel.onclose = () => {
           console.log('Data channel closed');
           this.isConnected = false;
+          this.cleanup();
         };
         
         this.isConnected = this.dataChannel.readyState === 'open';
@@ -184,22 +189,33 @@ class MultiplayerGame {
           this.dataChannel.onerror = (error) => {
             console.error('Data channel error:', error);
             this.isConnected = false;
+            this.cleanup();
           };
           
           this.dataChannel.onclose = () => {
             console.log('Data channel closed');
             this.isConnected = false;
+            this.cleanup();
           };
           
-          this.isConnected = true;
+          this.isConnected = this.dataChannel.readyState === 'open';
         }
         
         // Initialize player positions
         this.initializePositions();
         
-        // Start sync loops
-        this.startSyncLoop();
-        this.startPingLoop();
+        // Start sync loops if connected
+        if (this.isConnected) {
+          this.startSyncLoop();
+          this.startPingLoop();
+          
+          // Host sends initial state
+          if (this.role === 'host') {
+            setTimeout(() => {
+              this.sendFullStateSync();
+            }, 100);
+          }
+        }
       } else {
         console.error('No WebRTC connection found - game may not work in multiplayer mode');
         this.setupMessagePassingFallback();
@@ -410,6 +426,9 @@ class MultiplayerGame {
   
   // Handle attack from remote player
   handleAttack(data) {
+    // Don't process our own attacks
+    if (data.role === this.role) return;
+    
     const attacker = data.role === 'host' ? 
       this.gameState.players.host : 
       this.gameState.players.player;
@@ -418,27 +437,33 @@ class MultiplayerGame {
       this.gameState.players.player : 
       this.gameState.players.host;
     
+    // Use the attacker's position from the attack data (compensated for latency)
+    const attackerX = data.x || attacker.x;
+    const attackerY = data.y || attacker.y;
+    
     // Check if attack hits
-    const dx = target.x - attacker.x;
-    const dy = target.y - attacker.y;
+    const dx = target.x - attackerX;
+    const dy = target.y - attackerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    if (distance < 50 + target.radius) {
+    const attackRange = 50 + target.radius;
+    
+    if (distance < attackRange) {
       // Hit detected
-      target.health -= 10;
+      target.health = Math.max(0, target.health - 10);
       
-      if (data.role !== this.role) {
-        // Remote player hit us
-        this.onHit();
-      }
+      // Visual/haptic feedback for being hit
+      this.onHit();
       
-      // Update scores
+      // Update scores and check for round end
       if (target.health <= 0) {
         attacker.score++;
         this.onScoreChange();
         
-        // Reset positions
-        this.resetRound();
+        // Reset round after a short delay
+        setTimeout(() => {
+          this.resetRound();
+        }, 500);
       }
     }
   }
@@ -671,8 +696,27 @@ class MultiplayerGame {
   onHit() {}
   onScoreChange() {}
   
+  // Clean up intervals and connections
+  cleanup() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+  }
+  
   // Set WebRTC connection
   setConnection(pc, dataChannel) {
+    // Clean up any existing connection
+    this.cleanup();
+    
     this.pc = pc;
     this.dataChannel = dataChannel;
     
@@ -684,6 +728,18 @@ class MultiplayerGame {
         } catch (e) {
           console.error('Failed to parse message:', e);
         }
+      };
+      
+      this.dataChannel.onerror = (error) => {
+        console.error('Data channel error:', error);
+        this.isConnected = false;
+        this.cleanup();
+      };
+      
+      this.dataChannel.onclose = () => {
+        console.log('Data channel closed');
+        this.isConnected = false;
+        this.cleanup();
       };
     }
   }
