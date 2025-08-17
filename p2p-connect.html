@@ -451,6 +451,58 @@
       }
     }
 
+    /* Method selector */
+    .method-selector {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .method-btn {
+      background: var(--surface-light);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: left;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .method-btn:hover {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .method-icon {
+      font-size: 36px;
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface);
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+
+    .method-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .method-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
     /* Hidden */
     .hidden {
       display: none !important;
@@ -501,6 +553,46 @@
         <p style="color: var(--text-muted); font-size: 14px;">
           Host creates a game room. Join connects to an existing room.
         </p>
+      </div>
+
+      <!-- Host method selection -->
+      <div class="connection-card hidden" id="hostMethodSelection">
+        <h2 style="margin-bottom: 20px;">How do you want to share?</h2>
+        <div class="method-selector">
+          <button class="method-btn" onclick="selectHostMethod('qr')">
+            <div class="method-icon">📱</div>
+            <div class="method-title">QR Code</div>
+            <div class="method-desc">Generate a QR code for easy mobile scanning</div>
+          </button>
+          <button class="method-btn" onclick="selectHostMethod('text')">
+            <div class="method-icon">📋</div>
+            <div class="method-title">Text Code</div>
+            <div class="method-desc">Copy and share a text code via messaging</div>
+          </button>
+        </div>
+        <button class="btn btn-secondary" style="margin-top: 20px; width: 100%;" onclick="backToRoleSelection()">
+          ← Back
+        </button>
+      </div>
+
+      <!-- Player method selection -->
+      <div class="connection-card hidden" id="playerMethodSelection">
+        <h2 style="margin-bottom: 20px;">How do you want to connect?</h2>
+        <div class="method-selector">
+          <button class="method-btn" onclick="selectPlayerMethod('scan')">
+            <div class="method-icon">📷</div>
+            <div class="method-title">Scan QR Code</div>
+            <div class="method-desc">Use camera to scan host's QR code</div>
+          </button>
+          <button class="method-btn" onclick="selectPlayerMethod('paste')">
+            <div class="method-icon">📝</div>
+            <div class="method-title">Paste Code</div>
+            <div class="method-desc">Enter the text code from host</div>
+          </button>
+        </div>
+        <button class="btn btn-secondary" style="margin-top: 20px; width: 100%;" onclick="backToRoleSelection()">
+          ← Back
+        </button>
       </div>
 
       <!-- Host QR display -->
@@ -555,6 +647,9 @@
         </div>
         
         <div style="display: flex; gap: 12px; margin-top: 20px;">
+          <button class="btn btn-secondary" style="flex: 1;" onclick="toggleQRDisplay()">
+            <span id="toggleQRBtn">📋 Show Text Only</span>
+          </button>
           <button class="btn btn-secondary" style="flex: 1;" onclick="regenerateCode()">
             🔄 New Code
           </button>
@@ -667,14 +762,118 @@
       
       setTimeout(() => {
         document.getElementById('roleSelection').classList.add('hidden');
-        updateStep(2);
         
         if (role === 'host') {
-          createOffer();
+          // Show host method selection
+          document.getElementById('hostMethodSelection').classList.remove('hidden');
         } else {
-          showScanner();
+          // Show player method selection
+          document.getElementById('playerMethodSelection').classList.remove('hidden');
         }
       }, 300);
+    }
+
+    // Back to role selection
+    function backToRoleSelection() {
+      // Hide all method selections and displays
+      document.getElementById('hostMethodSelection').classList.add('hidden');
+      document.getElementById('playerMethodSelection').classList.add('hidden');
+      document.getElementById('hostQR').classList.add('hidden');
+      document.getElementById('scanner').classList.add('hidden');
+      document.getElementById('connecting').classList.add('hidden');
+      document.getElementById('connected').classList.add('hidden');
+      
+      // Clear any player answer display
+      const playerAnswer = document.getElementById('playerAnswer');
+      if (playerAnswer) {
+        playerAnswer.remove();
+      }
+      
+      // Show role selection
+      document.getElementById('roleSelection').classList.remove('hidden');
+      updateStep(1);
+      
+      // Reset connection
+      resetConnection();
+    }
+
+    // Host method selection
+    function selectHostMethod(method) {
+      document.getElementById('hostMethodSelection').classList.add('hidden');
+      updateStep(2);
+      
+      if (method === 'qr' || method === 'text') {
+        // Both methods generate the same offer, just display differently
+        createOffer(method);
+      }
+    }
+
+    // Player method selection
+    function selectPlayerMethod(method) {
+      document.getElementById('playerMethodSelection').classList.add('hidden');
+      updateStep(2);
+      
+      if (method === 'scan') {
+        showScanner();
+      } else if (method === 'paste') {
+        showManualInput();
+      }
+    }
+
+    // Show manual input for player
+    function showManualInput() {
+      // Create or show manual input card
+      let manualInputCard = document.getElementById('playerManualInput');
+      if (!manualInputCard) {
+        manualInputCard = document.createElement('div');
+        manualInputCard.id = 'playerManualInput';
+        manualInputCard.className = 'connection-card';
+        manualInputCard.innerHTML = `
+          <h2 style="margin-bottom: 20px;">Enter Host Code</h2>
+          <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
+            Paste the connection code shared by the host:
+          </p>
+          <div style="position: relative;">
+            <textarea 
+              id="playerManualCode" 
+              class="input"
+              placeholder="Paste the full connection code here..."
+              style="width: 100%; min-height: 120px; font-family: monospace; font-size: 12px; resize: vertical;"
+            ></textarea>
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 16px;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="backToPlayerMethod()">
+              ← Back
+            </button>
+            <button class="btn btn-primary" style="flex: 1;" onclick="connectWithManualCode()">
+              Connect
+            </button>
+          </div>
+        `;
+        document.querySelector('.main').appendChild(manualInputCard);
+      }
+      
+      manualInputCard.classList.remove('hidden');
+    }
+
+    // Back to player method selection
+    function backToPlayerMethod() {
+      const manualInputCard = document.getElementById('playerManualInput');
+      if (manualInputCard) {
+        manualInputCard.classList.add('hidden');
+      }
+      document.getElementById('playerMethodSelection').classList.remove('hidden');
+      updateStep(1);
+    }
+
+    // Connect with manual code (player)
+    function connectWithManualCode() {
+      const code = document.getElementById('playerManualCode').value.trim();
+      if (code) {
+        handleScannedCode(code);
+      } else {
+        showStatus('Please paste the host connection code', 'error');
+      }
     }
 
     // Reset connection
@@ -704,7 +903,7 @@
     }
 
     // Create WebRTC offer (host)
-    async function createOffer() {
+    async function createOffer(displayMethod = 'qr') {
       try {
         pc = new RTCPeerConnection({ iceServers: CONFIG.iceServers });
         
@@ -717,7 +916,7 @@
         pc.onicecandidate = (event) => {
           if (!event.candidate) {
             // All candidates gathered
-            displayOffer();
+            displayOffer(displayMethod);
           }
         };
         
@@ -732,41 +931,59 @@
     }
 
     // Display QR code with offer
-    function displayOffer() {
+    function displayOffer(displayMethod = 'qr') {
       const offerData = btoa(JSON.stringify(pc.localDescription));
       localOffer = offerData;
       
-      // Generate QR code
-      const qr = qrcode(0, 'M');
-      qr.addData(offerData);
-      qr.make();
+      // Update the host QR display based on method
+      const hostQRCard = document.getElementById('hostQR');
+      const qrContainer = hostQRCard.querySelector('.qr-container');
       
-      const canvas = document.getElementById('qrCanvas');
-      const size = 200;
-      canvas.width = size;
-      canvas.height = size;
-      
-      const ctx = canvas.getContext('2d');
-      const cellSize = size / qr.getModuleCount();
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, size, size);
-      
-      ctx.fillStyle = '#000000';
-      for (let row = 0; row < qr.getModuleCount(); row++) {
-        for (let col = 0; col < qr.getModuleCount(); col++) {
-          if (qr.isDark(row, col)) {
-            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+      if (displayMethod === 'qr') {
+        // Show QR code prominently
+        qrContainer.style.display = 'block';
+        
+        // Generate QR code
+        const qr = qrcode(0, 'M');
+        qr.addData(offerData);
+        qr.make();
+        
+        const canvas = document.getElementById('qrCanvas');
+        const size = 200;
+        canvas.width = size;
+        canvas.height = size;
+        
+        const ctx = canvas.getContext('2d');
+        const cellSize = size / qr.getModuleCount();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        
+        ctx.fillStyle = '#000000';
+        for (let row = 0; row < qr.getModuleCount(); row++) {
+          for (let col = 0; col < qr.getModuleCount(); col++) {
+            if (qr.isDark(row, col)) {
+              ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+            }
           }
         }
+        
+        // Update info text
+        document.querySelector('.qr-info').textContent = 'Show this QR code to the player or copy the code below';
+      } else {
+        // Hide QR for text-only method
+        qrContainer.style.display = 'none';
+        
+        // Update info text
+        document.querySelector('.qr-info').textContent = 'Copy this code and share it with the player via messaging';
       }
       
-      // Show FULL code in input (not truncated)
+      // Show FULL code in input
       document.getElementById('hostCode').value = offerData;
       
       // Show host QR screen
       document.getElementById('hostQR').classList.remove('hidden');
-      showStatus('Waiting for player to connect...', 'info');
+      showStatus('Share this code with the player', 'info');
       
       // Listen for answer
       waitForAnswer();
@@ -844,8 +1061,8 @@
         document.getElementById('hostQR').classList.remove('hidden');
         scanningForAnswer = false;
       } else {
-        // Go back to role selection
-        document.getElementById('roleSelection').classList.remove('hidden');
+        // Go back to player method selection
+        document.getElementById('playerMethodSelection').classList.remove('hidden');
         updateStep(1);
       }
     }
@@ -1163,8 +1380,31 @@
       }
     }
 
+    // Toggle QR display
+    function toggleQRDisplay() {
+      const qrContainer = document.querySelector('.qr-container');
+      const toggleBtn = document.getElementById('toggleQRBtn');
+      const qrInfo = document.querySelector('.qr-info');
+      
+      if (qrContainer.style.display === 'none') {
+        // Show QR
+        qrContainer.style.display = 'block';
+        toggleBtn.textContent = '📋 Show Text Only';
+        qrInfo.textContent = 'Show this QR code to the player or copy the code below';
+      } else {
+        // Hide QR
+        qrContainer.style.display = 'none';
+        toggleBtn.textContent = '📱 Show QR Code';
+        qrInfo.textContent = 'Copy this code and share it with the player via messaging';
+      }
+    }
+
     // Regenerate code
     function regenerateCode() {
+      // Remember current display method
+      const qrContainer = document.querySelector('.qr-container');
+      const currentMethod = qrContainer.style.display === 'none' ? 'text' : 'qr';
+      
       // Reset connection and generate new offer
       resetConnection();
       
@@ -1174,9 +1414,9 @@
       document.getElementById('connecting').classList.add('hidden');
       document.getElementById('connected').classList.add('hidden');
       
-      // Generate new offer
+      // Generate new offer with same display method
       setTimeout(() => {
-        createOffer();
+        createOffer(currentMethod);
       }, 100);
       
       showStatus('Generating new connection code...', 'info');
