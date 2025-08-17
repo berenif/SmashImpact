@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level System Test - 3 Comprehensive Levels</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0f1220;
+            color: #e8ecff;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .header {
+            background: rgba(21, 25, 54, 0.95);
+            border-bottom: 1px solid #2a2f4a;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .level-selector {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .level-btn {
+            padding: 10px 20px;
+            background: #1a1f3f;
+            border: 1px solid #2a2f4a;
+            color: #e8ecff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .level-btn:hover {
+            background: #2a2f5a;
+            border-color: #3a4f6a;
+        }
+        
+        .level-btn.active {
+            background: #00d084;
+            color: #0f1220;
+            border-color: #00d084;
+        }
+        
+        .game-info {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .level-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(21, 25, 54, 0.9);
+            border: 1px solid #2a2f4a;
+            border-radius: 12px;
+            padding: 15px;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .level-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .level-description {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        
+        .wave-info {
+            background: rgba(42, 47, 74, 0.5);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .wave-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .objectives {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .powerup-list {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(21, 25, 54, 0.9);
+            border: 1px solid #2a2f4a;
+            border-radius: 12px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .powerup-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .powerup-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(21, 25, 54, 0.9);
+            border: 1px solid #2a2f4a;
+            border-radius: 12px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            padding: 8px 16px;
+            background: #1a1f3f;
+            border: 1px solid #2a2f4a;
+            color: #e8ecff;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background: #2a2f5a;
+        }
+        
+        .difficulty-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .difficulty-easy { background: #44ff44; color: #0f1220; }
+        .difficulty-medium { background: #ffaa44; color: #0f1220; }
+        .difficulty-hard { background: #ff4444; color: #ffffff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="level-selector">
+            <button class="level-btn active" data-level="0">Level 1: Tutorial</button>
+            <button class="level-btn" data-level="1">Level 2: Hazard Factory</button>
+            <button class="level-btn" data-level="2">Level 3: Champions Arena</button>
+        </div>
+        <div class="game-info">
+            <div class="info-item">
+                <span class="info-label">Wave</span>
+                <span class="info-value" id="wave-counter">1/3</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Enemies</span>
+                <span class="info-value" id="enemy-counter">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Score</span>
+                <span class="info-value" id="score-counter">0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Time</span>
+                <span class="info-value" id="time-counter">0:00</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div class="level-overlay">
+            <div class="level-name" id="level-name">Tutorial Arena</div>
+            <span class="difficulty-badge difficulty-easy" id="difficulty">Easy</span>
+            <div class="level-description" id="level-desc">Learn the basics of movement, combat, and teamwork</div>
+            <div class="wave-info">
+                <div class="wave-name" id="wave-name">Wave 1: Basic Combat</div>
+                <div class="objectives" id="objectives">
+                    • Defeat all enemies<br>
+                    • Learn to dodge
+                </div>
+            </div>
+        </div>
+        
+        <div class="powerup-list">
+            <h3 style="margin-top: 0;">Active Powerups</h3>
+            <div id="powerup-container"></div>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn" id="start-wave">Start Wave</button>
+            <button class="control-btn" id="next-wave">Next Wave</button>
+            <button class="control-btn" id="spawn-powerup">Spawn Random Powerup</button>
+            <button class="control-btn" id="toggle-pause">Pause</button>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { LEVELS, levelManager } from './src/game/levels.js';
+        import { powerupManager } from './src/game/powerups.js';
+        import { initObstacles, drawObstacles } from './src/game/obstacles.js';
+        import { SquadDirector } from './src/game/squad-director.js';
+        import { Hero } from './src/game/heroes.js';
+        
+        // Canvas setup
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Game state
+        let currentLevelIndex = 0;
+        let currentLevel = null;
+        let currentWave = null;
+        let isPaused = false;
+        let gameTime = 0;
+        let waveStartTime = 0;
+        let enemies = [];
+        let players = [];
+        let squadDirector = new SquadDirector();
+        
+        // Camera
+        const camera = { x: 0, y: 0 };
+        
+        // Initialize level
+        function loadLevel(index) {
+            currentLevelIndex = index;
+            currentLevel = LEVELS[index];
+            levelManager.loadLevel(currentLevel.id);
+            
+            // Update UI
+            document.getElementById('level-name').textContent = currentLevel.name;
+            document.getElementById('level-desc').textContent = currentLevel.description;
+            document.getElementById('difficulty').textContent = 
+                currentLevel.difficulty.charAt(0).toUpperCase() + currentLevel.difficulty.slice(1);
+            document.getElementById('difficulty').className = 
+                `difficulty-badge difficulty-${currentLevel.difficulty}`;
+            
+            // Initialize obstacles
+            initObstacles(currentLevel.obstacles);
+            
+            // Initialize players
+            players = [];
+            for (const spawn of currentLevel.playerSpawns) {
+                const hero = new Hero(spawn.heroType, spawn.x, spawn.y, `player_${players.length}`);
+                players.push(hero);
+            }
+            
+            // Clear powerups
+            powerupManager.clear();
+            
+            // Load first wave
+            loadWave(0);
+            
+            // Update wave counter
+            document.getElementById('wave-counter').textContent = `1/${currentLevel.waves.length}`;
+        }
+        
+        // Load wave
+        function loadWave(waveIndex) {
+            if (waveIndex >= currentLevel.waves.length) {
+                console.log('Level complete!');
+                return;
+            }
+            
+            currentWave = currentLevel.waves[waveIndex];
+            waveStartTime = gameTime;
+            
+            // Update UI
+            document.getElementById('wave-name').textContent = `Wave ${currentWave.id}: ${currentWave.name}`;
+            document.getElementById('objectives').innerHTML = 
+                currentWave.objectives.map(o => `• ${o}`).join('<br>');
+            document.getElementById('wave-counter').textContent = 
+                `${waveIndex + 1}/${currentLevel.waves.length}`;
+            
+            // Load powerups for this wave
+            powerupManager.loadFromWave(currentWave, gameTime);
+            
+            // Schedule squad spawns
+            for (const squad of currentWave.squads) {
+                setTimeout(() => {
+                    if (!isPaused) {
+                        spawnSquad(squad);
+                    }
+                }, squad.spawnDelay);
+            }
+        }
+        
+        // Spawn squad
+        function spawnSquad(squadData) {
+            const squad = squadDirector.spawnSquad(
+                squadData.tactic,
+                squadData.spawnPoint.x,
+                squadData.spawnPoint.y
+            );
+            
+            // Add enemies to global list
+            for (const enemy of squad.members) {
+                enemies.push(enemy);
+            }
+            
+            updateEnemyCounter();
+        }
+        
+        // Update counters
+        function updateEnemyCounter() {
+            document.getElementById('enemy-counter').textContent = enemies.length;
+        }
+        
+        function updateTimeCounter() {
+            const seconds = Math.floor(gameTime / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            document.getElementById('time-counter').textContent = 
+                `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // Update powerup display
+        function updatePowerupDisplay() {
+            const container = document.getElementById('powerup-container');
+            container.innerHTML = '';
+            
+            for (const player of players) {
+                const effects = powerupManager.getActiveEffects(player.playerId);
+                for (const effect of effects) {
+                    const item = document.createElement('div');
+                    item.className = 'powerup-item';
+                    
+                    const icon = document.createElement('div');
+                    icon.className = 'powerup-icon';
+                    icon.style.background = getPowerupColor(effect.type);
+                    icon.textContent = getPowerupSymbol(effect.type);
+                    
+                    const text = document.createElement('span');
+                    text.textContent = `${effect.type} (${Math.ceil(effect.remaining / 1000)}s)`;
+                    
+                    item.appendChild(icon);
+                    item.appendChild(text);
+                    container.appendChild(item);
+                }
+            }
+        }
+        
+        function getPowerupColor(type) {
+            const colors = {
+                'health': '#ff4444',
+                'speed': '#ffff44',
+                'damage': '#ff8844',
+                'shield': '#4488ff',
+                'combo': '#ffaa00',
+                'revive': '#ffffff',
+                'double_points': '#44ff44',
+                'invincibility': '#ff00ff',
+                'rapid_fire': '#ff44ff',
+                'freeze': '#88ddff'
+            };
+            return colors[type] || '#888888';
+        }
+        
+        function getPowerupSymbol(type) {
+            const symbols = {
+                'health': '+',
+                'speed': '⚡',
+                'damage': '⚔',
+                'shield': '🛡',
+                'combo': '★',
+                'revive': '👼',
+                'double_points': 'x2',
+                'invincibility': '∞',
+                'rapid_fire': '»',
+                'freeze': '❄'
+            };
+            return symbols[type] || '?';
+        }
+        
+        // Game loop
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Cap at 100ms
+            lastTime = timestamp;
+            
+            if (!isPaused) {
+                gameTime += dt * 1000;
+                
+                // Update game objects
+                for (const player of players) {
+                    // Simple AI movement for demo
+                    const input = {
+                        moveX: Math.sin(gameTime * 0.001) * 0.5,
+                        moveY: Math.cos(gameTime * 0.001) * 0.5,
+                        aimX: 1,
+                        aimY: 0
+                    };
+                    player.update(dt, input, enemies, players[1 - players.indexOf(player)]);
+                }
+                
+                // Update enemies
+                squadDirector.update(dt, players, gameTime);
+                enemies = enemies.filter(e => e.health > 0);
+                updateEnemyCounter();
+                
+                // Update powerups
+                powerupManager.update(dt, gameTime, players);
+                
+                // Update UI
+                updateTimeCounter();
+                updatePowerupDisplay();
+            }
+            
+            // Render
+            render();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Render
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = currentLevel.arena.ambientColor || '#0b0e1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Calculate camera position (center on players)
+            if (players.length > 0) {
+                let centerX = 0, centerY = 0;
+                for (const player of players) {
+                    centerX += player.x;
+                    centerY += player.y;
+                }
+                centerX /= players.length;
+                centerY /= players.length;
+                
+                camera.x = centerX - canvas.width / 2;
+                camera.y = centerY - canvas.height / 2;
+            }
+            
+            // Draw grid
+            ctx.strokeStyle = '#1a1f3f';
+            ctx.lineWidth = 1;
+            for (let x = -camera.x % 50; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = -camera.y % 50; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw obstacles
+            drawObstacles(ctx, camera.x, camera.y);
+            
+            // Draw powerups
+            powerupManager.draw(ctx, camera);
+            
+            // Draw enemies
+            for (const enemy of enemies) {
+                enemy.draw(ctx, camera);
+            }
+            
+            // Draw players
+            for (const player of players) {
+                player.draw(ctx, camera);
+            }
+            
+            // Draw arena bounds
+            ctx.strokeStyle = '#2a2f4a';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(
+                -camera.x,
+                -camera.y,
+                currentLevel.arena.width,
+                currentLevel.arena.height
+            );
+            
+            // Draw paused overlay
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '48px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+            }
+        }
+        
+        // Event handlers
+        document.querySelectorAll('.level-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                loadLevel(parseInt(e.target.dataset.level));
+            });
+        });
+        
+        document.getElementById('start-wave').addEventListener('click', () => {
+            loadWave(levelManager.currentWaveIndex);
+        });
+        
+        document.getElementById('next-wave').addEventListener('click', () => {
+            enemies = [];
+            levelManager.nextWave();
+            loadWave(levelManager.currentWaveIndex);
+        });
+        
+        document.getElementById('spawn-powerup').addEventListener('click', () => {
+            const types = Object.values(POWERUP_TYPES);
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const x = camera.x + canvas.width / 2 + (Math.random() - 0.5) * 200;
+            const y = camera.y + canvas.height / 2 + (Math.random() - 0.5) * 200;
+            powerupManager.spawnPowerup(randomType, x, y, 0);
+        });
+        
+        document.getElementById('toggle-pause').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('toggle-pause').textContent = isPaused ? 'Resume' : 'Pause';
+        });
+        
+        // Initialize
+        loadLevel(0);
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
