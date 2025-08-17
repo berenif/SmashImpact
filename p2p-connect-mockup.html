@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>P2P Connect Mockup - LAN Game</title>
   
   <!-- React and dependencies via CDN -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
   
   <!-- Tailwind CSS for styling -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -86,7 +89,7 @@
     });
   </script>
 
-  <script type="text/babel">
+  <script type="text/babel" data-type="module">
     const { useState, useEffect } = React;
 
     // High-contrast, gradient glow, product-first mockups for a P2P QR connect flow
@@ -407,36 +410,47 @@
     }
 
     // Render the app with error handling
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        try {
-          if (typeof React === 'undefined') {
-            throw new Error('React not loaded');
+    if (typeof window !== 'undefined') {
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          try {
+            if (typeof React === 'undefined') {
+              throw new Error('React not loaded');
+            }
+            if (typeof ReactDOM === 'undefined') {
+              throw new Error('ReactDOM not loaded');
+            }
+            
+            const container = document.getElementById('root');
+            if (!container) {
+              throw new Error('Root element not found');
+            }
+            
+            const root = ReactDOM.createRoot(container);
+            root.render(React.createElement(P2PConnectMockups));
+          } catch (error) {
+            console.error('Failed to render app:', error);
+            const rootEl = document.getElementById('root');
+            if (rootEl) {
+              rootEl.innerHTML = `
+                <div style="padding: 20px; font-family: system-ui;">
+                  <h2>Error Loading Application</h2>
+                  <p>The React application failed to load. This might be due to:</p>
+                  <ul>
+                    <li>CDN resources not loading properly</li>
+                    <li>Network connectivity issues</li>
+                    <li>Browser compatibility issues</li>
+                    <li>Clear your browser cache and refresh</li>
+                  </ul>
+                  <p>Error: ${error.message}</p>
+                  <p>Please try refreshing the page (Ctrl+Shift+R or Cmd+Shift+R).</p>
+                </div>
+              `;
+            }
           }
-          if (typeof ReactDOM === 'undefined') {
-            throw new Error('ReactDOM not loaded');
-          }
-          
-          const root = ReactDOM.createRoot(document.getElementById('root'));
-          root.render(<P2PConnectMockups />);
-        } catch (error) {
-          console.error('Failed to render app:', error);
-          document.getElementById('root').innerHTML = `
-            <div style="padding: 20px; font-family: system-ui;">
-              <h2>Error Loading Application</h2>
-              <p>The React application failed to load. This might be due to:</p>
-              <ul>
-                <li>CDN resources not loading properly</li>
-                <li>Network connectivity issues</li>
-                <li>Browser compatibility issues</li>
-              </ul>
-              <p>Error: ${error.message}</p>
-              <p>Please try refreshing the page.</p>
-            </div>
-          `;
-        }
-      }, 100); // Small delay to ensure libraries are loaded
-    });
+        }, 500); // Increased delay to ensure all libraries are fully loaded
+      });
+    }
   </script>
 </body>
 </html>
