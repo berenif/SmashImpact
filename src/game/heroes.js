@@ -495,6 +495,9 @@ export class Hero {
       ctx.stroke();
     }
     
+    // Reset alpha for UI elements (health bar and revive indicator should always be fully opaque)
+    ctx.globalAlpha = 1.0;
+    
     // Health bar
     if (this.health < this.stats.maxHealth) {
       const barWidth = 40;
