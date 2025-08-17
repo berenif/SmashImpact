@@ -475,7 +475,7 @@ export class Hero {
     
     // Try to draw sprite, fallback to circle if not loaded
     if (spriteManager.sprites.has('hero')) {
-      spriteManager.draw(ctx, 'hero', this.animationState, screenX, screenY, 1, 0);
+      spriteManager.draw(ctx, 'hero', this.animationState, screenX, screenY, 1, this.angle);
     } else {
       // Fallback: Draw circle
       ctx.fillStyle = this.stats.color;
@@ -494,8 +494,6 @@ export class Hero {
       );
       ctx.stroke();
     }
-    
-    ctx.restore();
     
     // Health bar
     if (this.health < this.stats.maxHealth) {
@@ -520,5 +518,7 @@ export class Hero {
         -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * this.reviveProgress / 100));
       ctx.stroke();
     }
+    
+    ctx.restore();
   }
 }
