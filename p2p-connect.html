@@ -510,17 +510,31 @@
           <canvas id="qrCanvas"></canvas>
         </div>
         <div class="qr-info">
-          Show this QR code to the other player or share the code below
+          Show this QR code to the other player or copy the code below
         </div>
         <div class="manual-input">
-          <div class="input-group">
-            <input type="text" class="input" id="hostCode" readonly>
-            <button class="btn btn-primary" onclick="copyCode()">Copy</button>
+          <div style="position: relative;">
+            <textarea 
+              class="input" 
+              id="hostCode" 
+              readonly
+              style="width: 100%; min-height: 80px; font-family: monospace; font-size: 12px; resize: vertical; padding-right: 80px;"
+            ></textarea>
+            <button 
+              class="btn btn-primary" 
+              onclick="copyCode()"
+              style="position: absolute; right: 8px; top: 8px; padding: 8px 16px;"
+            >Copy</button>
           </div>
         </div>
-        <button class="btn btn-secondary" style="margin-top: 20px;" onclick="switchToScanner()">
-          Scan Player Code Instead
-        </button>
+        <div style="display: flex; gap: 12px; margin-top: 20px;">
+          <button class="btn btn-secondary" style="flex: 1;" onclick="regenerateCode()">
+            🔄 New Code
+          </button>
+          <button class="btn btn-secondary" style="flex: 1;" onclick="switchToScanner()">
+            📷 Scan Instead
+          </button>
+        </div>
       </div>
 
       <!-- Scanner -->
@@ -543,9 +557,18 @@
           <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
             Or paste the code manually:
           </p>
-          <div class="input-group">
-            <input type="text" class="input" id="manualCode" placeholder="Paste code here">
-            <button class="btn btn-primary" onclick="connectManual()">Connect</button>
+          <div style="position: relative;">
+            <textarea 
+              class="input" 
+              id="manualCode" 
+              placeholder="Paste the full connection code here..."
+              style="width: 100%; min-height: 80px; font-family: monospace; font-size: 12px; resize: vertical; padding-right: 80px;"
+            ></textarea>
+            <button 
+              class="btn btn-primary" 
+              onclick="connectManual()"
+              style="position: absolute; right: 8px; top: 8px; padding: 8px 16px;"
+            >Connect</button>
           </div>
         </div>
       </div>
@@ -597,8 +620,16 @@
     let scanning = false;
     let scannerStream = null;
 
+    // Reset connection on page load/refresh
+    window.addEventListener('load', () => {
+      resetConnection();
+    });
+
     // Role selection
     function selectRole(role) {
+      // Reset any existing connection first
+      resetConnection();
+      
       currentRole = role;
       document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
       event.target.closest('.role-btn').classList.add('active');
@@ -615,13 +646,33 @@
       }, 300);
     }
 
+    // Reset connection
+    function resetConnection() {
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      if (dataChannel) {
+        dataChannel.close();
+        dataChannel = null;
+      }
+      if (scannerStream) {
+        scannerStream.getTracks().forEach(track => track.stop());
+        scannerStream = null;
+      }
+      localOffer = null;
+      isConnected = false;
+      scanning = false;
+    }
+
     // Create WebRTC offer (host)
     async function createOffer() {
       try {
         pc = new RTCPeerConnection({ iceServers: CONFIG.iceServers });
         
-        // Create data channel
-        dataChannel = pc.createDataChannel('game', { ordered: true });
+        // Create data channel with timestamp for uniqueness
+        const channelName = 'game_' + Date.now();
+        dataChannel = pc.createDataChannel(channelName, { ordered: true });
         setupDataChannel(dataChannel);
         
         // Handle ICE candidates
@@ -672,8 +723,8 @@
         }
       }
       
-      // Show code in input
-      document.getElementById('hostCode').value = offerData.substring(0, 20) + '...';
+      // Show FULL code in input (not truncated)
+      document.getElementById('hostCode').value = offerData;
       
       // Show host QR screen
       document.getElementById('hostQR').classList.remove('hidden');
@@ -865,10 +916,47 @@
 
     // Copy code
     function copyCode() {
-      const input = document.getElementById('hostCode');
-      input.select();
-      document.execCommand('copy');
-      showStatus('Code copied to clipboard', 'success');
+      const textarea = document.getElementById('hostCode');
+      textarea.select();
+      textarea.setSelectionRange(0, 99999); // For mobile devices
+      
+      try {
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textarea.value).then(() => {
+            showStatus('✓ Code copied to clipboard', 'success');
+          }).catch(() => {
+            // Fallback to execCommand
+            document.execCommand('copy');
+            showStatus('✓ Code copied to clipboard', 'success');
+          });
+        } else {
+          // Fallback for older browsers
+          document.execCommand('copy');
+          showStatus('✓ Code copied to clipboard', 'success');
+        }
+      } catch (err) {
+        showStatus('Failed to copy code', 'error');
+      }
+    }
+
+    // Regenerate code
+    function regenerateCode() {
+      // Reset connection and generate new offer
+      resetConnection();
+      
+      // Hide current screens
+      document.getElementById('hostQR').classList.add('hidden');
+      document.getElementById('scanner').classList.add('hidden');
+      document.getElementById('connecting').classList.add('hidden');
+      document.getElementById('connected').classList.add('hidden');
+      
+      // Generate new offer
+      setTimeout(() => {
+        createOffer();
+      }, 100);
+      
+      showStatus('Generating new connection code...', 'info');
     }
 
     // Switch to scanner (host)
@@ -933,9 +1021,15 @@
 
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
+      resetConnection();
       stopScanner();
-      if (pc) {
-        pc.close();
+    });
+    
+    // Also cleanup on page hide (mobile background)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && !isConnected) {
+        // Stop camera when page is hidden (saves battery)
+        stopScanner();
       }
     });
   </script>
