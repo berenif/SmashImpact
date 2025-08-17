@@ -1,5 +1,5 @@
 // Service Worker for P2P WebRTC Game
-const CACHE_NAME = 'p2p-game-v1';
+const CACHE_NAME = 'p2p-game-v2';
 const urlsToCache = [
   '/',
   '/index.html',
