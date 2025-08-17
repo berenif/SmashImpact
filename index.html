@@ -3,97 +3,408 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>P2P LAN Game - Menu</title>
+  <title>P2P Connect Mockup - LAN Game</title>
+  
+  <!-- React via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- QR Code Library -->
+  <script src="vendor/qrcode.js"></script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
   <style>
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0f1220;
-      color: #e8ecff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .container {
-      max-width: 600px;
-      padding: 2rem;
-      text-align: center;
-    }
-    h1 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    p {
-      color: #a0a9c9;
-      margin-bottom: 2rem;
-      line-height: 1.6;
-    }
-    .links {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    a {
-      display: block;
-      padding: 1rem 2rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0f1220;
       color: white;
-      text-decoration: none;
-      border-radius: 12px;
-      font-weight: 600;
-      transition: transform 0.2s, box-shadow 0.2s;
     }
-    a:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    
+    /* Animations */
+    @keyframes float1 {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      50% { transform: translate(20px, -10px) rotate(10deg); }
     }
-    a.secondary {
-      background: #1a1f3f;
-      border: 2px solid #2a2f4a;
+    @keyframes float2 {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      50% { transform: translate(-16px, 14px) rotate(-8deg); }
     }
-    a.secondary:hover {
-      background: #252a4a;
-      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    @keyframes float3 {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(12px); }
     }
-    .badge {
-      display: inline-block;
-      background: #00d084;
-      color: #0f1220;
-      padding: 0.25rem 0.5rem;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      margin-left: 0.5rem;
-      font-weight: bold;
+    @keyframes qrFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    
+    .orb1 { animation: float1 22s ease-in-out infinite; }
+    .orb2 { animation: float2 24s ease-in-out infinite 1s; }
+    .orb3 { animation: float3 26s ease-in-out infinite 0.5s; }
+    .qr-float { animation: qrFloat 8s ease-in-out infinite; }
+    
+    @media (prefers-reduced-motion: reduce) {
+      .orb1, .orb2, .orb3, .qr-float { animation: none; }
+    }
+    
+    /* Custom styles */
+    .bg-dark { background-color: #0f1220; }
+    .border-light { border-color: rgba(255, 255, 255, 0.1); }
+    .bg-surface { background-color: rgba(255, 255, 255, 0.05); }
+    .text-muted { color: rgba(255, 255, 255, 0.7); }
+    
+    /* QR placeholder */
+    .qr-pattern {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+      height: 100%;
+      padding: 8px;
+    }
+    .qr-cell {
+      background-color: black;
+    }
+    .qr-cell.white {
+      background-color: white;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>P2P LAN Game</h1>
-    <p>Connect two browsers on the same network for a real-time multiplayer tag game experience.</p>
-    
-    <div class="links">
-      <a href="game.html">
-        🎮 Main Game Application
-      </a>
+  <div id="root"></div>
+
+  <script>
+    const { createElement: h, useState, useEffect, useRef } = React;
+    const { createRoot } = ReactDOM;
+
+    // Main App Component
+    function P2PConnectMockups() {
+      const [tab, setTab] = useState('host');
+      const [hostState, setHostState] = useState('waiting');
+      const [playerState, setPlayerState] = useState('scanHost');
+      const bothReady = hostState === 'ready' && playerState === 'ready';
+
+      return h('div', { className: 'min-h-screen text-white bg-dark relative' },
+        // Background
+        h(AnimatedBackground),
+        
+        // Header
+        h('header', { className: 'relative z-10 border-b border-light' },
+          h('div', { className: 'mx-auto max-w-6xl px-4 py-4 flex items-center justify-between' },
+            h('div', { className: 'flex items-center gap-3' },
+              h('div', { className: 'w-7 h-7 rounded-md bg-surface grid place-items-center font-bold' }, 'P2P'),
+              h('span', { className: 'text-sm text-muted' }, 'LAN Game Connect')
+            ),
+            h('nav', { className: 'flex items-center gap-2' },
+              h('button', {
+                onClick: () => setTab('host'),
+                className: `px-3 py-1.5 rounded-xl text-sm border transition ${
+                  tab === 'host' ? 'bg-white text-black border-white' : 'bg-surface text-white/80 border-light hover:bg-white/10'
+                }`
+              }, 'Host UI'),
+              h('button', {
+                onClick: () => setTab('player'),
+                className: `px-3 py-1.5 rounded-xl text-sm border transition ${
+                  tab === 'player' ? 'bg-white text-black border-white' : 'bg-surface text-white/80 border-light hover:bg-white/10'
+                }`
+              }, 'Player UI'),
+              h('a', {
+                href: 'game.html',
+                className: 'px-3 py-1.5 rounded-xl text-sm border bg-surface text-white/80 border-light hover:bg-white/10 transition'
+              }, '🎮 Play Game'),
+              h('a', {
+                href: 'menu.html',
+                className: 'px-3 py-1.5 rounded-xl text-sm border bg-surface text-white/80 border-light hover:bg-white/10 transition'
+              }, '📋 All Demos')
+            )
+          )
+        ),
+        
+        // Hero section
+        h('section', { className: 'relative z-10 mx-auto max-w-6xl px-4 py-8' },
+          h('h1', { className: 'text-3xl md:text-4xl font-semibold tracking-tight' }, 
+            'Connect two browsers on the same network, then start the match'),
+          h('p', { className: 'mt-2 text-muted max-w-2xl' }, 
+            'Fast QR pairing, clear steps, and a single primary action. Accessible, with visible focus states.')
+        ),
+        
+        // Main content
+        h('main', { className: 'relative z-10 mx-auto max-w-6xl px-4 pb-28' },
+          tab === 'host' ? 
+            h('div', { className: 'grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6' },
+              h(LeftRail, { title: 'Host', subtitle: 'Press to show code or scan a player' }),
+              h('div', { className: 'space-y-6' },
+                h(StatePicker, {
+                  label: 'Host state',
+                  value: hostState,
+                  onChange: setHostState,
+                  options: [
+                    { value: 'waiting', label: 'Waiting' },
+                    { value: 'showQR', label: 'Show QR' },
+                    { value: 'scanPlayer', label: 'Scan Player Code' },
+                    { value: 'ready', label: 'Ready' }
+                  ]
+                }),
+                hostState === 'waiting' && h(HostWaiting),
+                hostState === 'showQR' && h(HostShowQR),
+                hostState === 'scanPlayer' && h(HostScanPlayer),
+                hostState === 'ready' && h(HostReady)
+              )
+            ) :
+            h('div', { className: 'grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6' },
+              h(LeftRail, { title: 'Player', subtitle: 'Scan the host code to join' }),
+              h('div', { className: 'space-y-6' },
+                h(StatePicker, {
+                  label: 'Player state',
+                  value: playerState,
+                  onChange: setPlayerState,
+                  options: [
+                    { value: 'scanHost', label: 'Scan Host QR' },
+                    { value: 'ready', label: 'Ready' }
+                  ]
+                }),
+                playerState === 'scanHost' && h(PlayerScanHost),
+                playerState === 'ready' && h(PlayerReady)
+              )
+            )
+        ),
+        
+        // Footer
+        h('footer', { className: 'fixed bottom-0 inset-x-0 bg-black/60 backdrop-blur border-t border-light' },
+          h('div', { className: 'mx-auto max-w-6xl px-4 py-3 flex items-center gap-4' },
+            h(StepDots, { 
+              steps: ['Choose host', 'Scan QR', 'Start game'],
+              activeIndex: bothReady ? 2 : 1
+            }),
+            h('div', { className: 'ml-auto flex items-center gap-3' },
+              h('span', { className: 'text-sm text-muted hidden sm:block' }, 'Ready status'),
+              h('span', { 
+                className: `px-2 py-1 rounded-md text-xs ${
+                  bothReady ? 'bg-emerald-400 text-black' : 'bg-white/10 text-white/80'
+                }`
+              }, bothReady ? 'Both connected' : 'Waiting for devices'),
+              h('button', {
+                className: `px-4 py-2 rounded-xl text-sm font-medium transition ${
+                  bothReady ? 'bg-white text-black hover:bg-white/90' : 'bg-white/10 text-white/60 cursor-not-allowed'
+                }`,
+                disabled: !bothReady
+              }, 'Start match')
+            )
+          )
+        )
+      );
+    }
+
+    // Components
+    function AnimatedBackground() {
+      return h('div', { className: 'pointer-events-none absolute inset-0 overflow-hidden' },
+        h('div', { 
+          className: 'orb1 absolute -top-24 -left-24 w-[40vw] h-[40vw] rounded-full blur-3xl',
+          style: { background: 'radial-gradient(circle at center, rgba(99,102,241,0.25), rgba(99,102,241,0) 60%)' }
+        }),
+        h('div', { 
+          className: 'orb2 absolute -bottom-24 -right-24 w-[42vw] h-[42vw] rounded-full blur-3xl',
+          style: { background: 'radial-gradient(circle at center, rgba(34,211,238,0.22), rgba(34,211,238,0) 60%)' }
+        }),
+        h('div', { 
+          className: 'orb3 absolute top-1/3 left-1/4 w-[28vw] h-[28vw] rounded-full blur-3xl',
+          style: { background: 'radial-gradient(circle at center, rgba(236,72,153,0.18), rgba(236,72,153,0) 60%)' }
+        })
+      );
+    }
+
+    function LeftRail({ title, subtitle }) {
+      return h('aside', { className: 'rounded-2xl border border-light bg-surface p-4' },
+        h('div', { className: 'text-xs uppercase tracking-wider text-white/60' }, title),
+        h('div', { className: 'mt-1 text-sm text-white/80' }, subtitle),
+        h('div', { className: 'mt-4 grid gap-2' },
+          h('button', { className: 'h-12 rounded-xl border border-light bg-surface hover:bg-white/10 text-left px-3' },
+            h('div', { className: 'text-xs text-white/60' }, 'QR Code'),
+            h('div', { className: 'text-sm' }, 'Press to show')
+          ),
+          h('button', { className: 'h-12 rounded-xl border border-light bg-surface hover:bg-white/10 text-left px-3' },
+            h('div', { className: 'text-xs text-white/60' }, 'Alternative'),
+            h('div', { className: 'text-sm' }, 'Paste code')
+          )
+        )
+      );
+    }
+
+    function StatePicker({ label, value, onChange, options }) {
+      return h('div', { className: 'flex flex-wrap items-center gap-2' },
+        h('span', { className: 'text-sm text-muted mr-1' }, label + ':'),
+        ...options.map(o => 
+          h('button', {
+            key: o.value,
+            onClick: () => onChange(o.value),
+            className: `px-3 py-1.5 rounded-xl text-sm border transition ${
+              value === o.value ? 'bg-white text-black border-white' : 'bg-surface text-white/80 border-light hover:bg-white/10'
+            }`
+          }, o.label)
+        )
+      );
+    }
+
+    function ScreenCard({ title, children }) {
+      return h('div', { className: 'rounded-2xl border border-light bg-surface p-4' },
+        h('div', { className: 'text-xs uppercase tracking-wider text-white/60 mb-2' }, title),
+        h('div', { className: 'rounded-2xl border border-light bg-black/30 p-4 min-h-[280px] grid place-items-center' },
+          children
+        )
+      );
+    }
+
+    function PlaceholderQR({ size = 192, data = null }) {
+      const canvasRef = React.useRef(null);
       
-      <a href="p2p-connect-mockup-simple.html">
-        ✨ New UI Mockup <span class="badge">NEW</span>
-      </a>
+      React.useEffect(() => {
+        if (canvasRef.current && typeof qrcode !== 'undefined') {
+          const canvas = canvasRef.current;
+          const text = data || `P2P-CONNECT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          try {
+            // Generate QR code
+            const qr = qrcode(0, 'L');
+            qr.addData(text);
+            qr.make();
+            
+            const count = qr.getModuleCount();
+            const scale = Math.floor(size / count);
+            canvas.width = canvas.height = size;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, size, size);
+            
+            const margin = Math.floor((size - count * scale) / 2);
+            
+            for (let r = 0; r < count; r++) {
+              for (let c = 0; c < count; c++) {
+                ctx.fillStyle = qr.isDark(r, c) ? '#000' : '#fff';
+                ctx.fillRect(margin + c * scale, margin + r * scale, scale, scale);
+              }
+            }
+          } catch (e) {
+            // Fallback to pattern if QR generation fails
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#000';
+            for (let i = 0; i < 36; i++) {
+              const row = Math.floor(i / 6);
+              const col = i % 6;
+              if ((row + col) % 2 === 0) {
+                const cellSize = size / 6;
+                ctx.fillRect(col * cellSize, row * cellSize, cellSize - 4, cellSize - 4);
+              }
+            }
+          }
+        }
+      }, [size, data]);
       
-      <a href="test-qr.html" class="secondary">
-        🔧 QR Code Test
-      </a>
-      
-      <a href="test-simple.html" class="secondary">
-        🔧 Simple Connection Test
-      </a>
-    </div>
-  </div>
+      return h('div', {
+        className: 'bg-white rounded-lg p-2 shadow-inner qr-float',
+        style: { width: size, height: size }
+      },
+        h('canvas', {
+          ref: canvasRef,
+          width: size - 16,
+          height: size - 16,
+          style: { display: 'block' }
+        })
+      );
+    }
+
+    function CameraFrame({ label = 'Scan code' }) {
+      return h('div', { className: 'w-full h-80 rounded-2xl border border-white/20 bg-gradient-to-b from-white/5 to-white/0 grid place-items-center relative overflow-hidden' },
+        h('div', { className: 'absolute inset-8 border-2 border-white/70 rounded-xl pointer-events-none' }),
+        h('span', { className: 'absolute bottom-2 text-sm text-white/80' }, label)
+      );
+    }
+
+    function Pill({ text, muted = false }) {
+      return h('div', {
+        className: `w-full h-12 rounded-xl border grid place-items-center text-sm ${
+          muted ? 'bg-surface text-white/60 border-light' : 'bg-white text-black border-white'
+        }`
+      }, text);
+    }
+
+    function StepDots({ steps, activeIndex }) {
+      return h('ol', { className: 'flex items-center gap-3' },
+        ...steps.map((s, i) =>
+          h('li', { key: s, className: 'flex items-center gap-2' },
+            h('span', { className: `w-2.5 h-2.5 rounded-full ${i <= activeIndex ? 'bg-white' : 'bg-white/30'}` }),
+            h('span', { className: `text-xs ${i === activeIndex ? 'text-white' : 'text-white/60'}` }, s),
+            i < steps.length - 1 && h('span', { className: 'w-6 h-px bg-white/20' })
+          )
+        )
+      );
+    }
+
+    // Screen components
+    function HostWaiting() {
+      return h(ScreenCard, { title: 'Lobby' },
+        h('div', { className: 'w-full max-w-xl space-y-4' },
+          h(Pill, { text: 'You' }),
+          h(Pill, { text: 'Waiting for another player', muted: true })
+        )
+      );
+    }
+
+    function HostShowQR() {
+      return h('div', { className: 'w-full grid place-items-center gap-4' },
+        h(PlaceholderQR, { size: 220 }),
+        h('div', { className: 'text-sm text-white/80' }, 'Show this code to the player')
+      );
+    }
+
+    function HostScanPlayer() {
+      return h(ScreenCard, { title: 'Scan player code' },
+        h('div', { className: 'w-full max-w-xl space-y-4 grid place-items-center' },
+          h(CameraFrame, { label: 'Scan player QR' })
+        )
+      );
+    }
+
+    function HostReady() {
+      return h(ScreenCard, { title: 'Ready' },
+        h('div', { className: 'w-full max-w-xl space-y-4' },
+          h(Pill, { text: 'You' }),
+          h(Pill, { text: 'Player 2' })
+        )
+      );
+    }
+
+    function PlayerScanHost() {
+      return h('div', { className: 'w-full grid place-items-center gap-4' },
+        h(CameraFrame, { label: 'Scan host QR code' })
+      );
+    }
+
+    function PlayerReady() {
+      return h(ScreenCard, { title: 'Ready' },
+        h('div', { className: 'w-full max-w-sm' },
+          h(Pill, { text: 'Connected to host' })
+        )
+      );
+    }
+
+    // Initialize app
+    window.addEventListener('DOMContentLoaded', () => {
+      const container = document.getElementById('root');
+      if (container) {
+        try {
+          const root = createRoot(container);
+          root.render(h(P2PConnectMockups));
+        } catch (error) {
+          console.error('Failed to render:', error);
+          container.innerHTML = '<div style="padding: 20px;">Error loading app. Please refresh.</div>';
+        }
+      }
+    });
+  </script>
 </body>
 </html>
