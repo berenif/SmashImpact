@@ -1,36 +1,93 @@
-# SmashImpact
+# Smash Impact - P2P Multiplayer Battle Game
 
-SmashImpact est un prototype de jeu de "tag" jouable directement dans le navigateur. Deux joueurs se connectent en pair à pair via WebRTC et peuvent échanger l'offre/réponse soit en copiant du texte, soit en scannant des QR codes.
+A mobile-first multiplayer battle arena game with WebRTC peer-to-peer connectivity. No server required - connect directly with another player on the same network!
 
-## Installation
+## 🎮 Features
 
-1. Cloner ce dépôt.
-2. (Optionnel) Lancer un serveur HTTP statique, par exemple :
-   ```bash
-   python3 -m http.server
-   ```
+- **Mobile-First Design** - Optimized touch controls with virtual joystick
+- **P2P Multiplayer** - Direct connection via WebRTC (no server needed)
+- **QR Code Connection** - Easy pairing with QR codes or text codes
+- **Real-time Sync** - 60Hz state synchronization for smooth gameplay
+- **Cross-Platform** - Works on mobile and desktop browsers
+- **PWA Support** - Install as an app on your device
 
-## Lancement
+## 🚀 Quick Start
 
-### Dans un navigateur
-- Ouvrir `index.html` dans un navigateur moderne (Chrome, Firefox, etc.).
-- Suivre les instructions à l'écran pour créer ou rejoindre une partie.
+1. **Host a Game:**
+   - Open the game → Select "Multiplayer"
+   - Choose "Host" → Share the QR/text code
+   - Wait for player → Start the game
 
-### Via la ligne de commande
-- Si un serveur a été lancé avec la commande ci‑dessus, ouvrir `http://localhost:8000` dans le navigateur.
+2. **Join a Game:**
+   - Open the game → Select "Multiplayer"
+   - Choose "Join" → Scan QR or paste code
+   - Wait for host to start
 
-## Dépendances principales
+## 🎯 Controls
 
-- [jsQR](vendor/jsqr.js) : lecture de QR codes.
-- [qrcode.js](vendor/qrcode.js) : génération de QR codes.
-- APIs WebRTC et Web APIs standards du navigateur (canvas, etc.).
+**Mobile:**
+- Left joystick for movement
+- Attack button (💥) 
+- Boost button (⚡)
 
-## Pages de tests
+**Desktop:**
+- WASD or Arrow keys to move
+- Space to attack
+- Shift to boost
 
-Des pages de tests sont fournies pour vérifier diverses fonctionnalités :
+## 📁 Project Structure
 
-- `test-simple.html` : exemple minimal de connexion.
-- `test-simple-qr.html` : handshake simple avec QR code.
-- `test-qr.html` et `test-qr-debug.html` : tests d'offre/réponse via QR codes.
-- `test-qr-scan.html` : vérification du scan vidéo.
-- `test-firefox.html` : compatibilité spécifique à Firefox.
+```
+/
+├── index.html      # Auto-redirect to menu
+├── menu.html       # Main menu / landing page
+├── connect.html    # P2P connection interface
+├── game.html       # Game interface
+├── multiplayer.js  # Multiplayer synchronization
+├── sw.js          # Service worker for PWA
+├── manifest.json  # PWA manifest
+└── vendor/        # External libraries (QR code)
+```
+
+## 🌐 Live Demo
+
+Visit: https://berenif.github.io/SmashImpact/
+
+## 🛠️ Technologies
+
+- **WebRTC** - Peer-to-peer connectivity
+- **Canvas API** - Game rendering
+- **Touch API** - Mobile controls
+- **Service Worker** - Offline support
+- **QR Code** - Easy connection sharing
+
+## 📱 Browser Support
+
+- Chrome/Edge 80+
+- Firefox 75+
+- Safari 14+ (iOS/macOS)
+- Chrome Android
+- Samsung Internet
+
+## 🎨 Game Modes
+
+- **Solo Play** - Practice against AI
+- **P2P Multiplayer** - Connect with another player
+
+## 🔧 Development
+
+The game is built with vanilla JavaScript and requires no build process. Simply serve the files with any HTTP server.
+
+```bash
+# Local development
+python3 -m http.server 8000
+# Visit http://localhost:8000
+```
+
+## 📄 License
+
+MIT License - Feel free to use and modify!
+
+---
+
+Made with ❤️ for mobile gaming
