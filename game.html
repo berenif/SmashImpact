@@ -1035,6 +1035,12 @@
       }
 
       reset() {
+        // Ensure player and enemy objects exist
+        if (!this.player || !this.enemy) {
+          console.warn('reset() called before player/enemy initialized');
+          return;
+        }
+        
         this.player.x = this.canvas.width / 2;
         this.player.y = this.canvas.height / 2;
         this.player.vx = 0;

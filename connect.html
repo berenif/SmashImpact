@@ -1782,7 +1782,13 @@
       }
       
       // Send game start message to player
-      dataChannel.send(JSON.stringify({ type: 'gameStart' }));
+      try {
+        dataChannel.send(JSON.stringify({ type: 'gameStart' }));
+      } catch (e) {
+        showStatus('Failed to send game start signal', 'error');
+        console.error('Failed to send game start:', e);
+        return;
+      }
       
       // Store connection info in session for game to use
       sessionStorage.setItem('p2pConnected', 'true');
