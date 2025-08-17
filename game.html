@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>P2P LAN Webapp - Playable Tag</title>
+  <style>
+    :root {
+      --color-bg: #0f1220;
+      --color-surface: #151936;
+      --color-border: #2a2f4a;
+      --color-text: #e8ecff;
+      --color-button-bg: #1a1f3f;
+      --color-focus: #00d084;
+      --color-ui-bg: #ffffff;
+      --color-ui-text: #000000;
+      --color-ui-border: #000000;
+      --space-1: 8px;
+      --space-2: 16px;
+      --space-3: 20px;
+      --space-4: 40px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    body { margin: 0; background:var(--color-bg); color:var(--color-text); display:grid; grid-template-columns: 360px 1fr; height: 100vh; }
+    aside { border-right: 1px solid var(--color-border); padding: var(--space-2); overflow:auto; }
+    main { display:grid; grid-template-rows: auto 1fr; position:relative; }
+    h1 { font-size: 18px; margin: 0 0 var(--space-2); }
+    h2 { font-size: 15px; margin: var(--space-2) 0 var(--space-1); }
+    .box { background:var(--color-surface); border:1px solid var(--color-border); border-radius:12px; padding:var(--space-2); }
+    textarea, input { width:100%; background:#0f1129; color:var(--color-text); border:1px solid var(--color-border); border-radius:8px; padding:var(--space-1); }
+    button { cursor:pointer; border:1px solid var(--color-border); background:var(--color-button-bg); color:var(--color-text); border-radius:8px; padding:var(--space-1) var(--space-2); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    :focus-visible { outline:2px solid var(--color-focus); outline-offset:2px; }
+    .row { display:flex; gap:var(--space-1); align-items:center; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .small { font-size: 12px; opacity:.9; }
+    .sr-only {
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0 0 0 0);
+      white-space:nowrap;
+      border:0;
+    }
+    canvas { width:100%; height:100%; background:#0b0e1a; display:block; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--color-border); background:#121630; font-size:12px; }
+    .ok { color:#00d084; }
+    .warn { color:#ffc24b; }
+    .bad { color:#ff4d4f; }
+    .muted { color:#aab2ff; }
+    .grid { display:grid; gap:var(--space-1); }
+    .skip-link {
+      position:absolute;
+      left:var(--space-2);
+      top:-40px;
+      background:var(--color-button-bg);
+      color:var(--color-text);
+      padding:var(--space-1) var(--space-2);
+      z-index:100;
+    }
+    .skip-link:focus { top:var(--space-2); }
+    .qr-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:50}
+    .qr-modal.show{display:flex}
+    .qr-card{background:#fff;border-radius:12px;padding:20px;max-width:400px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.3)}
+    .qr-hint{margin-top:16px;gap:12px}
+    .qr-hint .small{font-size:12px;color:#666}
+
+    /* Scanning overlay styles */
+    .scan-container {
+      position: relative;
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+    }
+
+    .scan-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .scan-frame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      max-width: 180px;
+      aspect-ratio: 1 / 1;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      border-radius: 12px;
+    }
+
+    .scan-corner {
+      position: absolute;
+      width: 15%;
+      height: 15%;
+      border: 3px solid #00ff00;
+    }
+
+    .scan-corner-tl {
+      top: -3px;
+      left: -3px;
+      border-right: none;
+      border-bottom: none;
+      border-top-left-radius: 8px;
+    }
+
+    .scan-corner-tr {
+      top: -3px;
+      right: -3px;
+      border-left: none;
+      border-bottom: none;
+      border-top-right-radius: 8px;
+    }
+
+    .scan-corner-bl {
+      bottom: -3px;
+      left: -3px;
+      border-right: none;
+      border-top: none;
+      border-bottom-left-radius: 8px;
+    }
+
+    .scan-corner-br {
+      bottom: -3px;
+      right: -3px;
+      border-left: none;
+      border-top: none;
+      border-bottom-right-radius: 8px;
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00ff00, transparent);
+      animation: scanMove 2s linear infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+
+    .scan-status {
+      position: absolute;
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      white-space: nowrap;
+      pointer-events: auto;
+    }
+
+    .scan-status.detecting {
+      background: rgba(0, 255, 0, 0.8);
+      color: white;
+    }
+
+    .scan-status.success {
+      background: rgba(0, 255, 0, 0.9);
+      color: white;
+      animation: pulse 0.5s ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.1); }
+    }
+
+    /* Highlight detected QR code */
+    .scan-frame.detected {
+      border-color: #00ff00;
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    }
+
+    .scan-frame.detected .scan-corner {
+      border-color: #00ff00;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+    }
+
+    /* Quick Connect Modal Styles */
+    .quick-connect-card {
+      max-width: 600px;
+      width: 90vw;
+    }
+
+    .quick-connect-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .quick-connect-header h3 {
+      margin: 0 0 8px 0;
+      color: #333;
+    }
+
+    .quick-connect-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .offer-section, .answer-section {
+      text-align: center;
+    }
+
+    .offer-section h4, .answer-section h4 {
+      margin: 0 0 12px 0;
+      color: #555;
+      font-size: 16px;
+    }
+
+    .quick-connect-status {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .status-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      flex: 1;
+      position: relative;
+    }
+
+    .status-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      right: -50%;
+      width: 100%;
+      height: 2px;
+      background: #e9ecef;
+      z-index: 1;
+    }
+
+    .status-step.active::after {
+      background: #007cba;
+    }
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #e9ecef;
+      color: #6c757d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-bottom: 8px;
+      z-index: 2;
+      position: relative;
+    }
+
+    .status-step.active .step-number {
+      background: #007cba;
+      color: white;
+    }
+
+    .status-step.completed .step-number {
+      background: #28a745;
+      color: white;
+    }
+
+    .step-text {
+      font-size: 12px;
+      color: #6c757d;
+      max-width: 80px;
+      line-height: 1.2;
+    }
+
+    .status-step.active .step-text {
+      color: #007cba;
+      font-weight: 500;
+    }
+
+    .status-step.completed .step-text {
+      color: #28a745;
+    }
+
+    /* Responsive design for mobile */
+    @media (max-width: 768px) {
+      .quick-connect-content {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      
+      .quick-connect-status {
+        flex-direction: column;
+        gap: 16px;
+      }
+      
+      .status-step:not(:last-child)::after {
+        display: none;
+      }
+    }
+    
+    /* Cross-browser compatibility improvements */
+    * { box-sizing: border-box; }
+    
+    /* Fallback for browsers that don't support CSS Grid */
+    @supports not (display: grid) {
+      body { display: flex; }
+      aside { flex: 0 0 360px; }
+      main { flex: 1; display: flex; flex-direction: column; }
+    }
+    
+    /* Vendor prefixes for better browser support */
+    button { 
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    textarea, input { 
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    
+    /* Smooth scrolling for better UX */
+    html { scroll-behavior: smooth; }
+    
+    /* Better focus indicators for accessibility */
+    button:focus, textarea:focus, input:focus { 
+      outline: 2px solid #4a9eff; 
+      outline-offset: 2px;
+    }
+    
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+      .box { border-width: 2px; }
+      button { border-width: 2px; }
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+
+    /* Simple UI overlay */
+    .ui-container {
+      position:absolute;
+      inset:0;
+      z-index:10;
+      background:var(--color-ui-bg);
+      color:var(--color-ui-text);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .ui-container .screen { display:none; width:100%; height:100%; }
+    .ui-container .screen.active { display:flex; }
+    .role-selection {
+      display:flex;
+      flex-direction:column;
+      gap:var(--space-3);
+      margin:auto;
+      width:100%;
+      max-width:420px;
+    }
+    .role-box {
+      width:100%;
+      max-width:200px;
+      height:200px;
+      border:2px solid var(--color-ui-border);
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+      background:var(--color-ui-bg);
+      font: inherit;
+    }
+    @media (min-width:600px) {
+      .role-selection { flex-direction:row; }
+      .role-box { width:200px; }
+    }
+    .host-layout, .player-layout { display:flex; width:100%; height:100%; }
+    .sidebar { width:120px; padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-3); }
+    .sidebar .label { font-weight:bold; }
+    .qr-toggle {
+      width:60px; height:60px; border:2px solid var(--color-ui-border);
+      display:flex; align-items:center; justify-content:center;
+      text-align:center; font-size:12px; cursor:pointer;
+      background:var(--color-ui-bg);
+      font: inherit;
+    }
+    .content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-3); }
+    .wide-btn { width:60%; padding:var(--space-3); border:2px solid var(--color-ui-border); background:var(--color-ui-bg); text-align:center; }
+    .player-scan { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-3); }
+    .scan-box { width:200px; height:200px; border:2px solid var(--color-ui-border); }
+  </style>
+</head>
+<body>
+  <a href="#mainContent" class="skip-link">Skip to main content</a>
+  <aside aria-label="Connection controls">
+    <h1>P2P over LAN, pure browser</h1>
+    <div class="small muted box" style="margin-bottom:10px">
+      Two roles. Host creates an offer, peer pastes it and returns an answer. No server, copy paste or QR only. Same Wi‑Fi is ideal.
+    </div>
+
+    <div class="grid">
+      <section class="box">
+        <h2>Host (create offer)</h2>
+        <div class="row">
+          <button id="btnHostStart" type="button">Create Offer</button>
+          <button id="btnQuickConnect" type="button">🚀 Quick Connect</button>
+        </div>
+        <div class="row">
+          <button id="btnCopyOffer" type="button" disabled>Copy</button>
+          <button id="btnQrOffer" type="button" disabled>Show QR</button>
+        </div>
+        <div class="row">
+          <label for="offerOut" class="sr-only">Generated offer</label>
+          <input id="offerOut" placeholder="Offer will appear here" readonly />
+        </div>
+        <div class="row">
+          <button id="btnApplyAnswer" type="button" disabled>Apply Answer</button>
+          <button id="btnScanAnswer" type="button" disabled>Scan Answer</button>
+        </div>
+        <div class="row">
+          <label for="answerIn" class="sr-only">Answer from peer</label>
+          <input id="answerIn" placeholder="Paste or scan answer here" />
+        </div>
+        <div class="small muted" id="hostState" aria-live="polite">idle</div>
+      </section>
+
+      <section class="box">
+        <h2>Peer (join offer)</h2>
+        <div class="row">
+          <button id="btnPeerStart" type="button">Ready to Join</button>
+          <button id="btnScanHost" type="button">📱 Scan Host</button>
+        </div>
+        <div class="row">
+          <label for="offerIn" class="sr-only">Offer from host</label>
+          <input id="offerIn" placeholder="Paste or scan offer here" />
+        </div>
+        <div class="row">
+          <button id="btnApplyOffer" type="button" disabled>Apply Offer</button>
+          <button id="btnScanOffer" type="button" disabled>Scan Offer</button>
+        </div>
+        <div class="row">
+          <button id="btnCopyAnswer" type="button" disabled>Copy</button>
+          <button id="btnQrAnswer" type="button" disabled>Show QR</button>
+        </div>
+        <div class="row">
+        </div>
+        <div class="small muted" id="peerState" aria-live="polite">idle</div>
+      </section>
+
+      <section class="box">
+        <h2>Status</h2>
+        <div class="small mono" id="latency"></div>
+      </section>
+
+      <section class="box">
+        <h2>Chat, debug</h2>
+        <div class="row">
+          <button id="chatSend" type="button" disabled>Send</button>
+        </div>
+        <pre id="log" class="small mono" style="white-space:pre-wrap"></pre>
+      </section>
+
+      <section class="box">
+        <h2>Diagnostics</h2>
+        <div class="row">
+          <button id="btnRunTests" type="button">Run checks</button>
+          <button id="btnTestScan" type="button">Test Scan Setup</button>
+          <span class="small muted">Quick sanity tests log below</span>
+        </div>
+      </section>
+
+      <section class="box">
+        <h2>How to play</h2>
+        <div class="small muted">
+          Simple tag. Move with <span class="kbd">WASD</span> or arrows. If you are IT and touch the other player you score and roles swap. First to 10 wins or highest score when the timer ends.
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <main id="mainContent" role="main" tabindex="-1">
+    <div id="uiContainer" class="ui-container">
+      <div id="screenSelect" class="screen active">
+        <h2 id="roleHeading">Choose your role</h2>
+        <div class="role-selection" role="group" aria-labelledby="roleHeading">
+          <button id="chooseHost" class="role-box" type="button" aria-label="Host a new game">Host</button>
+          <button id="choosePlayer" class="role-box" type="button" aria-label="Join as a player">Player</button>
+        </div>
+      </div>
+      <div id="screenHostWait" class="screen">
+        <div class="host-layout">
+          <div class="sidebar">
+            <div class="label">Host</div>
+            <button id="hostQrBtn" class="qr-toggle" type="button" aria-label="Show QR code">QR CODE</button>
+          </div>
+          <div class="content">
+            <p class="wide-btn">You</p>
+            <p id="hostStatus" class="wide-btn" role="status" aria-live="polite">Waiting for another player</p>
+          </div>
+        </div>
+      </div>
+      <div id="screenHostScan" class="screen">
+        <div class="host-layout">
+          <div class="sidebar">
+            <div class="label">Host</div>
+            <button class="qr-toggle" type="button" disabled aria-disabled="true" aria-label="QR code unavailable">QR CODE</button>
+          </div>
+          <div class="content">
+            <p class="wide-btn">You</p>
+            <button id="hostScanBtn" class="wide-btn" type="button" aria-label="Scan the player's code">Scan player code</button>
+          </div>
+        </div>
+      </div>
+      <div id="screenPlayerScan" class="screen">
+        <div class="player-layout">
+          <div class="player-scan">
+            <div id="playerScanBox" class="scan-box" role="img" aria-label="Camera view for scanning"></div>
+            <p id="playerScanStatus" role="status" aria-live="polite">Scan host QR code</p>
+          </div>
+        </div>
+      </div>
+      <div id="screenPlayerReady" class="screen">
+        <div class="player-layout">
+          <div class="sidebar">
+            <div class="label">Player</div>
+            <button id="playerShowQr" class="qr-toggle" type="button" aria-label="Show your QR code">QR CODE</button>
+          </div>
+          <div class="player-scan">
+            <div class="scan-box" role="img" aria-label="Your QR code"></div>
+            <p role="status" aria-live="polite">Show this code to the host</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="padding:10px; gap:16px; align-items:center; border-bottom:1px solid #2a2f4a;">
+      <div>Game</div>
+      <div class="small muted">You are <span id="meTag" class="tag">not joined</span>, move with WASD or arrows</div>
+      <div class="row" style="margin-left:auto; gap:8px">
+        <button id="btnStartGame" type="button" disabled>Start</button>
+        <button id="btnResetGame" type="button" disabled>Reset</button>
+      </div>
+    </div>
+      <canvas id="game" role="img" aria-label="Game area"></canvas>
+
+    <div id="qrModal" class="qr-modal">
+      <div class="qr-card">
+          <canvas id="qrCanvas" width="360" height="360" role="img" aria-label="Connection QR code"></canvas>
+        <div class="row qr-hint" style="justify-content:space-between">
+          <span class="small muted">Scan with your camera, copy the text</span>
+          <button id="qrClose" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+    <div id="scanModal" class="qr-modal">
+      <div class="qr-card">
+        <div class="scan-container">
+          <video id="scanVideo" autoplay playsinline muted></video>
+          <div class="scan-overlay">
+            <div class="scan-frame">
+              <div class="scan-corner scan-corner-tl"></div>
+              <div class="scan-corner scan-corner-tr"></div>
+              <div class="scan-corner scan-corner-bl"></div>
+              <div class="scan-corner scan-corner-br"></div>
+              <div class="scan-line"></div>
+            </div>
+            <div class="scan-status">Point camera at QR code</div>
+          </div>
+        </div>
+        <div class="row qr-hint" style="justify-content:space-between">
+          <span class="small muted">Point at QR. It will auto-fill.</span>
+          <button id="scanClose" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Quick Connect Modal -->
+    <div id="quickConnectModal" class="qr-modal">
+      <div class="qr-card quick-connect-card">
+        <div class="quick-connect-header">
+          <h3>🚀 Quick Connect</h3>
+          <p class="small muted">Show this QR to peer, then wait for their answer</p>
+        </div>
+        
+        <div class="quick-connect-content">
+          <!-- Offer QR Section -->
+          <div class="offer-section">
+            <h4>Your Offer QR</h4>
+              <canvas id="quickConnectOfferQR" width="200" height="200" role="img" aria-label="Offer QR code"></canvas>
+          </div>
+          
+          <!-- Answer Scanning Section -->
+          <div class="answer-section">
+            <h4>Waiting for Answer...</h4>
+            <div class="scan-container">
+              <video id="quickConnectScanVideo" autoplay playsinline muted></video>
+              <div class="scan-overlay">
+                <div class="scan-frame">
+                  <div class="scan-corner scan-corner-tl"></div>
+                  <div class="scan-corner scan-corner-tr"></div>
+                  <div class="scan-corner scan-corner-bl"></div>
+                  <div class="scan-corner scan-corner-br"></div>
+                  <div class="scan-line"></div>
+                </div>
+                <div class="scan-status">Waiting for peer's answer QR...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="quick-connect-status" id="quickConnectStatus">
+          <div class="status-step active">
+            <span class="step-number">1</span>
+            <span class="step-text">Show offer QR to peer</span>
+          </div>
+          <div class="status-step">
+            <span class="step-number">2</span>
+            <span class="step-text">Peer scans and creates answer</span>
+          </div>
+          <div class="status-step">
+            <span class="step-number">3</span>
+            <span class="step-text">Peer shows answer QR</span>
+          </div>
+          <div class="status-step">
+            <span class="step-number">4</span>
+            <span class="step-text">Auto-connect when answer detected</span>
+          </div>
+        </div>
+        
+        <div class="row qr-hint" style="justify-content:space-between">
+          <span class="small muted">Connection will be established automatically</span>
+          <button id="quickConnectClose" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Role Selection Modal -->
+    <div id="roleModal" class="qr-modal">
+      <div class="qr-card" style="text-align:center">
+        <h2>Select Role</h2>
+        <div class="row" style="justify-content:center; gap:16px;">
+          <button id="chooseHostModal" type="button" aria-label="Host a new game">Host</button>
+          <button id="choosePlayerModal" type="button" aria-label="Join as a player">Player</button>
+        </div>
+        <div class="row" style="justify-content:center; margin-top:16px;">
+          <button id="btnQuickConnectFromRole" type="button">🚀 Quick Connect</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+<script src="./vendor/qrcode.js"></script>
+
+<!-- Add QR Scanner library for cross-browser compatibility -->
+<script src="./vendor/jsqr.js"></script>
+
+<script>
+// Ensure QR library is loaded before proceeding
+if (typeof window.qrcode !== 'function') {
+  console.error('QR library failed to load');
+}
+
+// Browser compatibility checks and polyfills
+function checkBrowserCompatibility() {
+  const issues = [];
+  
+  // Check WebRTC support
+  if (!window.RTCPeerConnection && !window.webkitRTCPeerConnection && !window.mozRTCPeerConnection) {
+    issues.push('WebRTC not supported - RTCPeerConnection missing');
+  }
+  
+  // Check canvas support
+  if (!document.createElement('canvas').getContext) {
+    issues.push('Canvas not supported');
+  }
+  
+  // Check for modern JavaScript features
+  if (!window.Promise) {
+    issues.push('Promises not supported');
+  }
+  
+  // Check for performance.now() with fallback
+  if (!window.performance || !window.performance.now) {
+    window.performance = window.performance || {};
+    window.performance.now = window.performance.now || function() {
+      return Date.now();
+    };
+  }
+  
+  // Check for requestAnimationFrame with fallback
+  if (!window.requestAnimationFrame) {
+    window.requestAnimationFrame = window.requestAnimationFrame || function(callback) {
+      return setTimeout(callback, 1000 / 60);
+    };
+    window.cancelAnimationFrame = window.cancelAnimationFrame || function(id) {
+      clearTimeout(id);
+    };
+  }
+  
+  // Check for devicePixelRatio
+  if (!window.devicePixelRatio) {
+    window.devicePixelRatio = 1;
+  }
+
+  // Check for camera access
+  const mediaDevices =
+    navigator.mediaDevices ||
+    navigator.getUserMedia ||
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia;
+
+  if (!mediaDevices) {
+    issues.push('Camera access not supported');
+  }
+  
+  if (issues.length > 0) {
+    const warning = document.createElement('div');
+    warning.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff4d4f;color:white;padding:10px;text-align:center;z-index:1000;font-family:system-ui;';
+    warning.innerHTML = '<strong>Browser Compatibility Issues:</strong> ' + issues.join(', ');
+    document.body.appendChild(warning);
+  }
+}
+
+// Run compatibility check after DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkBrowserCompatibility);
+} else {
+  checkBrowserCompatibility();
+}
+
+// Add error handling for unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('Unhandled promise rejection:', event.reason);
+  // Optionally show user-friendly error message
+});
+
+// Add error handling for global errors
+window.addEventListener('error', function(event) {
+  console.error('Global error:', event.error);
+});
+
+// Ensure QR library is ready before loading modules
+function loadModules() {
+  if (typeof window.qrcode === 'function') {
+    console.log('QR library ready, loading modules...');
+    // Load the main module
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = './src/main.js';
+    script.onerror = function() {
+      console.error('Failed to load main.js module');
+    };
+    document.head.appendChild(script);
+  } else {
+    console.warn('QR library not ready, retrying...');
+    setTimeout(loadModules, 100);
+  }
+}
+
+// Start loading modules after a short delay to ensure everything is ready
+setTimeout(loadModules, 200);
+</script>
+<script>
+  (function() {
+    const screens = {
+      select: document.getElementById('screenSelect'),
+      hostWait: document.getElementById('screenHostWait'),
+      hostScan: document.getElementById('screenHostScan'),
+      playerScan: document.getElementById('screenPlayerScan'),
+      playerReady: document.getElementById('screenPlayerReady')
+    };
+    function show(name) {
+      Object.values(screens).forEach(s => s.classList.remove('active'));
+      screens[name].classList.add('active');
+    }
+    document.getElementById('chooseHost')?.addEventListener('click', () => show('hostWait'));
+    document.getElementById('choosePlayer')?.addEventListener('click', () => show('playerScan'));
+    document.getElementById('chooseHostModal')?.addEventListener('click', () => show('hostWait'));
+    document.getElementById('choosePlayerModal')?.addEventListener('click', () => show('playerScan'));
+    document.getElementById('hostWaitBtn')?.addEventListener('click', () => show('hostScan'));
+    document.getElementById('playerScanBox')?.addEventListener('click', () => show('playerReady'));
+  })();
+</script>
+</body>
+</html>
