@@ -54,7 +54,7 @@ class MultiplayerGame {
     this.lastPingTime = 0;
     
     // Sync settings
-    this.SYNC_RATE = 60; // 60 Hz
+    this.SYNC_RATE = 30; // 30 Hz - reduced for better performance
     this.lastSyncTime = 0;
     
     this.init();
@@ -83,6 +83,9 @@ class MultiplayerGame {
     console.log('window.gameDataChannel:', window.gameDataChannel);
     console.log('window.gameRole:', window.gameRole);
     
+    // Clean up any existing intervals first
+    this.cleanup();
+    
     // Try to get connection from window globals (preserved from connect.html)
     if (window.gamePC && window.gameDataChannel) {
       console.log('Found game connection in window');
@@ -107,11 +110,13 @@ class MultiplayerGame {
         this.dataChannel.onerror = (error) => {
           console.error('Data channel error:', error);
           this.isConnected = false;
+          this.cleanup();
         };
         
         this.dataChannel.onclose = () => {
           console.log('Data channel closed');
           this.isConnected = false;
+          this.cleanup();
         };
         
         this.isConnected = this.dataChannel.readyState === 'open';
@@ -125,6 +130,13 @@ class MultiplayerGame {
       if (this.isConnected) {
         this.startSyncLoop();
         this.startPingLoop();
+        
+        // Host sends initial state to player
+        if (this.role === 'host') {
+          setTimeout(() => {
+            this.sendFullStateSync();
+          }, 100);
+        }
       } else {
         // Wait for connection to be ready
         this.connectionCheckInterval = setInterval(() => {
@@ -135,6 +147,13 @@ class MultiplayerGame {
             clearInterval(this.connectionCheckInterval);
             this.connectionCheckInterval = null;
             console.log('Connection ready, started sync loops');
+            
+            // Host sends initial state to player
+            if (this.role === 'host') {
+              setTimeout(() => {
+                this.sendFullStateSync();
+              }, 100);
+            }
           }
         }, 100);
         
@@ -170,22 +189,33 @@ class MultiplayerGame {
           this.dataChannel.onerror = (error) => {
             console.error('Data channel error:', error);
             this.isConnected = false;
+            this.cleanup();
           };
           
           this.dataChannel.onclose = () => {
             console.log('Data channel closed');
             this.isConnected = false;
+            this.cleanup();
           };
           
-          this.isConnected = true;
+          this.isConnected = this.dataChannel.readyState === 'open';
         }
         
         // Initialize player positions
         this.initializePositions();
         
-        // Start sync loops
-        this.startSyncLoop();
-        this.startPingLoop();
+        // Start sync loops if connected
+        if (this.isConnected) {
+          this.startSyncLoop();
+          this.startPingLoop();
+          
+          // Host sends initial state
+          if (this.role === 'host') {
+            setTimeout(() => {
+              this.sendFullStateSync();
+            }, 100);
+          }
+        }
       } else {
         console.error('No WebRTC connection found - game may not work in multiplayer mode');
         this.setupMessagePassingFallback();
@@ -246,6 +276,10 @@ class MultiplayerGame {
       case 'pong':
         this.latency = Date.now() - message.timestamp;
         break;
+        
+      case 'fullStateSync':
+        this.handleFullStateSync(message.data);
+        break;
     }
   }
   
@@ -255,6 +289,10 @@ class MultiplayerGame {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
     }
+    
+    // Track last full sync time
+    this.lastFullSyncTime = 0;
+    const FULL_SYNC_INTERVAL = 1000; // Full sync every second
     
     this.syncInterval = setInterval(() => {
       if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
@@ -267,6 +305,12 @@ class MultiplayerGame {
       if (now - this.lastSyncTime > (1000 / this.SYNC_RATE)) {
         this.syncLocalState();
         this.lastSyncTime = now;
+      }
+      
+      // Host sends full state sync periodically to prevent drift
+      if (this.role === 'host' && now - this.lastFullSyncTime > FULL_SYNC_INTERVAL) {
+        this.sendFullStateSync();
+        this.lastFullSyncTime = now;
       }
     }, 1000 / this.SYNC_RATE);
   }
@@ -304,6 +348,9 @@ class MultiplayerGame {
         vx: myPlayer.vx,
         vy: myPlayer.vy,
         boosting: myPlayer.boosting,
+        attacking: myPlayer.attacking,
+        health: myPlayer.health,
+        score: myPlayer.score,
         timestamp: Date.now()
       }
     });
@@ -321,20 +368,46 @@ class MultiplayerGame {
   
   // Handle position update from remote player
   handlePositionUpdate(data) {
+    // Don't update our own player from remote
+    if (data.role === this.role) return;
+    
     const player = data.role === 'host' ? 
       this.gameState.players.host : 
       this.gameState.players.player;
     
+    // Store previous position for smoothing
+    const prevX = player.x;
+    const prevY = player.y;
+    
     // Apply position with interpolation
-    const latencyCompensation = this.latency / 2;
-    const timeDiff = Date.now() - data.timestamp + latencyCompensation;
+    const latencyCompensation = Math.min(this.latency / 2, 50); // Cap compensation at 50ms
+    const timeDiff = Math.max(0, Date.now() - data.timestamp + latencyCompensation);
     
     // Predict position based on velocity and time difference
-    player.x = data.x + (data.vx * timeDiff / 1000);
-    player.y = data.y + (data.vy * timeDiff / 1000);
+    const predictedX = data.x + (data.vx * timeDiff / 1000);
+    const predictedY = data.y + (data.vy * timeDiff / 1000);
+    
+    // Smooth large position jumps with interpolation
+    const distance = Math.sqrt(Math.pow(predictedX - prevX, 2) + Math.pow(predictedY - prevY, 2));
+    const maxJump = 50; // Maximum allowed instant jump
+    
+    if (distance > maxJump && prevX !== 0 && prevY !== 0) {
+      // Smooth large jumps
+      const smoothFactor = 0.3;
+      player.x = prevX + (predictedX - prevX) * smoothFactor;
+      player.y = prevY + (predictedY - prevY) * smoothFactor;
+    } else {
+      // Apply position directly for small movements
+      player.x = predictedX;
+      player.y = predictedY;
+    }
+    
     player.vx = data.vx;
     player.vy = data.vy;
     player.boosting = data.boosting;
+    player.attacking = data.attacking || false;
+    player.health = data.health !== undefined ? data.health : player.health;
+    player.score = data.score !== undefined ? data.score : player.score;
   }
   
   // Handle input from remote player (for prediction)
@@ -353,6 +426,9 @@ class MultiplayerGame {
   
   // Handle attack from remote player
   handleAttack(data) {
+    // Don't process our own attacks
+    if (data.role === this.role) return;
+    
     const attacker = data.role === 'host' ? 
       this.gameState.players.host : 
       this.gameState.players.player;
@@ -361,27 +437,33 @@ class MultiplayerGame {
       this.gameState.players.player : 
       this.gameState.players.host;
     
+    // Use the attacker's position from the attack data (compensated for latency)
+    const attackerX = data.x || attacker.x;
+    const attackerY = data.y || attacker.y;
+    
     // Check if attack hits
-    const dx = target.x - attacker.x;
-    const dy = target.y - attacker.y;
+    const dx = target.x - attackerX;
+    const dy = target.y - attackerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    if (distance < 50 + target.radius) {
+    const attackRange = 50 + target.radius;
+    
+    if (distance < attackRange) {
       // Hit detected
-      target.health -= 10;
+      target.health = Math.max(0, target.health - 10);
       
-      if (data.role !== this.role) {
-        // Remote player hit us
-        this.onHit();
-      }
+      // Visual/haptic feedback for being hit
+      this.onHit();
       
-      // Update scores
+      // Update scores and check for round end
       if (target.health <= 0) {
         attacker.score++;
         this.onScoreChange();
         
-        // Reset positions
-        this.resetRound();
+        // Reset round after a short delay
+        setTimeout(() => {
+          this.resetRound();
+        }, 500);
       }
     }
   }
@@ -423,6 +505,9 @@ class MultiplayerGame {
       this.gameState.players.host : 
       this.gameState.players.player;
     
+    // Set attacking state
+    myPlayer.attacking = true;
+    
     // Send attack message
     this.sendMessage({
       type: 'attack',
@@ -436,6 +521,11 @@ class MultiplayerGame {
     
     // Visual feedback
     this.onAttack();
+    
+    // Reset attacking state after animation
+    setTimeout(() => {
+      myPlayer.attacking = false;
+    }, 200);
   }
   
   // Update local player position
@@ -508,14 +598,25 @@ class MultiplayerGame {
     this.gameState.players.player.x = (width * 2) / 3;
     this.gameState.players.player.y = height / 2;
     
+    // Reset velocities
+    this.gameState.players.host.vx = 0;
+    this.gameState.players.host.vy = 0;
+    this.gameState.players.player.vx = 0;
+    this.gameState.players.player.vy = 0;
+    
+    // Reset health
+    this.gameState.players.host.health = 100;
+    this.gameState.players.player.health = 100;
+    
+    // Reset attacking state
+    this.gameState.players.host.attacking = false;
+    this.gameState.players.player.attacking = false;
+    
     this.gameState.roundStart = Date.now();
     
-    // Sync reset
+    // Sync reset - host sends full state
     if (this.role === 'host') {
-      this.sendMessage({
-        type: 'gameState',
-        data: this.gameState
-      });
+      this.sendFullStateSync();
     }
   }
   
@@ -529,13 +630,93 @@ class MultiplayerGame {
     return this.latency;
   }
   
+  // Send full state sync (host only)
+  sendFullStateSync() {
+    if (this.role === 'host') {
+      this.sendMessage({
+        type: 'fullStateSync',
+        data: {
+          players: this.gameState.players,
+          gameTime: this.gameState.gameTime,
+          roundStart: this.gameState.roundStart,
+          gameActive: this.gameState.gameActive,
+          timestamp: Date.now()
+        }
+      });
+    }
+  }
+  
+  // Handle full state sync from host
+  handleFullStateSync(data) {
+    // Only non-host players should process this
+    if (this.role !== 'host') {
+      // Store old state for comparison
+      const myOldPlayer = { ...this.gameState.players.player };
+      const remoteOldPlayer = { ...this.gameState.players.host };
+      
+      // Update game state
+      this.gameState.gameTime = data.gameTime;
+      this.gameState.roundStart = data.roundStart;
+      this.gameState.gameActive = data.gameActive;
+      
+      // Update remote player (host) completely
+      this.gameState.players.host = data.players.host;
+      
+      // For local player, only update non-position properties to avoid jumps
+      // unless the difference is too large (indicating a reset or teleport)
+      const newPlayer = data.players.player;
+      const positionDiff = Math.sqrt(
+        Math.pow(newPlayer.x - myOldPlayer.x, 2) + 
+        Math.pow(newPlayer.y - myOldPlayer.y, 2)
+      );
+      
+      // If position difference is huge (> 200 pixels), it's likely a reset
+      if (positionDiff > 200) {
+        // Accept the full state including position
+        this.gameState.players.player = newPlayer;
+      } else {
+        // Keep local position but update other properties
+        this.gameState.players.player.health = newPlayer.health;
+        this.gameState.players.player.score = newPlayer.score;
+        this.gameState.players.player.radius = newPlayer.radius;
+        this.gameState.players.player.color = newPlayer.color;
+        // Don't override local position/velocity for smooth movement
+      }
+    }
+  }
+  
+  // Handle game state update (deprecated, use fullStateSync)
+  handleGameStateUpdate(data) {
+    // For backward compatibility
+    this.handleFullStateSync(data);
+  }
+  
   // Callbacks (to be overridden)
   onAttack() {}
   onHit() {}
   onScoreChange() {}
   
+  // Clean up intervals and connections
+  cleanup() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+  }
+  
   // Set WebRTC connection
   setConnection(pc, dataChannel) {
+    // Clean up any existing connection
+    this.cleanup();
+    
     this.pc = pc;
     this.dataChannel = dataChannel;
     
@@ -547,6 +728,18 @@ class MultiplayerGame {
         } catch (e) {
           console.error('Failed to parse message:', e);
         }
+      };
+      
+      this.dataChannel.onerror = (error) => {
+        console.error('Data channel error:', error);
+        this.isConnected = false;
+        this.cleanup();
+      };
+      
+      this.dataChannel.onclose = () => {
+        console.log('Data channel closed');
+        this.isConnected = false;
+        this.cleanup();
       };
     }
   }
