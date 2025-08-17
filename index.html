@@ -345,18 +345,56 @@
       const startScanning = async () => {
         try {
           setError(null);
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
-          });
+          setScanning(true);
+          
+          // Try different camera constraints for better compatibility
+          let stream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+              video: { 
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              } 
+            });
+          } catch (e) {
+            // Fallback to simpler constraints
+            stream = await navigator.mediaDevices.getUserMedia({ 
+              video: true 
+            });
+          }
           
           streamRef.current = stream;
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            setScanning(true);
-            scanQRCode();
-          }
+          
+          // Wait for video element to be ready
+          await new Promise((resolve) => {
+            const checkVideo = () => {
+              if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.onloadedmetadata = () => {
+                  videoRef.current.play();
+                  resolve();
+                };
+              } else {
+                setTimeout(checkVideo, 100);
+              }
+            };
+            checkVideo();
+          });
+          
+          // Start scanning after video is playing
+          setTimeout(() => scanQRCode(), 500);
         } catch (err) {
-          setError('Camera access denied. Please allow camera access to scan QR codes.');
+          setScanning(false);
+          let errorMsg = 'Camera access denied. Please allow camera access to scan QR codes.';
+          if (err.name === 'NotFoundError') {
+            errorMsg = 'No camera found on this device.';
+          } else if (err.name === 'NotAllowedError') {
+            errorMsg = 'Camera permission denied. Please allow camera access and refresh.';
+          } else if (err.name === 'NotReadableError') {
+            errorMsg = 'Camera is already in use by another application.';
+          }
+          setError(errorMsg);
           console.error('Camera error:', err);
         }
       };
@@ -370,10 +408,13 @@
       };
 
       const scanQRCode = () => {
-        if (!scanning || !videoRef.current || !canvasRef.current) return;
-
         const video = videoRef.current;
         const canvas = canvasRef.current;
+        
+        if (!video || !canvas || !streamRef.current) {
+          return;
+        }
+
         const ctx = canvas.getContext('2d');
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -381,17 +422,27 @@
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          
-          if (code) {
-            stopScanning();
-            onScan(code.data);
-            return;
+          try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            if (typeof jsQR !== 'undefined') {
+              const code = jsQR(imageData.data, imageData.width, imageData.height);
+              
+              if (code && code.data) {
+                console.log('QR Code detected:', code.data);
+                stopScanning();
+                onScan(code.data);
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('QR scanning error:', e);
           }
         }
 
-        requestAnimationFrame(scanQRCode);
+        if (scanning) {
+          requestAnimationFrame(scanQRCode);
+        }
       };
 
       useEffect(() => {
@@ -412,18 +463,23 @@
                 h('p', { className: 'text-sm text-muted mt-2' }, label)
               )
             ) :
-            h('div', { className: 'relative h-80' },
+            h('div', { className: 'relative h-80 bg-black rounded-xl overflow-hidden' },
               h('video', {
                 ref: videoRef,
                 autoPlay: true,
                 playsInline: true,
-                className: 'w-full h-full object-cover rounded-xl'
+                muted: true,
+                className: 'w-full h-full object-cover',
+                style: { display: 'block' }
               }),
               h('canvas', {
                 ref: canvasRef,
-                style: { display: 'none' }
+                className: 'hidden'
               }),
               h('div', { className: 'scan-overlay scanning' }),
+              h('div', { className: 'absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-lg text-xs text-white' },
+                '📷 Scanning for QR code...'
+              ),
               h('button', {
                 onClick: stopScanning,
                 className: 'absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition'
