@@ -2,8 +2,9 @@ import { el, setStatus as setStatusDom, setRoleTag, makeLogger } from './utils/d
 import { clamp, now } from './utils/time.js';
 import { encodeForShare, decodeShared } from './net/codec.js';
 import { Net } from './net/webrtc.js';
-import { world, R, SPEED, SCORE_TO_WIN, ROUND_TIME, TAG_COOLDOWN, me, them, role as roleRef, game, setRole, moveLocal, updateRemote, hostTick, broadcastState, applyState, resetForHostStart } from './game/state.js';
+import { world, R, SPEED, SCORE_TO_WIN, ROUND_TIME, TAG_COOLDOWN, me, them, role as roleRef, game, setRole, moveLocal, updateRemote, hostTick, broadcastState, applyState, resetForHostStart, aiPlayer, setGameMode, initSoloMode } from './game/state.js';
 import { drawQrToCanvas } from './ui/qr.js';
+import { drawObstacles, initObstacles } from './game/obstacles.js';
 
 // Cross-browser camera access compatibility
 function getMediaDevices() {
@@ -85,6 +86,9 @@ const btnScanHost = el('btnScanHost');
 const roleModal = el('roleModal');
 const chooseHost = el('chooseHost');
 const choosePlayer = el('choosePlayer');
+const btnSoloMode = el('btnSoloMode');
+const obstacleLayout = el('obstacleLayout');
+const gameModeEl = el('gameMode');
 
 const log = makeLogger(logEl);
 function setStatus(text, good){ setStatusDom(statusEl, text, good); }
@@ -124,26 +128,127 @@ window.addEventListener('keyup', e => { keys.delete(e.key.toLowerCase()); });
 function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
 function drawPlayer(p, camX, camY, isIT){ ctx.beginPath(); ctx.arc(p.x - camX, p.y - camY, R, 0, Math.PI*2); ctx.fillStyle = p.color; ctx.fill(); if(isIT){ ctx.strokeStyle='#ffd24e'; ctx.lineWidth=3; ctx.stroke(); } }
 
-function draw(){ const cx=(me.x+them.x)/2, cy=(me.y+them.y)/2; const scale = Math.min(W/world.w, H/world.h); const vw=W/scale, vh=H/scale; const camX=Math.min(Math.max(cx - vw/2, 0), Math.max(0, world.w - vw)); const camY=Math.min(Math.max(cy - vh/2, 0), Math.max(0, world.h - vh)); ctx.save(); ctx.scale(scale, scale); ctx.clearRect(0,0,vw,vh); ctx.fillStyle='#0b0e1a'; ctx.fillRect(0,0,vw,vh);
-	ctx.strokeStyle='#1e2447'; ctx.lineWidth=1; for(let x=0;x<world.w;x+=80){ line(x - camX, 0 - camY, x - camX, world.h - camY); } for(let y=0;y<world.h;y+=80){ line(0 - camX, y - camY, world.w - camX, y - camY); }
+function draw(){ 
+	let cx, cy;
+	if (game.mode === 'solo' && aiPlayer) {
+		cx = (me.x + aiPlayer.x) / 2;
+		cy = (me.y + aiPlayer.y) / 2;
+	} else {
+		cx = (me.x + them.x) / 2;
+		cy = (me.y + them.y) / 2;
+	}
+	
+	const scale = Math.min(W/world.w, H/world.h); 
+	const vw=W/scale, vh=H/scale; 
+	const camX=Math.min(Math.max(cx - vw/2, 0), Math.max(0, world.w - vw)); 
+	const camY=Math.min(Math.max(cy - vh/2, 0), Math.max(0, world.h - vh)); 
+	
+	ctx.save(); 
+	ctx.scale(scale, scale); 
+	ctx.clearRect(0,0,vw,vh); 
+	ctx.fillStyle='#0b0e1a'; 
+	ctx.fillRect(0,0,vw,vh);
+	
+	// Draw grid
+	ctx.strokeStyle='#1e2447'; 
+	ctx.lineWidth=1; 
+	for(let x=0;x<world.w;x+=80){ 
+		line(x - camX, 0 - camY, x - camX, world.h - camY); 
+	} 
+	for(let y=0;y<world.h;y+=80){ 
+		line(0 - camX, y - camY, world.w - camX, y - camY); 
+	}
+	
+	// Draw obstacles
+	drawObstacles(ctx, camX, camY);
+	
+	// Draw players
 	drawPlayer(me, camX, camY, game.it==='me');
-	drawPlayer(them, camX, camY, game.it==='peer');
-	ctx.fillStyle='#e8ecff'; ctx.font='16px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.textAlign='left';
-	const tText = `Time ${Math.ceil(game.tLeft)}s`; ctx.fillText(tText, 12 - camX, 24 - camY);
+	
+	if (game.mode === 'solo' && aiPlayer) {
+		// Draw AI player
+		aiPlayer.draw(ctx, camX, camY, game.it==='ai');
+	} else {
+		// Draw peer player
+		drawPlayer(them, camX, camY, game.it==='peer');
+	}
+	
+	// Draw UI text
+	ctx.fillStyle='#e8ecff'; 
+	ctx.font='16px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; 
+	ctx.textAlign='left';
+	const tText = `Time ${Math.ceil(game.tLeft)}s`; 
+	ctx.fillText(tText, 12 - camX, 24 - camY);
 	ctx.fillText(`You ${me.score}`, 12 - camX, 46 - camY);
-	ctx.fillText(`Peer ${them.score}`, 12 - camX, 68 - camY);
-	ctx.textAlign='center'; ctx.font='18px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
-	const roleText = game.started ? (game.it==='me' ? 'You are IT' : 'You are running') : 'Press Start';
+	
+	if (game.mode === 'solo' && aiPlayer) {
+		ctx.fillText(`AI ${aiPlayer.score}`, 12 - camX, 68 - camY);
+	} else {
+		ctx.fillText(`Peer ${them.score}`, 12 - camX, 68 - camY);
+	}
+	
+	ctx.textAlign='center'; 
+	ctx.font='18px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
+	
+	let roleText;
+	if (game.started) {
+		if (game.it === 'me') {
+			roleText = 'You are IT';
+		} else if (game.it === 'ai') {
+			roleText = 'AI is IT - Run!';
+		} else {
+			roleText = 'You are running';
+		}
+	} else {
+		roleText = game.mode === 'solo' ? 'Press Start (Solo Mode)' : 'Press Start';
+	}
+	
 	ctx.fillText(roleText, (vw/2), 28 - camY);
-	ctx.restore(); }
+	ctx.restore(); 
+}
 
 let lastTS = now(); let snapshotTimer = 0.2; let lastSend = 0;
 function sendThrottled(obj){ const t=now(); if(t - lastSend > 33){ net.send(obj); lastSend = t; } }
 
-function loop(ts){ const dt = Math.min(0.05, (ts - lastTS)/1000); lastTS = ts; moveLocal(keys, dt, sendThrottled); updateRemote(dt); if(net.role==='host'){ hostTick(dt, now, (state)=> net.send({ type:'state', state })); snapshotTimer -= dt; if(snapshotTimer<=0){ snapshotTimer=0.2; const state = { me:{x:me.x,y:me.y,score:me.score}, them:{x:them.x,y:them.y,score:them.score}, started:game.started, it:game.it, tLeft:Math.ceil(game.tLeft) }; net.send({ type:'state', state }); } } draw(); requestAnimationFrame(loop); }
+function loop(ts){ 
+	const dt = Math.min(0.05, (ts - lastTS)/1000); 
+	lastTS = ts; 
+	
+	if (game.mode === 'solo') {
+		// Solo mode - no network communication
+		moveLocal(keys, dt, null, now()); 
+		hostTick(dt, now, null);
+	} else {
+		// Multiplayer mode
+		moveLocal(keys, dt, sendThrottled, now()); 
+		updateRemote(dt); 
+		if(net.role==='host'){ 
+			hostTick(dt, now, (state)=> net.send({ type:'state', state })); 
+			snapshotTimer -= dt; 
+			if(snapshotTimer<=0){ 
+				snapshotTimer=0.2; 
+				const state = { me:{x:me.x,y:me.y,score:me.score}, them:{x:them.x,y:them.y,score:them.score}, started:game.started, it:game.it, tLeft:Math.ceil(game.tLeft) }; 
+				net.send({ type:'state', state }); 
+			} 
+		} 
+	}
+	
+	draw(); 
+	requestAnimationFrame(loop); 
+}
 requestAnimationFrame(loop);
 
-net.onopen = () => { btnStartGame.disabled = (net.role!=='host'); btnResetGame.disabled = (net.role!=='host'); if(net.role==='host'){ resetForHostStart(); const state = { started:false, it: Math.random()<0.5? 'me':'peer', tLeft: ROUND_TIME, lastTick: now(), lastTagAt: 0 }; net.send({ type:'state', state }); }
+net.onopen = () => { 
+	btnStartGame.disabled = (net.role!=='host'); 
+	btnResetGame.disabled = (net.role!=='host'); 
+	if(net.role==='host'){ 
+		// Initialize obstacles for multiplayer
+		setGameMode('multiplayer', 'simple');
+		resetForHostStart(); 
+		const state = { started:false, it: Math.random()<0.5? 'me':'peer', tLeft: ROUND_TIME, lastTick: now(), lastTagAt: 0 }; 
+		net.send({ type:'state', state }); 
+		gameModeEl.textContent = 'Mode: Multiplayer';
+	}
 };
 net.onclose = () => { btnStartGame.disabled = true; btnResetGame.disabled = true; setChatEnabled(false); };
 net.onmessage = (msg) => { if(msg.type==='pos'){ them.tx = Math.min(Math.max(msg.x, R), world.w-R); them.ty = Math.min(Math.max(msg.y, R), world.h-R); them.lastUpdate = now(); }
@@ -159,8 +264,45 @@ async function applyOfferFromText(txt){ await net.applyOfferFromText(txt); }
 btnApplyAnswer.onclick = async ()=>{ await applyAnswerFromText(answerIn.value); };
 btnApplyOffer.onclick  = async ()=>{ await applyOfferFromText(offerIn.value); };
 
-btnStartGame.onclick = () => { if(net.role!=='host') return; game.started=true; game.tLeft = ROUND_TIME; game.lastTagAt = 0; const state = { me:{x:me.x,y:me.y,score:me.score}, them:{x:them.x,y:them.y,score:them.score}, started:game.started, it:game.it, tLeft:Math.ceil(game.tLeft) }; net.send({ type:'state', state }); };
-btnResetGame.onclick = () => { if(net.role!=='host') return; resetForHostStart(); const state = { me:{x:me.x,y:me.y,score:me.score}, them:{x:them.x,y:them.y,score:them.score}, started:game.started, it:game.it, tLeft:Math.ceil(game.tLeft) }; net.send({ type:'state', state }); };
+btnStartGame.onclick = () => { 
+	if (game.mode === 'solo') {
+		// Solo mode start
+		game.started = true;
+		game.tLeft = ROUND_TIME;
+		game.lastTagAt = 0;
+	} else if (net.role === 'host') {
+		// Multiplayer mode start
+		game.started = true;
+		game.tLeft = ROUND_TIME;
+		game.lastTagAt = 0;
+		const state = { me:{x:me.x,y:me.y,score:me.score}, them:{x:them.x,y:them.y,score:them.score}, started:game.started, it:game.it, tLeft:Math.ceil(game.tLeft) };
+		net.send({ type:'state', state });
+	}
+};
+
+btnResetGame.onclick = () => { 
+	if (game.mode === 'solo') {
+		// Solo mode reset
+		initSoloMode(game.obstacleLayout);
+	} else if (net.role === 'host') {
+		// Multiplayer mode reset
+		resetForHostStart();
+		const state = { me:{x:me.x,y:me.y,score:me.score}, them:{x:them.x,y:them.y,score:them.score}, started:game.started, it:game.it, tLeft:Math.ceil(game.tLeft) };
+		net.send({ type:'state', state });
+	}
+};
+
+// Solo mode button
+btnSoloMode.onclick = () => {
+	const layout = obstacleLayout.value || 'simple';
+	setGameMode('solo', layout);
+	btnStartGame.disabled = false;
+	btnResetGame.disabled = false;
+	setStatus('Solo Mode - Playing against AI', true);
+	gameModeEl.textContent = 'Mode: Solo vs AI';
+	setRoleTag(meTag, 'solo');
+	log(`Solo mode started with ${layout} layout`);
+};
 
 chatSend.onclick = () => { const text = chatInput.value.trim(); if(!text) return; net.send({ type:'chat', text }); log('You: ' + text); chatInput.value=''; };
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') chatSend.click(); });

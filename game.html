@@ -603,6 +603,21 @@
           Simple tag. Move with <span class="kbd">WASD</span> or arrows. If you are IT and touch the other player you score and roles swap. First to 10 wins or highest score when the timer ends.
         </div>
       </section>
+
+      <section class="box">
+        <h2>Solo Mode</h2>
+        <div class="row">
+          <button id="btnSoloMode" type="button">Start Solo Game</button>
+          <select id="obstacleLayout" style="padding: 8px; background: #0f1129; color: #e8ecff; border: 1px solid #2a2f4a; border-radius: 8px;">
+            <option value="simple">Simple Layout</option>
+            <option value="complex">Complex Layout</option>
+            <option value="random">Random Layout</option>
+          </select>
+        </div>
+        <div class="small muted">
+          Play against AI with obstacles. The AI will try to tag you while avoiding traps!
+        </div>
+      </section>
     </div>
   </aside>
 
@@ -663,6 +678,7 @@
     <div class="row" style="padding:10px; gap:16px; align-items:center; border-bottom:1px solid #2a2f4a;">
       <div>Game</div>
       <div class="small muted">You are <span id="meTag" class="tag">not joined</span>, move with WASD or arrows</div>
+      <div class="small muted" id="gameMode" style="margin-left: 10px;">Mode: Multiplayer</div>
       <div class="row" style="margin-left:auto; gap:8px">
         <button id="btnStartGame" type="button" disabled>Start</button>
         <button id="btnResetGame" type="button" disabled>Reset</button>
