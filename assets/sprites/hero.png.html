@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Hero Sprite Sheet</title>
+    <style>
+        body {
+            margin: 20px;
+            font-family: system-ui;
+            background: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid #333;
+            background: white;
+            display: block;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hero Sprite Sheet Generator</h1>
+    <div class="info">
+        <p>This generates a placeholder hero.png sprite sheet matching the structure from your provided image.</p>
+        <p>The sprite sheet contains a 3x3 grid of 64x64 pixel frames showing a knight character in different poses:</p>
+        <ul>
+            <li>Row 1: Idle animations (no cloak → with cloak)</li>
+            <li>Row 2: Walking/moving with sword</li>
+            <li>Row 3: Attack poses</li>
+        </ul>
+    </div>
+    
+    <canvas id="spriteCanvas" width="192" height="192"></canvas>
+    
+    <button onclick="downloadImage()">Download as hero.png</button>
+    <button onclick="copyDataURL()">Copy as Data URL</button>
+    
+    <div id="output" style="margin-top: 20px;"></div>
+    
+    <script>
+        const canvas = document.getElementById('spriteCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Frame size
+        const frameWidth = 64;
+        const frameHeight = 64;
+        
+        function drawKnight(x, y, frame) {
+            ctx.save();
+            ctx.translate(x + frameWidth/2, y + frameHeight/2);
+            
+            // Determine pose and equipment based on frame
+            const row = Math.floor(frame / 3);
+            const col = frame % 3;
+            
+            // Colors matching the sprite sheet aesthetic
+            const armorColor = '#4a6fa5';
+            const cloakColor = '#2c3e50';
+            const skinColor = '#fdbcb4';
+            const swordColor = '#95a5a6';
+            const hairColor = '#d4a574';
+            const bootsColor = '#5d4037';
+            
+            // Cloak (increases with column)
+            if (col > 0 || row > 0) {
+                ctx.fillStyle = cloakColor;
+                const cloakWidth = 15 + col * 3;
+                
+                ctx.beginPath();
+                if (row === 2) { // Attack pose - flowing cloak
+                    ctx.moveTo(-12, -5);
+                    ctx.quadraticCurveTo(-cloakWidth, 10, -cloakWidth + 5, 22);
+                    ctx.lineTo(cloakWidth - 5, 22);
+                    ctx.quadraticCurveTo(cloakWidth, 10, 12, -5);
+                } else if (row === 1) { // Walking - medium cloak
+                    ctx.moveTo(-10, 0);
+                    ctx.lineTo(-cloakWidth + 2, 20);
+                    ctx.lineTo(cloakWidth - 2, 20);
+                    ctx.lineTo(10, 0);
+                } else { // Idle - straight cloak
+                    ctx.moveTo(-8, 2);
+                    ctx.lineTo(-12, 20);
+                    ctx.lineTo(12, 20);
+                    ctx.lineTo(8, 2);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Body armor
+            ctx.fillStyle = armorColor;
+            ctx.fillRect(-10, -5, 20, 18);
+            
+            // Armor details
+            ctx.fillStyle = '#3a5683';
+            ctx.fillRect(-10, 2, 20, 2);
+            ctx.fillRect(-2, -5, 4, 18);
+            
+            // Arms
+            ctx.fillStyle = armorColor;
+            if (row === 1) { // Walking pose
+                // Left arm back
+                ctx.save();
+                ctx.rotate(-0.3);
+                ctx.fillRect(-15, -3, 5, 12);
+                ctx.restore();
+                // Right arm forward
+                ctx.save();
+                ctx.rotate(0.3);
+                ctx.fillRect(10, -3, 5, 12);
+                ctx.restore();
+            } else if (row === 2 && col > 0) { // Attack pose
+                // Sword arm raised
+                ctx.save();
+                ctx.rotate(-Math.PI/3);
+                ctx.fillRect(10, -3, 5, 12);
+                ctx.restore();
+                // Shield arm
+                ctx.fillRect(-15, -3, 5, 12);
+            } else { // Idle
+                ctx.fillRect(-15, -3, 5, 12);
+                ctx.fillRect(10, -3, 5, 12);
+            }
+            
+            // Legs
+            ctx.fillStyle = bootsColor;
+            if (row === 1) { // Walking animation
+                // Left leg forward
+                ctx.fillRect(-8 + col, 13, 6, 10);
+                // Right leg back
+                ctx.fillRect(2 - col, 13, 6, 10);
+            } else {
+                ctx.fillRect(-7, 13, 5, 10);
+                ctx.fillRect(2, 13, 5, 10);
+            }
+            
+            // Head
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.arc(0, -13, 7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Hair
+            ctx.fillStyle = hairColor;
+            ctx.beginPath();
+            ctx.arc(0, -15, 7, Math.PI, 0);
+            ctx.fill();
+            
+            // Face details
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-3, -13, 2, 2); // Left eye
+            ctx.fillRect(1, -13, 2, 2);  // Right eye
+            
+            // Sword (for armed poses)
+            if (row > 0) {
+                ctx.fillStyle = swordColor;
+                if (row === 2 && col > 0) { // Attack pose
+                    ctx.save();
+                    ctx.rotate(-Math.PI/3);
+                    ctx.fillRect(16, -25, 3, 30);
+                    // Sword guard
+                    ctx.fillRect(13, -8, 9, 2);
+                    // Sword tip
+                    ctx.beginPath();
+                    ctx.moveTo(16, -25);
+                    ctx.lineTo(17.5, -28);
+                    ctx.lineTo(19, -25);
+                    ctx.fill();
+                    ctx.restore();
+                } else { // Idle with sword
+                    ctx.fillRect(-18, -5, 3, 22);
+                    // Sword guard
+                    ctx.fillRect(-21, 2, 9, 2);
+                }
+            }
+            
+            ctx.restore();
+        }
+        
+        // Clear canvas with transparent background
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw all 9 frames
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 3; col++) {
+                const frame = row * 3 + col;
+                drawKnight(col * frameWidth, row * frameHeight, frame);
+            }
+        }
+        
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'hero.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            document.getElementById('output').innerHTML = 
+                '<p style="color: green;">✓ Downloaded hero.png - Place this file in /workspace/assets/sprites/</p>';
+        }
+        
+        function copyDataURL() {
+            const dataURL = canvas.toDataURL('image/png');
+            navigator.clipboard.writeText(dataURL).then(() => {
+                document.getElementById('output').innerHTML = 
+                    '<p style="color: green;">✓ Data URL copied to clipboard!</p>' +
+                    '<p>You can use this directly in the sprite configuration if needed.</p>';
+            }).catch(() => {
+                document.getElementById('output').innerHTML = 
+                    '<textarea style="width: 100%; height: 100px;">' + dataURL + '</textarea>' +
+                    '<p>Copy the above data URL manually</p>';
+            });
+        }
+    </script>
+</body>
+</html>

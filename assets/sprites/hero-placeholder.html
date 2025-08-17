@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hero Sprite Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid #333;
+            background: transparent;
+            image-rendering: pixelated;
+        }
+        button {
+            margin: 10px 0;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Hero Sprite Sheet Generator</h2>
+    <p>This generates a placeholder sprite sheet that matches the structure from the image you provided.</p>
+    <canvas id="spriteCanvas" width="192" height="192"></canvas>
+    <br>
+    <button onclick="downloadImage()">Download as hero.png</button>
+    
+    <script>
+        const canvas = document.getElementById('spriteCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Frame size
+        const frameWidth = 64;
+        const frameHeight = 64;
+        
+        // Draw a simple knight character in different poses
+        function drawKnight(x, y, pose, hasCloak = false, hasSword = false) {
+            ctx.save();
+            ctx.translate(x + frameWidth/2, y + frameHeight/2);
+            
+            // Base colors
+            const armorColor = '#4a5568';
+            const cloakColor = '#2d3748';
+            const skinColor = '#fdbcb4';
+            const swordColor = '#cbd5e0';
+            const hairColor = '#f6e05e';
+            
+            // Draw cloak if applicable
+            if (hasCloak) {
+                ctx.fillStyle = cloakColor;
+                ctx.beginPath();
+                if (pose === 'idle') {
+                    ctx.moveTo(-12, 0);
+                    ctx.lineTo(-15, 20);
+                    ctx.lineTo(15, 20);
+                    ctx.lineTo(12, 0);
+                } else if (pose === 'walk') {
+                    ctx.moveTo(-12, 0);
+                    ctx.lineTo(-18, 20);
+                    ctx.lineTo(18, 20);
+                    ctx.lineTo(12, 0);
+                } else {
+                    ctx.moveTo(-12, 0);
+                    ctx.lineTo(-20, 22);
+                    ctx.lineTo(20, 22);
+                    ctx.lineTo(12, 0);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Draw body (armor)
+            ctx.fillStyle = armorColor;
+            ctx.fillRect(-10, -5, 20, 20);
+            
+            // Draw arms
+            ctx.fillStyle = armorColor;
+            if (pose === 'walk') {
+                ctx.fillRect(-15, -3, 5, 12);
+                ctx.fillRect(10, -3, 5, 12);
+            } else if (pose === 'attack' && hasSword) {
+                // Sword arm raised
+                ctx.save();
+                ctx.rotate(-Math.PI/4);
+                ctx.fillRect(10, -3, 5, 12);
+                ctx.restore();
+                ctx.fillRect(-15, -3, 5, 12);
+            } else {
+                ctx.fillRect(-15, -3, 5, 12);
+                ctx.fillRect(10, -3, 5, 12);
+            }
+            
+            // Draw legs
+            ctx.fillStyle = '#8b4513'; // Brown boots
+            if (pose === 'walk') {
+                ctx.fillRect(-8, 15, 6, 10);
+                ctx.fillRect(2, 15, 6, 10);
+            } else {
+                ctx.fillRect(-7, 15, 5, 10);
+                ctx.fillRect(2, 15, 5, 10);
+            }
+            
+            // Draw head
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.arc(0, -15, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw hair
+            ctx.fillStyle = hairColor;
+            ctx.beginPath();
+            ctx.arc(0, -18, 8, Math.PI, 0);
+            ctx.fill();
+            
+            // Draw sword if applicable
+            if (hasSword) {
+                ctx.fillStyle = swordColor;
+                if (pose === 'attack') {
+                    ctx.save();
+                    ctx.rotate(-Math.PI/4);
+                    ctx.fillRect(15, -20, 3, 25);
+                    // Sword guard
+                    ctx.fillRect(12, -5, 9, 2);
+                    ctx.restore();
+                } else {
+                    ctx.fillRect(-18, -5, 3, 20);
+                    // Sword guard
+                    ctx.fillRect(-21, 0, 9, 2);
+                }
+            }
+            
+            ctx.restore();
+        }
+        
+        // Clear canvas
+        ctx.fillStyle = 'rgba(200, 180, 140, 0.2)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw grid lines for reference
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * frameWidth, 0);
+            ctx.lineTo(i * frameWidth, canvas.height);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(0, i * frameHeight);
+            ctx.lineTo(canvas.width, i * frameHeight);
+            ctx.stroke();
+        }
+        
+        // Row 1: Idle variations (no cloak to full cloak)
+        drawKnight(0, 0, 'idle', false, false);
+        drawKnight(frameWidth, 0, 'idle', true, false);
+        drawKnight(frameWidth * 2, 0, 'idle', true, false);
+        
+        // Row 2: Walking/Moving with sword
+        drawKnight(0, frameHeight, 'walk', false, true);
+        drawKnight(frameWidth, frameHeight, 'walk', true, true);
+        drawKnight(frameWidth * 2, frameHeight, 'walk', true, true);
+        
+        // Row 3: Attack poses
+        drawKnight(0, frameHeight * 2, 'attack', true, true);
+        drawKnight(frameWidth, frameHeight * 2, 'attack', true, true);
+        drawKnight(frameWidth * 2, frameHeight * 2, 'attack', true, true);
+        
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'hero.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>

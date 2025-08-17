@@ -2,6 +2,8 @@
 // Runner: Fast dodge, smoke beacon, short stun
 // Anchor: Slower, frontal shield cone, grappling line
 
+import { spriteManager } from './sprite-manager.js';
+
 export const HERO_TYPES = {
   RUNNER: 'runner',
   ANCHOR: 'anchor'
@@ -58,6 +60,16 @@ export class Hero {
     this.isDowned = false;
     this.reviveProgress = 0;
     this.isReviving = false;
+    
+    // Sprite animation
+    this.animationState = spriteManager.createAnimationState('hero') || {
+      currentAnimation: 'idle',
+      currentFrame: 0,
+      elapsedTime: 0,
+      flipped: false
+    };
+    this.isMoving = false;
+    this.isAttacking = false;
     
     // Abilities
     this.abilities = {
@@ -118,6 +130,9 @@ export class Hero {
     
     // Movement
     this.updateMovement(dt, input);
+    
+    // Update animation based on state
+    this.updateAnimation(dt);
     
     // Co-op mechanics
     this.updateCoopMechanics(dt, partner);
@@ -202,9 +217,11 @@ export class Hero {
       this.vx = (moveX / moveMag) * speed;
       this.vy = (moveY / moveMag) * speed;
       this.moveAngle = Math.atan2(moveY, moveX);
+      this.isMoving = true;
     } else {
       this.vx *= 0.9; // Friction
       this.vy *= 0.9;
+      this.isMoving = Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1;
     }
     
     // Update position
@@ -214,7 +231,30 @@ export class Hero {
     // Update facing angle based on aim
     if (input.aimX !== undefined && input.aimY !== undefined) {
       this.angle = Math.atan2(input.aimY, input.aimX);
+      // Update sprite flip based on direction
+      this.animationState.flipped = Math.cos(this.angle) < 0;
     }
+  }
+  
+  updateAnimation(dt) {
+    // Determine animation state
+    let targetAnimation = 'idle';
+    
+    if (this.isDowned) {
+      targetAnimation = 'idle'; // Could add a 'downed' animation
+    } else if (this.isAttacking || 
+               (this.type === HERO_TYPES.ANCHOR && this.grappleLine) ||
+               (this.type === HERO_TYPES.RUNNER && this.abilities.utility.active)) {
+      targetAnimation = 'attack';
+    } else if (this.isMoving || this.isDodging) {
+      targetAnimation = 'walk';
+    }
+    
+    // Set animation
+    spriteManager.setAnimation(this.animationState, targetAnimation);
+    
+    // Update animation frame
+    spriteManager.updateAnimation('hero', this.animationState, dt);
   }
   
   updateCoopMechanics(dt, partner) {
@@ -424,7 +464,7 @@ export class Hero {
       ctx.restore();
     }
     
-    // Draw hero
+    // Draw hero sprite or fallback to circle
     ctx.save();
     
     if (this.isDowned) {
@@ -433,22 +473,29 @@ export class Hero {
       ctx.globalAlpha = 0.7;
     }
     
-    // Body
-    ctx.fillStyle = this.stats.color;
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, this.stats.radius, 0, Math.PI * 2);
-    ctx.fill();
+    // Try to draw sprite, fallback to circle if not loaded
+    if (spriteManager.sprites.has('hero')) {
+      spriteManager.draw(ctx, 'hero', this.animationState, screenX, screenY, 1, 0);
+    } else {
+      // Fallback: Draw circle
+      ctx.fillStyle = this.stats.color;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, this.stats.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Direction indicator
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY);
+      ctx.lineTo(
+        screenX + Math.cos(this.angle) * this.stats.radius,
+        screenY + Math.sin(this.angle) * this.stats.radius
+      );
+      ctx.stroke();
+    }
     
-    // Direction indicator
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(screenX, screenY);
-    ctx.lineTo(
-      screenX + Math.cos(this.angle) * this.stats.radius,
-      screenY + Math.sin(this.angle) * this.stats.radius
-    );
-    ctx.stroke();
+    ctx.restore();
     
     // Health bar
     if (this.health < this.stats.maxHealth) {
@@ -473,7 +520,5 @@ export class Hero {
         -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * this.reviveProgress / 100));
       ctx.stroke();
     }
-    
-    ctx.restore();
   }
 }

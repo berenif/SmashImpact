@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprite System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
+        canvas {
+            border: 2px solid #16213e;
+            background: #0f3460;
+            display: block;
+            margin: 20px auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px;
+        }
+        
+        .controls button {
+            margin: 5px;
+            padding: 10px 20px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .controls button:hover {
+            background: #c23450;
+        }
+        
+        .info {
+            text-align: center;
+            margin: 10px;
+        }
+        
+        .status {
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            margin: 10px auto;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Hero Sprite System Test</h1>
+    
+    <div class="status" id="status">Loading sprites...</div>
+    
+    <canvas id="game-canvas" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <h3>Use Arrow Keys or WASD to Move</h3>
+        <button onclick="toggleAnimation('idle')">Idle Animation</button>
+        <button onclick="toggleAnimation('walk')">Walk Animation</button>
+        <button onclick="toggleAnimation('attack')">Attack Animation</button>
+        <button onclick="toggleSprite()">Toggle Sprite/Circle</button>
+    </div>
+    
+    <div class="info">
+        <p>Current Animation: <span id="current-anim">idle</span></p>
+        <p>Position: <span id="position">400, 300</span></p>
+        <p>Sprite Loaded: <span id="sprite-status">Checking...</span></p>
+    </div>
+    
+    <script type="module">
+        import { Hero } from './src/game/heroes.js';
+        import { spriteManager } from './src/game/sprite-manager.js';
+        import { loadGameSprites } from './src/game/sprite-loader.js';
+        
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let hero = null;
+        let useSprite = true;
+        let keys = {};
+        let camera = { x: 0, y: 0 };
+        
+        // Initialize
+        async function init() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Loading sprites...';
+            
+            // Load sprites
+            const spritesLoaded = await loadGameSprites();
+            
+            if (spritesLoaded) {
+                statusEl.textContent = '✓ Sprites loaded successfully!';
+                statusEl.style.color = '#4ade80';
+                document.getElementById('sprite-status').textContent = 'Yes';
+                document.getElementById('sprite-status').style.color = '#4ade80';
+            } else {
+                statusEl.textContent = '⚠ Using fallback rendering (sprites failed to load)';
+                statusEl.style.color = '#fbbf24';
+                document.getElementById('sprite-status').textContent = 'No (using fallback)';
+                document.getElementById('sprite-status').style.color = '#fbbf24';
+            }
+            
+            // Create hero
+            hero = new Hero('runner', canvas.width / 2, canvas.height / 2, 'player1');
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Input handling
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        // Game loop
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Cap at 100ms
+            lastTime = timestamp;
+            
+            // Update input
+            const input = {
+                moveX: 0,
+                moveY: 0,
+                aimX: 1,
+                aimY: 0
+            };
+            
+            // Movement input
+            if (keys['arrowleft'] || keys['a']) input.moveX -= 1;
+            if (keys['arrowright'] || keys['d']) input.moveX += 1;
+            if (keys['arrowup'] || keys['w']) input.moveY -= 1;
+            if (keys['arrowdown'] || keys['s']) input.moveY += 1;
+            
+            // Normalize movement
+            const mag = Math.sqrt(input.moveX * input.moveX + input.moveY * input.moveY);
+            if (mag > 0) {
+                input.moveX /= mag;
+                input.moveY /= mag;
+                // Update aim to match movement
+                input.aimX = input.moveX;
+                input.aimY = input.moveY;
+            }
+            
+            // Update hero
+            if (hero) {
+                hero.update(dt, input, [], null);
+                
+                // Keep hero in bounds
+                hero.x = Math.max(30, Math.min(canvas.width - 30, hero.x));
+                hero.y = Math.max(30, Math.min(canvas.height - 30, hero.y));
+                
+                // Update UI
+                document.getElementById('position').textContent = 
+                    `${Math.round(hero.x)}, ${Math.round(hero.y)}`;
+                document.getElementById('current-anim').textContent = 
+                    hero.animationState.currentAnimation;
+            }
+            
+            // Render
+            render();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#0f3460';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw hero
+            if (hero) {
+                if (!useSprite) {
+                    // Force fallback rendering
+                    const tempSprites = spriteManager.sprites;
+                    spriteManager.sprites = new Map();
+                    hero.draw(ctx, camera);
+                    spriteManager.sprites = tempSprites;
+                } else {
+                    hero.draw(ctx, camera);
+                }
+            }
+            
+            // Draw instructions
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(10, 10, 200, 60);
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px system-ui';
+            ctx.fillText('Use Arrow Keys or WASD to move', 20, 30);
+            ctx.fillText('Click buttons to test animations', 20, 50);
+        }
+        
+        // Global functions for buttons
+        window.toggleAnimation = function(animName) {
+            if (hero && hero.animationState) {
+                spriteManager.setAnimation(hero.animationState, animName);
+            }
+        };
+        
+        window.toggleSprite = function() {
+            useSprite = !useSprite;
+            const btn = event.target;
+            btn.textContent = useSprite ? 'Toggle Sprite/Circle' : 'Toggle Circle/Sprite';
+        };
+        
+        // Start
+        init();
+    </script>
+</body>
+</html>

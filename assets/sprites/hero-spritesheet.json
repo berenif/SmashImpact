@@ -1,0 +1,33 @@
+{
+  "imagePath": "/assets/sprites/hero.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "animations": {
+    "idle": {
+      "frames": [0, 1, 2],
+      "duration": 200,
+      "loop": true
+    },
+    "walk": {
+      "frames": [3, 4, 5],
+      "duration": 150,
+      "loop": true
+    },
+    "attack": {
+      "frames": [6, 7, 8],
+      "duration": 100,
+      "loop": false
+    }
+  },
+  "frames": [
+    {"x": 0, "y": 0, "w": 64, "h": 64},
+    {"x": 64, "y": 0, "w": 64, "h": 64},
+    {"x": 128, "y": 0, "w": 64, "h": 64},
+    {"x": 0, "y": 64, "w": 64, "h": 64},
+    {"x": 64, "y": 64, "w": 64, "h": 64},
+    {"x": 128, "y": 64, "w": 64, "h": 64},
+    {"x": 0, "y": 128, "w": 64, "h": 64},
+    {"x": 64, "y": 128, "w": 64, "h": 64},
+    {"x": 128, "y": 128, "w": 64, "h": 64}
+  ]
+}
