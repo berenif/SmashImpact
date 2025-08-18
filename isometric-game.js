@@ -1187,12 +1187,15 @@
                     dy = 0;
                 }
                 
-                // Update facing direction
+                // Update facing direction and rotation
                 if (dx !== 0 || dy !== 0) {
                     if (dx > 0) this.facing = 'right';
                     else if (dx < 0) this.facing = 'left';
                     else if (dy > 0) this.facing = 'down';
                     else if (dy < 0) this.facing = 'up';
+                    
+                    // Update target rotation for smooth rotation animation
+                    this.targetRotation = Math.atan2(dy, dx);
                     
                     // Start moving to new tile
                     const newGridX = this.gridX + dx;
@@ -1233,10 +1236,7 @@
                 this.bobOffset *= 0.9;
             }
             
-            // Update rotation smoothly
-            if (dx !== 0 || dy !== 0) {
-                this.targetRotation = Math.atan2(dy, dx);
-            }
+            // Update rotation smoothly (rotation is set during movement input handling above)
             this.rotation += (this.targetRotation - this.rotation) * 0.2;
             
             // Update effects
