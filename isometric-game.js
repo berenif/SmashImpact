@@ -166,6 +166,8 @@
         rupees: 0,
         hearts: 3,
         maxHearts: 5,
+        maxShield: 50,
+        maxHealth: 100,
         paused: false,
         gameOver: false,
         lastTime: 0,
@@ -491,7 +493,7 @@
                 lightColor = '#fbbf24';
                 darkColor = COLORS.lavaDeep;
                 // Animated lava glow
-                const glowOffset = Math.sin(animationTime * 0.003 + x * 0.5) * 0.2;
+                const glowOffset = Math.sin(gameState.animationTime * 0.003 + x * 0.5) * 0.2;
                 gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
                 gradient.addColorStop(0, lightColor);
                 gradient.addColorStop(0.5 + glowOffset, baseColor);
@@ -612,7 +614,7 @@
             }
         } else if (type === TILE_TYPES.LAVA) {
             // Lava glow animation
-            const glow = Math.sin(animationTime * 0.003 + x * 0.5 + y * 0.5) * 0.3 + 0.7;
+            const glow = Math.sin(gameState.animationTime * 0.003 + x * 0.5 + y * 0.5) * 0.3 + 0.7;
             
             ctx.save();
             ctx.globalAlpha = glow;
@@ -629,7 +631,7 @@
             ctx.restore();
             
             // Bubbles
-            const bubble = Math.sin(animationTime * 0.004 + x + y) * 0.5 + 0.5;
+            const bubble = Math.sin(gameState.animationTime * 0.004 + x + y) * 0.5 + 0.5;
             if (bubble > 0.8) {
                 ctx.fillStyle = COLORS.torch;
                 ctx.globalAlpha = bubble;
@@ -1605,7 +1607,7 @@
             ctx.fillRect(-24, -3, 48 * healthPercent, 6);
             
             // Shield
-            if (this.shield > 0) {
+            if (this.shield > 0 && this.maxShield > 0) {
                 const shieldPercent = this.shield / this.maxShield;
                 ctx.fillStyle = COLORS.shieldBlue;
                 ctx.fillRect(-24, 4, 48 * shieldPercent, 3);
@@ -1673,6 +1675,8 @@
                 case 'octorok':
                     this.health = 30;
                     this.maxHealth = 30;
+                    this.maxShield = 0;
+                    this.shield = 0;
                     this.speed = 1.5;
                     this.damage = 10;
                     this.color = COLORS.enemyRed;
@@ -1683,6 +1687,8 @@
                 case 'moblin':
                     this.health = 60;
                     this.maxHealth = 60;
+                    this.maxShield = 0;
+                    this.shield = 0;
                     this.speed = 1;
                     this.damage = 20;
                     this.color = COLORS.enemyBlue;
@@ -1693,6 +1699,8 @@
                 case 'darknut':
                     this.health = 100;
                     this.maxHealth = 100;
+                    this.maxShield = 20;
+                    this.shield = 20;
                     this.speed = 0.8;
                     this.damage = 30;
                     this.color = COLORS.enemyPurple;
@@ -1703,6 +1711,8 @@
                 default:
                     this.health = 40;
                     this.maxHealth = 40;
+                    this.maxShield = 0;
+                    this.shield = 0;
                     this.speed = 1.2;
                     this.damage = 15;
                     this.color = COLORS.enemyRed;
@@ -2070,6 +2080,16 @@
                 ctx.fillRect(-19, -2, 38 * healthPercent, 4);
             }
             
+            // Shield bar (only for darknut)
+            if (this.shield > 0 && this.maxShield > 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(-20, 4, 40, 3);
+                
+                const shieldPercent = this.shield / this.maxShield;
+                ctx.fillStyle = COLORS.shieldBlue;
+                ctx.fillRect(-19, 5, 38 * shieldPercent, 1);
+            }
+            
             ctx.restore();
         }
     }
@@ -2079,13 +2099,16 @@
         constructor(x, y, vx, vy, owner) {
             this.x = x;
             this.y = y;
+            this.z = 0;
             this.vx = vx;
             this.vy = vy;
+            this.vz = 0;
             this.owner = owner;
             this.radius = 0.1;
             this.damage = 20;
             this.lifetime = 2;
             this.trail = [];
+            this.color = COLORS.magicYellow;
         }
 
         update(deltaTime) {
@@ -2166,7 +2189,7 @@
                 ctx.save();
                 ctx.translate(iso.x, iso.y);
                 ctx.globalAlpha = point.life * 0.5;
-                ctx.fillStyle = COLORS.magicYellow;
+                ctx.fillStyle = this.color;
                 ctx.beginPath();
                 ctx.arc(0, 0, 3 * point.life, 0, Math.PI * 2);
                 ctx.fill();
@@ -2179,9 +2202,9 @@
             ctx.translate(iso.x, iso.y);
             
             // Glow effect
-            ctx.shadowColor = COLORS.magicYellow;
+            ctx.shadowColor = this.color;
             ctx.shadowBlur = 10;
-            ctx.fillStyle = COLORS.magicYellow;
+            ctx.fillStyle = this.color;
             ctx.beginPath();
             ctx.arc(0, 0, 5, 0, Math.PI * 2);
             ctx.fill();
@@ -2201,6 +2224,7 @@
             super(x, y, vx, vy, null);
             this.damage = damage;
             this.radius = 0.2;
+            this.lifetime = 3;
         }
 
         update(deltaTime) {
@@ -3106,6 +3130,9 @@
                 gameOver: false,
                 score: 0,
                 rupees: 0,
+                maxHearts: 5,
+                maxShield: 50,
+                maxHealth: 100,
                 wave: { current: 0, state: 'preparing', timer: 5, spawned: 0, enemies: [] },
                 players: new Map(),
                 input: { keys: {}, mouse: { x: 0, y: 0, isDown: false }, joystick: { x: 0, y: 0, active: false } },
@@ -3122,6 +3149,9 @@
             gameState.gameOver = false;
             gameState.score = 0;
             gameState.rupees = 0;
+            gameState.maxHearts = 5;
+            gameState.maxShield = 50;
+            gameState.maxHealth = 100;
             gameState.wave.current = 0;
             gameState.wave.state = 'preparing';
             gameState.wave.timer = 5;
