@@ -7,8 +7,8 @@
         TILE_WIDTH: 64,     // Larger for better 3D blocks
         TILE_HEIGHT: 32,    // Maintain 2:1 ratio
         TILE_DEPTH: 24,     // Significant depth for 3D blocks
-        GRID_WIDTH: 20,     // Smaller for performance with 3D blocks
-        GRID_HEIGHT: 20,    // Smaller for performance with 3D blocks
+        GRID_WIDTH: 200,     // Increased 10x for larger maps
+        GRID_HEIGHT: 200,    // Increased 10x for larger maps
         PLAYER_SPEED: 0.15, // Slower for tile-based movement
         MOVE_SPEED: 8,      // Speed of tile-to-tile animation
         FPS: 60,
@@ -142,6 +142,7 @@
         effects: [],
         obstacles: [],
         groundTiles: [],
+        groundIndex: [],
         decorations: [],
         particles: [],
         mapGrid: [],
@@ -2492,6 +2493,7 @@
         
         // Create ground tiles with bounds checking
         gameState.groundTiles = [];
+        gameState.groundIndex = Array.from({ length: CONFIG.GRID_HEIGHT }, () => new Array(CONFIG.GRID_WIDTH));
         if (mapData.grid && Array.isArray(mapData.grid)) {
             for (let y = 0; y < mapData.grid.length && y < CONFIG.GRID_HEIGHT; y++) {
                 if (mapData.grid[y] && Array.isArray(mapData.grid[y])) {
@@ -2510,18 +2512,25 @@
                             z += 0.3;
                         }
                         
-                        gameState.groundTiles.push({
+                        const tileObj = {
                             x: x,
                             y: y,
                             z: z,
                             type: tileType,
                             walkable: mapData.grid[y][x] && mapData.grid[y][x].walkable !== undefined ? mapData.grid[y][x].walkable : true
-                        });
+                        };
+                        gameState.groundTiles.push(tileObj);
+                        if (gameState.groundIndex[y]) {
+                            gameState.groundIndex[y][x] = tileObj;
+                        }
                     }
                 }
             }
         }
         
+        // Store raw grid for potential pathfinding/logic
+        gameState.mapGrid = mapData.grid;
+
         console.log('Ground tiles created:', gameState.groundTiles.length);
         
         // Create decorations with bounds checking
@@ -2726,13 +2735,50 @@
             -cameraIso.y + gameState.camera.shakeY
         );
         
+        // Compute view bounds in isometric space for culling
+        const invZoom = 1 / gameState.camera.zoom;
+        const halfW = (canvas.width / 2) * invZoom;
+        const halfH = (canvas.height / 2) * invZoom;
+        const cullPadX = CONFIG.TILE_WIDTH * 2;
+        const cullPadY = CONFIG.TILE_HEIGHT * 2 + CONFIG.TILE_DEPTH * 2;
+        const isIsoOnscreen = (isoX, isoY) => {
+            const dx = isoX - cameraIso.x;
+            const dy = isoY - cameraIso.y;
+            return !(dx < -halfW - cullPadX || dx > halfW + cullPadX || dy < -halfH - cullPadY || dy > halfH + cullPadY);
+        };
+        
         // Render order (back to front)
         const renderables = [];
         
-        // Add ground tiles with elevation
-        if (gameState.groundTiles && Array.isArray(gameState.groundTiles)) {
-            for (const tile of gameState.groundTiles) {
-                if (tile && typeof tile.x === 'number' && typeof tile.y === 'number') {
+        // Add ground tiles with elevation (iterate only visible bounds)
+        if (gameState.groundIndex && Array.isArray(gameState.groundIndex) && gameState.groundIndex.length) {
+            // Approximate visible cartesian bounds by inverting corners of screen rect
+            const corners = [
+                { x: -halfW + cameraIso.x, y: -halfH + cameraIso.y },
+                { x: halfW + cameraIso.x, y: -halfH + cameraIso.y },
+                { x: halfW + cameraIso.x, y: halfH + cameraIso.y },
+                { x: -halfW + cameraIso.x, y: halfH + cameraIso.y }
+            ];
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const c of corners) {
+                const cart = isometricToCartesian(c.x, c.y);
+                minX = Math.min(minX, cart.x);
+                minY = Math.min(minY, cart.y);
+                maxX = Math.max(maxX, cart.x);
+                maxY = Math.max(maxY, cart.y);
+            }
+            // Pad by a few tiles to cover edges and tall blocks
+            minX = Math.floor(Math.max(0, minX - 4));
+            minY = Math.floor(Math.max(0, minY - 4));
+            maxX = Math.ceil(Math.min(CONFIG.GRID_WIDTH - 1, maxX + 4));
+            maxY = Math.ceil(Math.min(CONFIG.GRID_HEIGHT - 1, maxY + 4));
+
+            for (let y = minY; y <= maxY; y++) {
+                const row = gameState.groundIndex[y];
+                if (!row) continue;
+                for (let x = minX; x <= maxX; x++) {
+                    const tile = row[x];
+                    if (!tile) continue;
                     renderables.push({
                         x: tile.x,
                         y: tile.y,
@@ -2742,19 +2788,34 @@
                     });
                 }
             }
+        } else if (gameState.groundTiles && Array.isArray(gameState.groundTiles)) {
+            // Fallback to legacy iteration
+            for (const tile of gameState.groundTiles) {
+                if (!tile) continue;
+                renderables.push({
+                    x: tile.x,
+                    y: tile.y,
+                    z: tile.z || 0,
+                    type: 'tile',
+                    data: tile
+                });
+            }
         }
         
         // Add decorations
         if (gameState.decorations && Array.isArray(gameState.decorations)) {
             for (const decoration of gameState.decorations) {
                 if (decoration && typeof decoration.x === 'number' && typeof decoration.y === 'number') {
-                    renderables.push({
-                        x: decoration.x,
-                        y: decoration.y,
-                        z: 0,
-                        type: 'decoration',
-                        data: decoration
-                    });
+                    const iso = cartesianToIsometric(decoration.x, decoration.y, 0);
+                    if (isIsoOnscreen(iso.x, iso.y)) {
+                        renderables.push({
+                            x: decoration.x,
+                            y: decoration.y,
+                            z: 0,
+                            type: 'decoration',
+                            data: decoration
+                        });
+                    }
                 }
             }
         }
@@ -2763,13 +2824,16 @@
         if (gameState.players && gameState.players.size > 0) {
             for (const [id, player] of gameState.players) {
                 if (player && typeof player.x === 'number' && typeof player.y === 'number') {
-                    renderables.push({
-                        x: player.x,
-                        y: player.y,
-                        z: 0.5,
-                        type: 'player',
-                        data: player
-                    });
+                    const iso = cartesianToIsometric(player.x, player.y, 0);
+                    if (isIsoOnscreen(iso.x, iso.y)) {
+                        renderables.push({
+                            x: player.x,
+                            y: player.y,
+                            z: 0.5,
+                            type: 'player',
+                            data: player
+                        });
+                    }
                 }
             }
         }
@@ -2777,13 +2841,16 @@
         if (gameState.enemies && Array.isArray(gameState.enemies)) {
             for (const enemy of gameState.enemies) {
                 if (enemy && typeof enemy.x === 'number' && typeof enemy.y === 'number') {
-                    renderables.push({
-                        x: enemy.x,
-                        y: enemy.y,
-                        z: 0.5,
-                        type: 'enemy',
-                        data: enemy
-                    });
+                    const iso = cartesianToIsometric(enemy.x, enemy.y, 0);
+                    if (isIsoOnscreen(iso.x, iso.y)) {
+                        renderables.push({
+                            x: enemy.x,
+                            y: enemy.y,
+                            z: 0.5,
+                            type: 'enemy',
+                            data: enemy
+                        });
+                    }
                 }
             }
         }
@@ -2817,7 +2884,10 @@
         if (gameState.projectiles && Array.isArray(gameState.projectiles)) {
             for (const projectile of gameState.projectiles) {
                 if (projectile && typeof projectile.draw === 'function') {
-                    projectile.draw(ctx);
+                    const iso = cartesianToIsometric(projectile.x || 0, projectile.y || 0, 0);
+                    if (isIsoOnscreen(iso.x, iso.y)) {
+                        projectile.draw(ctx);
+                    }
                 }
             }
         }
@@ -2826,7 +2896,10 @@
         if (gameState.particles && Array.isArray(gameState.particles)) {
             for (const particle of gameState.particles) {
                 if (particle && typeof particle.draw === 'function') {
-                    particle.draw(ctx);
+                    const iso = cartesianToIsometric(particle.x || 0, particle.y || 0, 0);
+                    if (isIsoOnscreen(iso.x, iso.y)) {
+                        particle.draw(ctx);
+                    }
                 }
             }
         }
