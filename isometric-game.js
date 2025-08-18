@@ -260,7 +260,9 @@
             for (let i = 0; i < 8; i++) {
                 const x = Math.floor(Math.random() * this.width);
                 const y = Math.floor(Math.random() * this.height);
-                if (this.grid[y] && this.grid[y][x]) {
+                if (y >= 0 && y < this.grid.length && 
+                    x >= 0 && x < this.grid[y].length &&
+                    this.grid[y] && this.grid[y][x]) {
                     this.grid[y][x].type = TILE_TYPES.WALL;
                     this.grid[y][x].walkable = false;
                 }
@@ -272,7 +274,9 @@
             for (let i = 0; i < 5; i++) {
                 const x = Math.floor(Math.random() * this.width);
                 const y = Math.floor(Math.random() * this.height);
-                if (this.grid[y] && this.grid[y][x] && this.grid[y][x].room === null) {
+                if (y >= 0 && y < this.grid.length && 
+                    x >= 0 && x < this.grid[y].length &&
+                    this.grid[y] && this.grid[y][x] && this.grid[y][x].room === null) {
                     this.grid[y][x].type = TILE_TYPES.PIT;
                     this.grid[y][x].walkable = false;
                 }
@@ -1102,9 +1106,12 @@
                 
                 for (let py = pitY - pitSize; py <= pitY + pitSize; py++) {
                     for (let px = pitX - pitSize; px <= pitX + pitSize; px++) {
-                        if (px >= 0 && py >= 0 && px < this.width && py < this.height) {
+                        if (px >= 0 && py >= 0 && px < this.width && py < this.height &&
+                            py >= 0 && py < this.grid.length &&
+                            px >= 0 && px < this.grid[py].length &&
+                            this.grid[py] && this.grid[py][px] && this.grid[py][px].room === null) {
                             const dist = Math.sqrt(Math.pow(px - pitX, 2) + Math.pow(py - pitY, 2));
-                            if (dist <= pitSize && this.grid[py][px].room === null) {
+                            if (dist <= pitSize) {
                                 this.grid[py][px].type = TILE_TYPES.LAVA;
                                 this.grid[py][px].walkable = false;
                             }
@@ -1115,11 +1122,13 @@
             
             // Add walls at edges for dungeon
             for (let y = 0; y < this.height; y++) {
-                if (this.grid[y][0].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                if (y >= 0 && y < this.grid.length &&
+                    this.grid[y] && this.grid[y][0] && this.grid[y][0].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
                     this.grid[y][0].type = TILE_TYPES.WALL;
                     this.grid[y][0].walkable = false;
                 }
-                if (this.grid[y][this.width - 1].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                if (y >= 0 && y < this.grid.length &&
+                    this.grid[y] && this.grid[y][this.width - 1] && this.grid[y][this.width - 1].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
                     this.grid[y][this.width - 1].type = TILE_TYPES.WALL;
                     this.grid[y][this.width - 1].walkable = false;
                 }
@@ -1127,11 +1136,11 @@
             
             // Add walls to top and bottom edges
             for (let x = 0; x < this.width; x++) {
-                if (this.grid[0][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                if (this.grid[0] && this.grid[0][x] && this.grid[0][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
                     this.grid[0][x].type = TILE_TYPES.WALL;
                     this.grid[0][x].walkable = false;
                 }
-                if (this.grid[this.height - 1][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                if (this.grid[this.height - 1] && this.grid[this.height - 1][x] && this.grid[this.height - 1][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
                     this.grid[this.height - 1][x].type = TILE_TYPES.WALL;
                     this.grid[this.height - 1][x].walkable = false;
                 }
@@ -1140,6 +1149,9 @@
 
         getStartPosition() {
             const startRoom = this.rooms.find(r => r.type === 'start');
+            if (!startRoom) {
+                return { x: this.width / 2, y: this.height / 2 };
+            }
             return {
                 x: startRoom.x + startRoom.width / 2,
                 y: startRoom.y + startRoom.height / 2
@@ -1358,6 +1370,8 @@
             this.swordSwing = 0;
             this.facing = 'down';
             this.moveDelay = 0; // Delay between moves
+            this.vx = 0; // Velocity for animation
+            this.vy = 0; // Velocity for animation
         }
 
         update(deltaTime) {
@@ -2424,7 +2438,10 @@
                         
                         // Check if position is walkable
                         if (x >= 0 && y >= 0 && x < CONFIG.GRID_WIDTH && y < CONFIG.GRID_HEIGHT &&
-                            mapData.grid[Math.floor(y)] && mapData.grid[Math.floor(y)][Math.floor(x)] &&
+                            Math.floor(y) >= 0 && Math.floor(y) < mapData.grid.length &&
+                            mapData.grid[Math.floor(y)] && 
+                            Math.floor(x) >= 0 && Math.floor(x) < mapData.grid[Math.floor(y)].length &&
+                            mapData.grid[Math.floor(y)][Math.floor(x)] &&
                             mapData.grid[Math.floor(y)][Math.floor(x)].type !== TILE_TYPES.WATER) {
                             
                             const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
@@ -2443,7 +2460,10 @@
             const y = Math.random() * CONFIG.GRID_HEIGHT;
             
             if (x >= 0 && y >= 0 && x < CONFIG.GRID_WIDTH && y < CONFIG.GRID_HEIGHT &&
-                mapData.grid[Math.floor(y)] && mapData.grid[Math.floor(y)][Math.floor(x)] &&
+                Math.floor(y) >= 0 && Math.floor(y) < mapData.grid.length &&
+                mapData.grid[Math.floor(y)] && 
+                Math.floor(x) >= 0 && Math.floor(x) < mapData.grid[Math.floor(y)].length &&
+                mapData.grid[Math.floor(y)][Math.floor(x)] &&
                 mapData.grid[Math.floor(y)][Math.floor(x)].type === TILE_TYPES.STONE_FLOOR) {
                 
                 const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
@@ -2534,12 +2554,12 @@
         }
         
         // Wave management
-        if (gameState.wave.state === 'preparing') {
+        if (gameState.wave && gameState.wave.state === 'preparing') {
             gameState.wave.timer -= deltaTime;
             if (gameState.wave.timer <= 0) {
                 startWave(gameState.wave.current + 1);
             }
-        } else if (gameState.wave.state === 'active') {
+        } else if (gameState.wave && gameState.wave.state === 'active') {
             // Spawn enemies
             if (gameState.wave.spawned < gameState.wave.enemies.length) {
                 if (Math.random() < 0.02) { // 2% chance per frame
@@ -2606,46 +2626,62 @@
         const renderables = [];
         
         // Add ground tiles with elevation
-        for (const tile of gameState.groundTiles) {
-            renderables.push({
-                x: tile.x,
-                y: tile.y,
-                z: tile.z || 0,
-                type: 'tile',
-                data: tile
-            });
+        if (gameState.groundTiles && Array.isArray(gameState.groundTiles)) {
+            for (const tile of gameState.groundTiles) {
+                if (tile && typeof tile.x === 'number' && typeof tile.y === 'number') {
+                    renderables.push({
+                        x: tile.x,
+                        y: tile.y,
+                        z: tile.z || 0,
+                        type: 'tile',
+                        data: tile
+                    });
+                }
+            }
         }
         
         // Add decorations
-        for (const decoration of gameState.decorations) {
-            renderables.push({
-                x: decoration.x,
-                y: decoration.y,
-                z: 0,
-                type: 'decoration',
-                data: decoration
-            });
+        if (gameState.decorations && Array.isArray(gameState.decorations)) {
+            for (const decoration of gameState.decorations) {
+                if (decoration && typeof decoration.x === 'number' && typeof decoration.y === 'number') {
+                    renderables.push({
+                        x: decoration.x,
+                        y: decoration.y,
+                        z: 0,
+                        type: 'decoration',
+                        data: decoration
+                    });
+                }
+            }
         }
         
         // Add entities
-        for (const [id, player] of gameState.players) {
-            renderables.push({
-                x: player.x,
-                y: player.y,
-                z: 0.5,
-                type: 'player',
-                data: player
-            });
+        if (gameState.players && gameState.players.size > 0) {
+            for (const [id, player] of gameState.players) {
+                if (player && typeof player.x === 'number' && typeof player.y === 'number') {
+                    renderables.push({
+                        x: player.x,
+                        y: player.y,
+                        z: 0.5,
+                        type: 'player',
+                        data: player
+                    });
+                }
+            }
         }
         
-        for (const enemy of gameState.enemies) {
-            renderables.push({
-                x: enemy.x,
-                y: enemy.y,
-                z: 0.5,
-                type: 'enemy',
-                data: enemy
-            });
+        if (gameState.enemies && Array.isArray(gameState.enemies)) {
+            for (const enemy of gameState.enemies) {
+                if (enemy && typeof enemy.x === 'number' && typeof enemy.y === 'number') {
+                    renderables.push({
+                        x: enemy.x,
+                        y: enemy.y,
+                        z: 0.5,
+                        type: 'enemy',
+                        data: enemy
+                    });
+                }
+            }
         }
         
         // Sort by depth (y position in isometric)
@@ -2674,13 +2710,21 @@
         }
         
         // Render projectiles (always on top)
-        for (const projectile of gameState.projectiles) {
-            projectile.draw(ctx);
+        if (gameState.projectiles && Array.isArray(gameState.projectiles)) {
+            for (const projectile of gameState.projectiles) {
+                if (projectile && typeof projectile.draw === 'function') {
+                    projectile.draw(ctx);
+                }
+            }
         }
         
         // Render particles
-        for (const particle of gameState.particles) {
-            particle.draw(ctx);
+        if (gameState.particles && Array.isArray(gameState.particles)) {
+            for (const particle of gameState.particles) {
+                if (particle && typeof particle.draw === 'function') {
+                    particle.draw(ctx);
+                }
+            }
         }
         
         // Render visual effects
