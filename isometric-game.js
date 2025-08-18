@@ -463,73 +463,66 @@
         
         ctx.restore(); // End of elevated top surface
         
-        // Tile details with better visuals
-        if (type === TILE_TYPES.GRASS) {
-            // Random grass texture
+        // Tile details for dungeon theme
+        if (type === TILE_TYPES.CRACKED_FLOOR) {
+            // Cracks in the floor
             const seed = x * 100 + y;
-            if ((seed % 5) === 0) {
-                // Grass blades
-                ctx.strokeStyle = COLORS.grassDark;
-                ctx.lineWidth = 1;
-                ctx.globalAlpha = 0.6;
-                for (let i = 0; i < 3; i++) {
-                    const gx = (Math.sin(seed + i) * 0.5) * w * 0.6;
-                    const gy = (Math.cos(seed + i) * 0.5) * h * 0.6;
-                    ctx.beginPath();
-                    ctx.moveTo(gx, gy);
-                    ctx.lineTo(gx - 2, gy - 5);
-                    ctx.stroke();
-                }
-                ctx.globalAlpha = 1;
-            }
-        } else if (type === TILE_TYPES.FLOWER) {
-            // Small flowers with better placement
-            const seed = x * 100 + y;
-            const flowerColors = [COLORS.flowerRed, COLORS.flowerYellow, COLORS.flowerBlue];
-            const color = flowerColors[seed % flowerColors.length];
-            
-            // Flower shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.beginPath();
-            ctx.ellipse(0, 2, 4, 2, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Flower petals
-            ctx.fillStyle = color;
-            for (let i = 0; i < 5; i++) {
-                const angle = (i / 5) * Math.PI * 2;
-                const px = Math.cos(angle) * 3;
-                const py = Math.sin(angle) * 3;
-                ctx.beginPath();
-                ctx.arc(px, py, 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Flower center
-            ctx.fillStyle = COLORS.flowerYellow;
-            ctx.beginPath();
-            ctx.arc(0, 0, 2, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (type === TILE_TYPES.WATER) {
-            // Better water animation
-            const wave = Math.sin(animationTime * 0.002 + x * 0.5 + y * 0.5) * 0.5 + 0.5;
-            const wave2 = Math.cos(animationTime * 0.003 - x * 0.3 + y * 0.3) * 0.5 + 0.5;
-            
-            // Water ripples
-            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (wave * 0.4) + ')';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(0, 0, w * wave * 0.4, 0, Math.PI * 2);
+            ctx.moveTo(-w * 0.3, -h * 0.2);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(w * 0.2, h * 0.3);
             ctx.stroke();
             
-            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (wave2 * 0.3) + ')';
-            ctx.beginPath();
-            ctx.arc(w * 0.2, h * 0.2, w * wave2 * 0.3, 0, Math.PI * 2);
-            ctx.stroke();
-        } else if (type === TILE_TYPES.PATH) {
-            // Path texture
-            const seed = x * 100 + y;
             if ((seed % 3) === 0) {
+                ctx.beginPath();
+                ctx.moveTo(w * 0.2, -h * 0.3);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(-w * 0.3, h * 0.2);
+                ctx.stroke();
+            }
+        } else if (type === TILE_TYPES.LAVA) {
+            // Lava glow animation
+            const glow = Math.sin(animationTime * 0.003 + x * 0.5 + y * 0.5) * 0.3 + 0.7;
+            
+            ctx.save();
+            ctx.globalAlpha = glow;
+            ctx.shadowColor = COLORS.lava;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = COLORS.lava;
+            ctx.beginPath();
+            ctx.moveTo(0, -h * 0.8);
+            ctx.lineTo(w * 0.8, 0);
+            ctx.lineTo(0, h * 0.8);
+            ctx.lineTo(-w * 0.8, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            
+            // Bubbles
+            const bubble = Math.sin(animationTime * 0.004 + x + y) * 0.5 + 0.5;
+            if (bubble > 0.8) {
+                ctx.fillStyle = COLORS.torch;
+                ctx.globalAlpha = bubble;
+                ctx.beginPath();
+                ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        } else if (type === TILE_TYPES.DARK_FLOOR) {
+            // Dark floor details
+            const seed = x * 100 + y;
+            if ((seed % 7) === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.arc((seed % 5 - 2) * 4, (seed % 3 - 1) * 4, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (type === TILE_TYPES.STONE_FLOOR) {
+            // Stone floor texture
+            const seed = x * 100 + y;
+            if ((seed % 4) === 0) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
                 ctx.beginPath();
                 ctx.arc((seed % 7 - 3) * 3, (seed % 5 - 2) * 3, 2, 0, Math.PI * 2);
@@ -712,7 +705,7 @@
                 this.grid[y] = [];
                 for (let x = 0; x < this.width; x++) {
                     this.grid[y][x] = {
-                        type: TILE_TYPES.GRASS,
+                        type: TILE_TYPES.STONE_FLOOR,
                         walkable: true,
                         room: null
                     };
@@ -797,11 +790,11 @@
                     if (x >= 0 && y >= 0 && x < this.width && y < this.height) {
                         // Different tile types for different room types
                         if (room.type === 'treasure') {
-                            this.grid[y][x].type = TILE_TYPES.SAND;
+                            this.grid[y][x].type = TILE_TYPES.DARK_FLOOR;
                         } else if (room.type === 'boss') {
-                            this.grid[y][x].type = (x + y) % 2 === 0 ? TILE_TYPES.PATH : TILE_TYPES.GRASS;
+                            this.grid[y][x].type = (x + y) % 2 === 0 ? TILE_TYPES.CRACKED_FLOOR : TILE_TYPES.STONE_FLOOR;
                         } else {
-                            this.grid[y][x].type = TILE_TYPES.PATH;
+                            this.grid[y][x].type = TILE_TYPES.STONE_FLOOR;
                         }
                         this.grid[y][x].room = room;
                         this.grid[y][x].walkable = true;
@@ -848,10 +841,10 @@
             const maxX = Math.max(start.x, midX);
             for (let x = minX; x <= maxX; x++) {
                 if (x >= 0 && start.y >= 0 && x < this.width && start.y < this.height) {
-                    this.grid[start.y][x].type = TILE_TYPES.PATH;
+                    this.grid[start.y][x].type = TILE_TYPES.STONE_FLOOR;
                     this.grid[start.y][x].walkable = true;
                     if (start.y > 0) {
-                        this.grid[start.y - 1][x].type = TILE_TYPES.PATH;
+                        this.grid[start.y - 1][x].type = TILE_TYPES.STONE_FLOOR;
                         this.grid[start.y - 1][x].walkable = true;
                     }
                 }
@@ -862,10 +855,10 @@
             const maxY = Math.max(start.y, end.y);
             for (let y = minY; y <= maxY; y++) {
                 if (midX >= 0 && y >= 0 && midX < this.width && y < this.height) {
-                    this.grid[y][midX].type = TILE_TYPES.PATH;
+                    this.grid[y][midX].type = TILE_TYPES.STONE_FLOOR;
                     this.grid[y][midX].walkable = true;
                     if (midX > 0) {
-                        this.grid[y][midX - 1].type = TILE_TYPES.PATH;
+                        this.grid[y][midX - 1].type = TILE_TYPES.STONE_FLOOR;
                         this.grid[y][midX - 1].walkable = true;
                     }
                 }
@@ -876,10 +869,10 @@
             const maxX2 = Math.max(midX, end.x);
             for (let x = minX2; x <= maxX2; x++) {
                 if (x >= 0 && end.y >= 0 && x < this.width && end.y < this.height) {
-                    this.grid[end.y][x].type = TILE_TYPES.PATH;
+                    this.grid[end.y][x].type = TILE_TYPES.STONE_FLOOR;
                     this.grid[end.y][x].walkable = true;
                     if (end.y > 0) {
-                        this.grid[end.y - 1][x].type = TILE_TYPES.PATH;
+                        this.grid[end.y - 1][x].type = TILE_TYPES.STONE_FLOOR;
                         this.grid[end.y - 1][x].walkable = true;
                     }
                 }
@@ -925,34 +918,34 @@
         }
 
         addDecorations() {
-            // Add grass variations and flowers with better distribution
+            // Add dungeon floor variations
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
-                    if (this.grid[y][x].type === TILE_TYPES.GRASS) {
+                    if (this.grid[y][x].type === TILE_TYPES.STONE_FLOOR) {
                         const rand = Math.random();
-                        if (rand > 0.92) {
-                            this.grid[y][x].type = TILE_TYPES.FLOWER;
-                        } else if (rand > 0.88 && rand <= 0.92) {
-                            // Add some sand patches for variety
-                            this.grid[y][x].type = TILE_TYPES.SAND;
+                        if (rand > 0.95) {
+                            this.grid[y][x].type = TILE_TYPES.CRACKED_FLOOR;
+                        } else if (rand > 0.90 && rand <= 0.95) {
+                            // Add some dark floor patches for variety
+                            this.grid[y][x].type = TILE_TYPES.DARK_FLOOR;
                         }
                     }
                 }
             }
             
-            // Create water features (ponds and streams)
-            const numPonds = 3 + Math.floor(Math.random() * 3);
-            for (let i = 0; i < numPonds; i++) {
-                const pondX = Math.floor(Math.random() * (this.width - 4)) + 2;
-                const pondY = Math.floor(Math.random() * (this.height - 4)) + 2;
-                const pondSize = 2 + Math.floor(Math.random() * 2);
+            // Create lava pits for dungeon
+            const numPits = 2 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < numPits; i++) {
+                const pitX = Math.floor(Math.random() * (this.width - 4)) + 2;
+                const pitY = Math.floor(Math.random() * (this.height - 4)) + 2;
+                const pitSize = 1 + Math.floor(Math.random() * 2);
                 
-                for (let py = pondY - pondSize; py <= pondY + pondSize; py++) {
-                    for (let px = pondX - pondSize; px <= pondX + pondSize; px++) {
+                for (let py = pitY - pitSize; py <= pitY + pitSize; py++) {
+                    for (let px = pitX - pitSize; px <= pitX + pitSize; px++) {
                         if (px >= 0 && py >= 0 && px < this.width && py < this.height) {
-                            const dist = Math.sqrt(Math.pow(px - pondX, 2) + Math.pow(py - pondY, 2));
-                            if (dist <= pondSize && this.grid[py][px].room === null) {
-                                this.grid[py][px].type = TILE_TYPES.WATER;
+                            const dist = Math.sqrt(Math.pow(px - pitX, 2) + Math.pow(py - pitY, 2));
+                            if (dist <= pitSize && this.grid[py][px].room === null) {
+                                this.grid[py][px].type = TILE_TYPES.LAVA;
                                 this.grid[py][px].walkable = false;
                             }
                         }
@@ -960,26 +953,26 @@
                 }
             }
             
-            // Add decorative water edges
+            // Add walls at edges for dungeon
             for (let y = 0; y < this.height; y++) {
-                if (this.grid[y][0].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
-                    this.grid[y][0].type = TILE_TYPES.WATER;
+                if (this.grid[y][0].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                    this.grid[y][0].type = TILE_TYPES.WALL;
                     this.grid[y][0].walkable = false;
                 }
-                if (this.grid[y][this.width - 1].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
-                    this.grid[y][this.width - 1].type = TILE_TYPES.WATER;
+                if (this.grid[y][this.width - 1].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                    this.grid[y][this.width - 1].type = TILE_TYPES.WALL;
                     this.grid[y][this.width - 1].walkable = false;
                 }
             }
             
-            // Add water to top and bottom edges for atmosphere
+            // Add walls to top and bottom edges
             for (let x = 0; x < this.width; x++) {
-                if (this.grid[0][x].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
-                    this.grid[0][x].type = TILE_TYPES.WATER;
+                if (this.grid[0][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                    this.grid[0][x].type = TILE_TYPES.WALL;
                     this.grid[0][x].walkable = false;
                 }
-                if (this.grid[this.height - 1][x].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
-                    this.grid[this.height - 1][x].type = TILE_TYPES.WATER;
+                if (this.grid[this.height - 1][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
+                    this.grid[this.height - 1][x].type = TILE_TYPES.WALL;
                     this.grid[this.height - 1][x].walkable = false;
                 }
             }
