@@ -2832,7 +2832,7 @@
         }
         
         // Render visual effects
-        if (visualEffects) {
+        if (visualEffects && visualEffects.update) {
             visualEffects.render(ctx);
         }
         
