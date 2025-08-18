@@ -804,7 +804,8 @@
           health: 100,
           score: 0,
           speed: 4, // Base speed
-          boosting: false
+          boosting: false,
+          lastBoostParticle: 0
         };
         
         this.enemy = {
@@ -819,6 +820,11 @@
           speed: 4, // Base speed
           boosting: false
         };
+        
+        // Level elements for solo mode
+        this.obstacles = [];
+        this.powerUps = [];
+        this.lastPowerUpSpawn = 0;
         
         this.score = { you: 0, them: 0 };
         this.startTime = Date.now();
@@ -938,9 +944,57 @@
           this.initDesktopControls();
         }
         
+        // Generate level for solo mode
+        if (!this.isMultiplayer) {
+          this.generateLevel();
+        }
+        
         // Start game
         this.reset();
         this.start();
+      }
+      
+      generateLevel() {
+        // Clear existing level elements
+        this.obstacles = [];
+        this.powerUps = [];
+        
+        // Generate obstacles
+        const numObstacles = 5 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < numObstacles; i++) {
+          this.obstacles.push({
+            x: Math.random() * this.canvas.width,
+            y: Math.random() * this.canvas.height,
+            radius: 20 + Math.random() * 30,
+            color: '#4a5568'
+          });
+        }
+        
+        // Generate initial power-ups
+        const numPowerUps = 3;
+        for (let i = 0; i < numPowerUps; i++) {
+          this.spawnPowerUp();
+        }
+      }
+      
+      spawnPowerUp() {
+        const types = ['speed', 'shield', 'points'];
+        const colors = {
+          speed: '#10b981',
+          shield: '#3b82f6', 
+          points: '#f59e0b'
+        };
+        
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        this.powerUps.push({
+          x: Math.random() * this.canvas.width,
+          y: Math.random() * this.canvas.height,
+          radius: 10,
+          type: type,
+          color: colors[type],
+          collected: false
+        });
       }
       
       destroy() {
@@ -1249,9 +1303,8 @@
           }
         } else {
           // Single player movement
-          const baseSpeed = 4; // Base speed matching multiplayer
           const boostMultiplier = 2; // Boost multiplier
-          const speed = this.player.boosting ? baseSpeed * boostMultiplier : baseSpeed;
+          const speed = this.player.boosting ? this.player.speed * boostMultiplier : this.player.speed;
           
           // Apply velocity with smoothing for consistency
           const smoothing = 0.2;
@@ -1283,15 +1336,151 @@
         // Update visual effects
         this.vfx.update(deltaTime);
         
-        // Simple enemy AI
-        const enemySpeed = 2;
-        const dx = this.player.x - this.enemy.x;
-        const dy = this.player.y - this.enemy.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Solo mode level logic
+        if (!this.isMultiplayer) {
+          // Check collision with obstacles
+          for (const obstacle of this.obstacles) {
+            const dx = this.player.x - obstacle.x;
+            const dy = this.player.y - obstacle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < this.player.radius + obstacle.radius) {
+              // Push player away from obstacle
+              const pushAngle = Math.atan2(dy, dx);
+              const pushForce = (this.player.radius + obstacle.radius - dist) * 0.5;
+              this.player.x += Math.cos(pushAngle) * pushForce;
+              this.player.y += Math.sin(pushAngle) * pushForce;
+              
+              // Slow down player
+              this.player.vx *= 0.8;
+              this.player.vy *= 0.8;
+            }
+            
+            // Check enemy collision with obstacles
+            const edx = this.enemy.x - obstacle.x;
+            const edy = this.enemy.y - obstacle.y;
+            const edist = Math.sqrt(edx * edx + edy * edy);
+            
+            if (edist < this.enemy.radius + obstacle.radius) {
+              // Push enemy away from obstacle
+              const pushAngle = Math.atan2(edy, edx);
+              const pushForce = (this.enemy.radius + obstacle.radius - edist) * 0.5;
+              this.enemy.x += Math.cos(pushAngle) * pushForce;
+              this.enemy.y += Math.sin(pushAngle) * pushForce;
+            }
+          }
+          
+          // Check collision with power-ups
+          for (let i = this.powerUps.length - 1; i >= 0; i--) {
+            const powerUp = this.powerUps[i];
+            if (powerUp.collected) continue;
+            
+            const dx = this.player.x - powerUp.x;
+            const dy = this.player.y - powerUp.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < this.player.radius + powerUp.radius) {
+              // Collect power-up
+              powerUp.collected = true;
+              
+              // Apply power-up effect
+              switch (powerUp.type) {
+                case 'speed':
+                  this.player.speed = 6; // Temporary speed boost
+                  setTimeout(() => { this.player.speed = 4; }, 5000);
+                  break;
+                case 'shield':
+                  // Visual shield effect (placeholder)
+                  this.player.hasShield = true;
+                  setTimeout(() => { this.player.hasShield = false; }, 5000);
+                  break;
+                case 'points':
+                  this.score.you += 5;
+                  document.getElementById('scoreYou').textContent = this.score.you;
+                  break;
+              }
+              
+              // Visual feedback
+              this.vfx.createExplosion(powerUp.x, powerUp.y, {
+                color: powerUp.color,
+                particleCount: 20,
+                force: 5
+              });
+              
+              // Remove collected power-up
+              this.powerUps.splice(i, 1);
+            }
+          }
+          
+          // Spawn new power-ups periodically
+          const now = Date.now();
+          if (now - this.lastPowerUpSpawn > 5000 && this.powerUps.length < 5) {
+            this.spawnPowerUp();
+            this.lastPowerUpSpawn = now;
+          }
+        }
         
-        if (dist > 0) {
-          this.enemy.x += (dx / dist) * enemySpeed * Math.sin(Date.now() * 0.001);
-          this.enemy.y += (dy / dist) * enemySpeed * Math.cos(Date.now() * 0.001);
+        // Simple enemy AI - only in solo mode
+        if (!this.isMultiplayer) {
+          const enemySpeed = 2;
+          const dx = this.player.x - this.enemy.x;
+          const dy = this.player.y - this.enemy.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > 50) { // Keep some distance from player
+            // Move towards player with some variation
+            const angleToPlayer = Math.atan2(dy, dx);
+            const wobble = Math.sin(Date.now() * 0.002) * 0.5; // Add some unpredictability
+            
+            this.enemy.x += Math.cos(angleToPlayer + wobble) * enemySpeed;
+            this.enemy.y += Math.sin(angleToPlayer + wobble) * enemySpeed;
+            
+            // Keep enemy in bounds
+            this.enemy.x = Math.max(this.enemy.radius, Math.min(this.canvas.width - this.enemy.radius, this.enemy.x));
+            this.enemy.y = Math.max(this.enemy.radius, Math.min(this.canvas.height - this.enemy.radius, this.enemy.y));
+          }
+          
+          // Enemy "attacks" when close
+          if (dist < 100 && Math.random() < 0.01) { // 1% chance per frame when close
+            // Visual feedback for enemy attack
+            this.attackEffect = {
+              x: this.enemy.x,
+              y: this.enemy.y,
+              radius: 50,
+              alpha: 0.5
+            };
+            
+            // Check if enemy hit player
+            if (dist < 50) {
+              if (this.player.hasShield) {
+                // Shield blocks the attack
+                this.player.hasShield = false; // Shield breaks
+                
+                // Visual feedback for shield break
+                this.vfx.createExplosion(this.player.x, this.player.y, {
+                  color: '#3b82f6',
+                  particleCount: 30,
+                  force: 8
+                });
+              } else {
+                // Player takes damage
+                this.score.them++;
+                document.getElementById('scoreThem').textContent = this.score.them;
+                
+                // Visual feedback
+                this.vfx.createImpact(this.player.x, this.player.y, {
+                  color: '#ef4444',
+                  particleCount: 15,
+                  spread: 180
+                });
+                
+                // Haptic feedback
+                if ('vibrate' in navigator) {
+                  navigator.vibrate([50]);
+                }
+              }
+            }
+          }
         }
         
         // Update timer
@@ -1324,6 +1513,55 @@
           this.ctx.moveTo(0, y);
           this.ctx.lineTo(this.canvas.width, y);
           this.ctx.stroke();
+        }
+        
+        // Draw obstacles (solo mode only)
+        if (!this.isMultiplayer && this.obstacles) {
+          for (const obstacle of this.obstacles) {
+            this.ctx.fillStyle = obstacle.color;
+            this.ctx.beginPath();
+            this.ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Add border for better visibility
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+          }
+        }
+        
+        // Draw power-ups (solo mode only)
+        if (!this.isMultiplayer && this.powerUps) {
+          for (const powerUp of this.powerUps) {
+            if (powerUp.collected) continue;
+            
+            // Pulsing effect
+            const pulse = Math.sin(Date.now() * 0.005) * 0.2 + 1;
+            const radius = powerUp.radius * pulse;
+            
+            // Glow effect
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowColor = powerUp.color;
+            
+            this.ctx.fillStyle = powerUp.color;
+            this.ctx.beginPath();
+            this.ctx.arc(powerUp.x, powerUp.y, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Icon or symbol
+            this.ctx.shadowBlur = 0;
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = '12px sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            
+            const symbols = {
+              speed: '⚡',
+              shield: '🛡',
+              points: '★'
+            };
+            this.ctx.fillText(symbols[powerUp.type] || '?', powerUp.x, powerUp.y);
+          }
         }
         
         // Draw attack effect if active
@@ -1372,6 +1610,22 @@
         this.ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.shadowBlur = 0;
+        
+        // Draw shield if active
+        if (this.player.hasShield) {
+          this.ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.x, this.player.y, this.player.radius + 10, 0, Math.PI * 2);
+          this.ctx.stroke();
+          
+          // Inner shield glow
+          this.ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+          this.ctx.lineWidth = 5;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.x, this.player.y, this.player.radius + 5, 0, Math.PI * 2);
+          this.ctx.stroke();
+        }
         
         // Draw name tag for multiplayer
         if (this.isMultiplayer) {
