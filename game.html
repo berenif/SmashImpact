@@ -1464,5 +1464,28 @@
       }
     });
   </script>
+  
+  <!-- Debug Panel -->
+  <script type="module">
+    // Load debug panel if in development mode or debug parameter is present
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.has('debug') || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (debugMode) {
+      import('./src/debug/debug-panel.js').then(module => {
+        console.log('🔧 Debug Panel loaded - Press F12 or ` to toggle');
+        
+        // Make debug panel accessible globally
+        window.debugPanel = module.default || window.debugPanel;
+        
+        // Auto-show if debug=true in URL
+        if (urlParams.get('debug') === 'true') {
+          setTimeout(() => window.debugPanel.show(), 500);
+        }
+      }).catch(err => {
+        console.warn('Debug panel not available:', err);
+      });
+    }
+  </script>
 </body>
 </html>
