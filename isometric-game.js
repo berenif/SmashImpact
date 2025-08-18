@@ -55,6 +55,15 @@
         goblin: '#16a34a',       // Goblin green
         demon: '#dc2626',        // Demon red
         
+        // Link colors
+        linkGreen: '#16a34a',
+        linkHat: '#dc2626',
+        
+        // Enemy colors
+        enemyRed: '#ef4444',
+        enemyBlue: '#3b82f6',
+        enemyPurple: '#8b5cf6',
+        
         // Effects
         heartRed: '#ef4444',
         rupeeGreen: '#10b981',
@@ -69,7 +78,14 @@
         
         // Additional colors
         shieldBlue: '#3b82f6',
-        healthGreen: '#10b981'
+        healthGreen: '#10b981',
+        
+        // Decoration colors
+        bushGreen: '#16a34a',
+        bushDark: '#15803d',
+        rockGray: '#6b7280',
+        woodBrown: '#92400e',
+        woodDark: '#78350f'
     };
 
     // Tile types for Dungeon map
@@ -79,7 +95,8 @@
         LAVA: 'lava',
         CRACKED_FLOOR: 'cracked_floor',
         DARK_FLOOR: 'dark_floor',
-        PIT: 'pit'
+        PIT: 'pit',
+        WATER: 'water'
     };
 
     // Dungeon decoration types
@@ -89,7 +106,12 @@
         BARREL: 'barrel',
         SKULL: 'skull',
         PILLAR: 'pillar',
-        SPIKES: 'spikes'
+        SPIKES: 'spikes',
+        BUSH: 'bush',
+        ROCK: 'rock',
+        FLOWER: 'flower',
+        TREE: 'tree',
+        POT: 'pot'
     };
 
     // Device detection
@@ -102,7 +124,6 @@
     // Game state
     let canvas, ctx;
     let visualEffects = null;
-    let animationTime = 0;
     let gameState = {
         players: new Map(),
         enemies: [],
@@ -114,6 +135,7 @@
         particles: [],
         mapGrid: [],
         rooms: [],
+        animationTime: 0,
         camera: { 
             x: 0, 
             y: 0, 
@@ -150,6 +172,111 @@
         deltaTime: 0,
         deviceType: isMobile() ? 'mobile' : 'desktop'
     };
+
+    // Simple Dungeon Generator for basic level creation
+    class DungeonGenerator {
+        constructor(width, height) {
+            this.width = width;
+            this.height = height;
+            this.grid = [];
+            this.rooms = [];
+        }
+
+        generate() {
+            // Initialize grid
+            for (let y = 0; y < this.height; y++) {
+                this.grid[y] = [];
+                for (let x = 0; x < this.width; x++) {
+                    this.grid[y][x] = {
+                        type: TILE_TYPES.STONE_FLOOR,
+                        walkable: true,
+                        room: null
+                    };
+                }
+            }
+
+            // Create a simple room layout
+            const centerX = Math.floor(this.width / 2);
+            const centerY = Math.floor(this.height / 2);
+            
+            // Main room
+            this.rooms.push({
+                x: centerX - 3,
+                y: centerY - 3,
+                width: 6,
+                height: 6,
+                type: 'start'
+            });
+
+            // Add some smaller rooms
+            this.rooms.push({
+                x: 2,
+                y: 2,
+                width: 4,
+                height: 4,
+                type: 'normal'
+            });
+
+            this.rooms.push({
+                x: this.width - 6,
+                y: this.height - 6,
+                width: 4,
+                height: 4,
+                type: 'normal'
+            });
+
+            // Carve rooms into grid
+            for (const room of this.rooms) {
+                this.carveRoom(room);
+            }
+
+            // Add some walls and obstacles
+            this.addWalls();
+            this.addPits();
+
+            return {
+                grid: this.grid,
+                rooms: this.rooms,
+                startPosition: { x: centerX, y: centerY }
+            };
+        }
+
+        carveRoom(room) {
+            for (let y = room.y; y < room.y + room.height; y++) {
+                for (let x = room.x; x < room.x + room.width; x++) {
+                    if (x >= 0 && y >= 0 && x < this.width && y < this.height) {
+                        this.grid[y][x].type = TILE_TYPES.STONE_FLOOR;
+                        this.grid[y][x].walkable = true;
+                        this.grid[y][x].room = room;
+                    }
+                }
+            }
+        }
+
+        addWalls() {
+            // Add some random walls
+            for (let i = 0; i < 8; i++) {
+                const x = Math.floor(Math.random() * this.width);
+                const y = Math.floor(Math.random() * this.height);
+                if (this.grid[y] && this.grid[y][x]) {
+                    this.grid[y][x].type = TILE_TYPES.WALL;
+                    this.grid[y][x].walkable = false;
+                }
+            }
+        }
+
+        addPits() {
+            // Add some pits
+            for (let i = 0; i < 5; i++) {
+                const x = Math.floor(Math.random() * this.width);
+                const y = Math.floor(Math.random() * this.height);
+                if (this.grid[y] && this.grid[y][x] && this.grid[y][x].room === null) {
+                    this.grid[y][x].type = TILE_TYPES.PIT;
+                    this.grid[y][x].walkable = false;
+                }
+            }
+        }
+    }
 
     // Particle system for Zelda-style effects
     class Particle {
@@ -212,7 +339,8 @@
 
     // Helper functions
     function shadeColor(color, percent) {
-        if (!color) color = "#808080";         const num = parseInt(color.replace("#",""), 16);
+        if (!color) color = "#808080";
+        const num = parseInt(color.replace("#",""), 16);
         const amt = Math.round(2.55 * percent);
         const R = (num >> 16) + amt;
         const G = (num >> 8 & 0x00FF) + amt;
@@ -1343,36 +1471,50 @@
         }
 
         takeDamage(damage) {
-            // Shield absorbs damage first
+            if (typeof damage !== 'number' || damage <= 0) return false;
+            
+            // Apply damage to shield first, then health
             if (this.shield > 0) {
-                const shieldDamage = Math.min(damage, this.shield);
+                const shieldDamage = Math.min(this.shield, damage);
                 this.shield -= shieldDamage;
                 damage -= shieldDamage;
             }
             
-            this.health -= damage;
-            this.hitFlash = 1;
-            
-            // Screen shake on hit
-            gameState.camera.shake = 5;
-            
-            // Damage particles
-            for (let i = 0; i < 10; i++) {
-                gameState.particles.push(new Particle(
-                    this.x, this.y, 0.5,
-                    {
-                        vx: (Math.random() - 0.5) * 3,
-                        vy: (Math.random() - 0.5) * 3,
-                        vz: Math.random() * 3,
-                        color: COLORS.heartRed,
-                        size: 4,
-                        life: 1,
-                        decay: 0.03
-                    }
-                ));
+            if (damage > 0) {
+                this.health -= damage;
             }
             
-            return this.health <= 0;
+            this.hitFlash = 1;
+            
+            // Create hit effect
+            if (gameState.particles && Array.isArray(gameState.particles)) {
+                for (let i = 0; i < 8; i++) {
+                    gameState.particles.push(new Particle(
+                        this.x, this.y, 0.3,
+                        {
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: (Math.random() - 0.5) * 4,
+                            vz: Math.random() * 3,
+                            color: COLORS.heartRed,
+                            size: 3,
+                            life: 1,
+                            decay: 0.05,
+                            glow: true
+                        }
+                    ));
+                }
+            }
+            
+            // Check if player is dead
+            if (this.health <= 0) {
+                this.health = 0;
+                if (gameState.gameOver !== undefined) {
+                    gameState.gameOver = true;
+                }
+                return true; // Player is dead
+            }
+            
+            return false; // Player is still alive
         }
 
         draw(ctx) {
@@ -1485,28 +1627,32 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist > 0) {
-                gameState.projectiles.push(new Projectile(
-                    this.x, this.y, 
-                    (dx / dist) * 8, 
-                    (dy / dist) * 8,
-                    this.id
-                ));
+                if (gameState.projectiles && Array.isArray(gameState.projectiles)) {
+                    gameState.projectiles.push(new Projectile(
+                        this.x, this.y, 
+                        (dx / dist) * 8, 
+                        (dy / dist) * 8,
+                        this.id
+                    ));
+                }
                 
                 // Muzzle flash effect
-                for (let i = 0; i < 5; i++) {
-                    gameState.particles.push(new Particle(
-                        this.x, this.y, 0.3,
-                        {
-                            vx: (Math.random() - 0.5) * 2,
-                            vy: (Math.random() - 0.5) * 2,
-                            vz: Math.random() * 2,
-                            color: COLORS.magicYellow,
-                            size: 3,
-                            life: 0.5,
-                            decay: 0.05,
-                            glow: true
-                        }
-                    ));
+                if (gameState.particles && Array.isArray(gameState.particles)) {
+                    for (let i = 0; i < 5; i++) {
+                        gameState.particles.push(new Particle(
+                            this.x, this.y, 0.3,
+                            {
+                                vx: (Math.random() - 0.5) * 2,
+                                vy: (Math.random() - 0.5) * 2,
+                                vz: Math.random() * 2,
+                                color: COLORS.magicYellow,
+                                size: 2,
+                                life: 0.8,
+                                decay: 0.04,
+                                glow: true
+                            }
+                        ));
+                    }
                 }
             }
         }
@@ -1678,85 +1824,78 @@
         }
 
         shootProjectile(target) {
+            if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return;
+            
             const dx = target.x - this.x;
             const dy = target.y - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist > 0) {
-                gameState.projectiles.push(new EnemyProjectile(
-                    this.x, this.y,
-                    (dx / dist) * 5,
-                    (dy / dist) * 5,
-                    this.damage
-                ));
+                const speed = 3;
+                const vx = (dx / dist) * speed;
+                const vy = (dy / dist) * speed;
+                
+                if (gameState.projectiles && Array.isArray(gameState.projectiles)) {
+                    gameState.projectiles.push(new EnemyProjectile(
+                        this.x, this.y, vx, vy, this.damage
+                    ));
+                }
             }
         }
 
         takeDamage(damage) {
+            if (typeof damage !== 'number' || damage <= 0) return false;
+            
             this.health -= damage;
             this.hitFlash = 1;
             
-            // Damage number
-            if (visualEffects) {
-                visualEffects.createDamageNumber(this.x, this.y, damage);
+            // Create hit effect
+            if (gameState.particles && Array.isArray(gameState.particles)) {
+                for (let i = 0; i < 5; i++) {
+                    gameState.particles.push(new Particle(
+                        this.x, this.y, 0.3,
+                        {
+                            vx: (Math.random() - 0.5) * 3,
+                            vy: (Math.random() - 0.5) * 3,
+                            vz: Math.random() * 2,
+                            color: COLORS.heartRed,
+                            size: 2,
+                            life: 0.8,
+                            decay: 0.04
+                        }
+                    ));
+                }
             }
             
-            // Hit particles
-            for (let i = 0; i < 5; i++) {
-                gameState.particles.push(new Particle(
-                    this.x, this.y, 0.3,
-                    {
-                        vx: (Math.random() - 0.5) * 3,
-                        vy: (Math.random() - 0.5) * 3,
-                        vz: Math.random() * 2,
-                        color: this.color,
-                        size: 3,
-                        life: 0.6,
-                        decay: 0.04
-                    }
-                ));
-            }
-            
+            // Check if enemy is dead
             if (this.health <= 0) {
-                // Death effect
-                for (let i = 0; i < 15; i++) {
-                    gameState.particles.push(new Particle(
-                        this.x, this.y, 0.5,
-                        {
-                            vx: (Math.random() - 0.5) * 5,
-                            vy: (Math.random() - 0.5) * 5,
-                            vz: Math.random() * 4,
-                            color: this.color,
-                            size: 5,
-                            life: 1,
-                            decay: 0.02,
-                            glow: true
-                        }
-                    ));
+                // Add score
+                if (gameState.score !== undefined) {
+                    gameState.score += this.score;
                 }
                 
-                // Drop rupee
-                if (Math.random() > 0.5) {
-                    gameState.particles.push(new Particle(
-                        this.x, this.y, 0.5,
-                        {
-                            vx: 0,
-                            vy: 0,
-                            vz: 2,
-                            color: COLORS.rupeeGreen,
-                            size: 8,
-                            life: 2,
-                            decay: 0.005,
-                            sparkle: true
-                        }
-                    ));
-                    gameState.rupees += 1;
+                // Create death effect
+                if (gameState.particles && Array.isArray(gameState.particles)) {
+                    for (let i = 0; i < 10; i++) {
+                        gameState.particles.push(new Particle(
+                            this.x, this.y, 0.3,
+                            {
+                                vx: (Math.random() - 0.5) * 4,
+                                vy: (Math.random() - 0.5) * 4,
+                                vz: Math.random() * 3,
+                                color: this.color,
+                                size: 3,
+                                life: 1,
+                                decay: 0.03
+                            }
+                        ));
+                    }
                 }
                 
-                gameState.score += this.score;
-                return true;
+                return true; // Enemy is dead
             }
-            return false;
+            
+            return false; // Enemy is still alive
         }
 
         draw(ctx) {
@@ -2061,6 +2200,7 @@
         constructor(x, y, vx, vy, damage) {
             super(x, y, vx, vy, null);
             this.damage = damage;
+            this.radius = 0.2;
         }
 
         update(deltaTime) {
@@ -2069,14 +2209,20 @@
             this.lifetime -= deltaTime;
             
             // Check collision with players
-            for (const [id, player] of gameState.players) {
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist < player.radius + this.radius) {
-                    player.takeDamage(this.damage);
-                    return false;
+            if (gameState.players && gameState.players.size > 0) {
+                for (const [id, player] of gameState.players) {
+                    if (player && typeof player.x === 'number' && typeof player.y === 'number' && typeof player.radius === 'number') {
+                        const dx = player.x - this.x;
+                        const dy = player.y - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < player.radius + this.radius) {
+                            if (player.takeDamage && typeof player.takeDamage === 'function') {
+                                player.takeDamage(this.damage);
+                            }
+                            return false;
+                        }
+                    }
                 }
             }
             
@@ -2407,8 +2553,8 @@
         ctx.save();
         ctx.globalAlpha = 0.2;
         for (let i = 0; i < 3; i++) {
-            const cloudX = (animationTime * 0.00001 * (i + 1) % 1.2) * canvas.width - 100;
-            const cloudY = 20 + i * 40 + Math.sin(animationTime * 0.0001 + i) * 5;
+            const cloudX = (gameState.animationTime * 0.00001 * (i + 1) % 1.2) * canvas.width - 100;
+            const cloudY = 20 + i * 40 + Math.sin(gameState.animationTime * 0.0001 + i) * 5;
             
             // Simple cloud shapes
             ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
