@@ -83,6 +83,7 @@ export const BalanceConfig = {
             health: 60,
             speed: 150,
             damage: 25,
+            attackRate: 0.8,      // Slow but heavy attacks
             shieldHealth: 40,
             shieldRegen: 2,
             knockback: 200,
@@ -96,6 +97,7 @@ export const BalanceConfig = {
             health: 35,
             speed: 250,
             damage: 12,
+            attackRate: 1.5,      // Fast combo attacks
             dashCooldown: 2,
             dashDistance: 150,
             comboDamage: 30,      // If hits 3 times
@@ -108,6 +110,7 @@ export const BalanceConfig = {
             health: 30,
             speed: 200,
             damage: 8,
+            attackRate: 1.0,      // Normal attack rate
             mineDamage: 25,
             mineRadius: 60,
             mineArmTime: 1,       // Seconds to activate
@@ -509,7 +512,14 @@ export class BalanceValidator {
      * Calculate DPS for balance testing
      */
     static calculateDPS(enemyType) {
+        if (enemyType === 'boss') {
+            // Boss DPS varies by phase, return average
+            return 50; // Approximate boss DPS
+        }
         const enemy = BalanceConfig.enemies[enemyType];
+        if (!enemy || !enemy.damage || !enemy.attackRate) {
+            return 0; // Return 0 for invalid enemies
+        }
         return enemy.damage * enemy.attackRate;
     }
     
@@ -535,10 +545,17 @@ export class BalanceValidator {
         
         // Calculate enemy threat
         wave.enemies.forEach(enemyType => {
-            const enemy = BalanceConfig.enemies[enemyType];
-            if (enemy) {
-                const threat = (enemy.health / 30) * (this.calculateDPS(enemyType) / 10);
-                difficulty += threat;
+            // Special handling for boss
+            if (enemyType === 'boss') {
+                const boss = BalanceConfig.boss;
+                // Boss has significantly higher difficulty
+                difficulty += (boss.health / 100) * 2; // Boss is worth ~20 difficulty points
+            } else {
+                const enemy = BalanceConfig.enemies[enemyType];
+                if (enemy) {
+                    const threat = (enemy.health / 30) * (this.calculateDPS(enemyType) / 10);
+                    difficulty += threat;
+                }
             }
         });
         

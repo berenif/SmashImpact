@@ -450,7 +450,8 @@ async function main() {
     console.log(`${colors.bright}SUMMARY${colors.reset}`);
     console.log('='.repeat(60));
     
-    const passRate = ((totalPassed / (totalPassed + totalFailed)) * 100).toFixed(1);
+    const totalTests = totalPassed + totalFailed;
+    const passRate = totalTests > 0 ? ((totalPassed / totalTests) * 100).toFixed(1) : '0.0';
     console.log(`\nTests Run: ${totalPassed + totalFailed}`);
     console.log(`${colors.green}Passed: ${totalPassed}${colors.reset}`);
     console.log(`${colors.red}Failed: ${totalFailed}${colors.reset}`);

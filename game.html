@@ -957,10 +957,10 @@
         
         // Cleanup keyboard listeners if present
         if (this.keydownHandler) {
-          document.removeEventListener('keydown', this.keydownHandler);
+          window.removeEventListener('keydown', this.keydownHandler);
         }
         if (this.keyupHandler) {
-          document.removeEventListener('keyup', this.keyupHandler);
+          window.removeEventListener('keyup', this.keyupHandler);
         }
       }
 
@@ -1005,7 +1005,7 @@
         
         // Keyboard controls
         this.keys = {};
-        window.addEventListener('keydown', (e) => {
+        this.keydownHandler = (e) => {
           this.keys[e.key.toLowerCase()] = true;
           
           if (e.key === ' ') {
@@ -1016,9 +1016,9 @@
             e.preventDefault();
             this.handleAction('boost', true);
           }
-        });
+        };
         
-        window.addEventListener('keyup', (e) => {
+        this.keyupHandler = (e) => {
           this.keys[e.key.toLowerCase()] = false;
           
           if (e.key === ' ') {
@@ -1027,7 +1027,10 @@
           if (e.key === 'Shift') {
             this.handleAction('boost', false);
           }
-        });
+        };
+        
+        window.addEventListener('keydown', this.keydownHandler);
+        window.addEventListener('keyup', this.keyupHandler);
       }
 
       resizeCanvas() {

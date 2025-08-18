@@ -796,14 +796,16 @@ class MultiplayerGame {
       if (typeof player.health !== 'number' || typeof player.score !== 'number') return false;
       
       // Validate ranges
-      if (player.health < 0 || player.health > 100) return false;
-      if (player.score < 0 || player.score > 999) return false;
+      // Health can be up to 150 for anchor players
+      if (player.health < 0 || player.health > 200) return false;
+      if (player.score < 0 || player.score > 999999) return false;
       
       // Validate position bounds (assuming max canvas size)
       if (player.x < 0 || player.x > 2000 || player.y < 0 || player.y > 2000) return false;
       
       // Validate velocity bounds (prevent teleportation)
-      if (Math.abs(player.vx) > 50 || Math.abs(player.vy) > 50) return false;
+      // Max speed is 350 for runner, add some buffer for physics
+      if (Math.abs(player.vx) > 500 || Math.abs(player.vy) > 500) return false;
     }
     
     return true;
