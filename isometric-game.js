@@ -1231,30 +1231,7 @@
             }
             
             // Tile-based movement is handled above
-            // No velocity-based movement needed
-            
-            // Check bounds and collisions
-            if (newX >= this.radius && newX <= CONFIG.GRID_WIDTH - this.radius) {
-                let collision = false;
-                for (const decoration of gameState.decorations) {
-                    if (decoration.checkCollision({ x: newX, y: this.y, radius: this.radius })) {
-                        collision = true;
-                        break;
-                    }
-                }
-                if (!collision) this.x = newX;
-            }
-            
-            if (newY >= this.radius && newY <= CONFIG.GRID_HEIGHT - this.radius) {
-                let collision = false;
-                for (const decoration of gameState.decorations) {
-                    if (decoration.checkCollision({ x: this.x, y: newY, radius: this.radius })) {
-                        collision = true;
-                        break;
-                    }
-                }
-                if (!collision) this.y = newY;
-            }
+            // Bounds checking is done in the tile movement logic
             
             // Walking animation
             if (Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1) {
