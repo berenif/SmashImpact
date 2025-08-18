@@ -1,12 +1,15 @@
 // Service Worker for P2P WebRTC Game
-const CACHE_NAME = 'p2p-game-v3';
+const CACHE_NAME = 'p2p-game-v4-' + Date.now(); // Dynamic cache name with timestamp
 const urlsToCache = [
   './',
   './index.html',
   './menu.html',
   './connect.html',
   './game.html',
+  './game-iso.html',
   './multiplayer.js',
+  './isometric-game.js',
+  './visual-effects.js',
   './vendor/qrcode.js',
   './vendor/jsqr.js',
   './manifest.json'
@@ -44,7 +47,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - Network first, fallback to cache (for better updates)
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
@@ -54,40 +57,56 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
+  // For JS and HTML files, always try network first
+  const isImportantFile = event.request.url.endsWith('.js') || 
+                          event.request.url.endsWith('.html') ||
+                          event.request.url.endsWith('/');
+
+  if (isImportantFile) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Update cache with new version
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+          }
           return response;
-        }
-
-        // Clone the request
-        const fetchRequest = event.request.clone();
-
-        return fetch(fetchRequest).then((response) => {
-          // Check if valid response
-          if (!response || response.status !== 200 || response.type === 'opaque') {
+        })
+        .catch(() => {
+          // Network failed, try cache
+          return caches.match(event.request);
+        })
+    );
+  } else {
+    // For other resources, use cache-first
+    event.respondWith(
+      caches.match(event.request)
+        .then((response) => {
+          if (response) {
             return response;
           }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          // Cache the fetched response
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        });
-      })
-      .catch(() => {
-        // Offline fallback
-        if (event.request.destination === 'document') {
-          return caches.match('./menu.html');
-        }
-      })
-  );
+          return fetch(event.request).then((response) => {
+            if (!response || response.status !== 200) {
+              return response;
+            }
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+            return response;
+          });
+        })
+        .catch(() => {
+          // Offline fallback
+          if (event.request.destination === 'document') {
+            return caches.match('./menu.html');
+          }
+        })
+    );
+  }
 });
