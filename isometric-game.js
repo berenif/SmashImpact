@@ -6,29 +6,29 @@
     const CONFIG = {
         TILE_WIDTH: 64,
         TILE_HEIGHT: 32,
-        GRID_WIDTH: 20,
-        GRID_HEIGHT: 20,
+        GRID_WIDTH: 30,  // Increased map size
+        GRID_HEIGHT: 30,  // Increased map size
         PLAYER_SPEED: 4,
         FPS: 60,
         DEBUG: false,
         CAMERA_SMOOTHING: 0.15,
-        ZOOM_DEFAULT: 1.8,
-        ZOOM_MOBILE: 1.4,
+        ZOOM_DEFAULT: 1.2,  // Adjusted zoom for bigger map
+        ZOOM_MOBILE: 1.0,   // Adjusted zoom for mobile
         VOXEL_HEIGHT: 16,
-        AMBIENT_LIGHT: 0.6,
-        SHADOW_OPACITY: 0.25
+        AMBIENT_LIGHT: 0.7,  // Brighter ambient light
+        SHADOW_OPACITY: 0.2  // Softer shadows
     };
 
-    // Zelda-inspired color palette
+    // Enhanced Zelda-inspired color palette
     const COLORS = {
         // Ground and terrain
-        grassLight: '#4ade80',
-        grassDark: '#16a34a',
-        grassMid: '#22c55e',
-        pathSand: '#fbbf24',
-        pathDirt: '#a16207',
-        water: '#06b6d4',
-        waterDeep: '#0891b2',
+        grassLight: '#5eead4',  // Brighter teal-green
+        grassDark: '#059669',   // Rich forest green
+        grassMid: '#10b981',    // Vibrant emerald
+        pathSand: '#fde047',    // Bright golden sand
+        pathDirt: '#92400e',    // Warm brown
+        water: '#38bdf8',       // Crystal blue
+        waterDeep: '#0284c7',   // Deep ocean blue
         
         // Decorations
         bushGreen: '#15803d',
@@ -246,8 +246,11 @@
         // Add subtle elevation for tiles
         const elevation = 2;
         
-        // Draw tile shadow/depth
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        // Draw enhanced tile shadow/depth with gradient
+        const shadowGradient = ctx.createLinearGradient(0, -h + elevation, 0, h + elevation);
+        shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.05)');
+        shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
+        ctx.fillStyle = shadowGradient;
         ctx.beginPath();
         ctx.moveTo(0, -h + elevation);
         ctx.lineTo(w, elevation);
@@ -304,16 +307,26 @@
         ctx.closePath();
         ctx.fill();
         
-        // Add tile edge highlight for depth
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
+        // Add enhanced tile edge highlight for better depth perception
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(0, -h);
         ctx.lineTo(w, 0);
         ctx.stroke();
         
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.beginPath();
         ctx.moveTo(0, -h);
+        ctx.lineTo(-w, 0);
+        ctx.stroke();
+        
+        // Add subtle bottom edge shadow
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(w, 0);
+        ctx.lineTo(0, h);
         ctx.lineTo(-w, 0);
         ctx.stroke();
         
@@ -576,26 +589,41 @@
 
         generateRooms() {
             // Create main rooms in a grid pattern
-            const roomSize = 5;
-            const spacing = 2;
+            const roomSize = 6;  // Bigger rooms
+            const spacing = 3;   // More spacing between rooms
             
             // Start room (center)
-            const centerX = Math.floor(this.width / 2) - 2;
-            const centerY = Math.floor(this.height / 2) - 2;
+            const centerX = Math.floor(this.width / 2) - 3;
+            const centerY = Math.floor(this.height / 2) - 3;
             const startRoom = new Room(centerX, centerY, roomSize, roomSize, 'start');
             this.rooms.push(startRoom);
             this.carveRoom(startRoom);
             
-            // Generate surrounding rooms
+            // Generate more rooms for the bigger map
             const positions = [
+                // Inner ring
                 { x: centerX - roomSize - spacing, y: centerY, type: 'normal' }, // Left
                 { x: centerX + roomSize + spacing, y: centerY, type: 'normal' }, // Right
                 { x: centerX, y: centerY - roomSize - spacing, type: 'normal' }, // Top
                 { x: centerX, y: centerY + roomSize + spacing, type: 'normal' }, // Bottom
+                
+                // Diagonal rooms
                 { x: centerX - roomSize - spacing, y: centerY - roomSize - spacing, type: 'treasure' }, // Top-left
                 { x: centerX + roomSize + spacing, y: centerY - roomSize - spacing, type: 'normal' }, // Top-right
                 { x: centerX - roomSize - spacing, y: centerY + roomSize + spacing, type: 'normal' }, // Bottom-left
-                { x: centerX + roomSize + spacing, y: centerY + roomSize + spacing, type: 'boss' } // Bottom-right
+                { x: centerX + roomSize + spacing, y: centerY + roomSize + spacing, type: 'boss' }, // Bottom-right
+                
+                // Outer ring for bigger map
+                { x: centerX - (roomSize + spacing) * 2, y: centerY, type: 'treasure' }, // Far left
+                { x: centerX + (roomSize + spacing) * 2, y: centerY, type: 'normal' }, // Far right
+                { x: centerX, y: centerY - (roomSize + spacing) * 2, type: 'normal' }, // Far top
+                { x: centerX, y: centerY + (roomSize + spacing) * 2, type: 'treasure' }, // Far bottom
+                
+                // Additional corner rooms
+                { x: centerX - (roomSize + spacing) * 2, y: centerY - roomSize - spacing, type: 'normal' },
+                { x: centerX + (roomSize + spacing) * 2, y: centerY - roomSize - spacing, type: 'normal' },
+                { x: centerX - (roomSize + spacing) * 2, y: centerY + roomSize + spacing, type: 'normal' },
+                { x: centerX + (roomSize + spacing) * 2, y: centerY + roomSize + spacing, type: 'boss' }
             ];
             
             for (const pos of positions) {
@@ -743,26 +771,62 @@
         }
 
         addDecorations() {
-            // Add grass variations and flowers
+            // Add grass variations and flowers with better distribution
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
                     if (this.grid[y][x].type === TILE_TYPES.GRASS) {
-                        if (Math.random() > 0.9) {
+                        const rand = Math.random();
+                        if (rand > 0.92) {
                             this.grid[y][x].type = TILE_TYPES.FLOWER;
+                        } else if (rand > 0.88 && rand <= 0.92) {
+                            // Add some sand patches for variety
+                            this.grid[y][x].type = TILE_TYPES.SAND;
                         }
                     }
                 }
             }
             
-            // Add water edges
+            // Create water features (ponds and streams)
+            const numPonds = 3 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < numPonds; i++) {
+                const pondX = Math.floor(Math.random() * (this.width - 4)) + 2;
+                const pondY = Math.floor(Math.random() * (this.height - 4)) + 2;
+                const pondSize = 2 + Math.floor(Math.random() * 2);
+                
+                for (let py = pondY - pondSize; py <= pondY + pondSize; py++) {
+                    for (let px = pondX - pondSize; px <= pondX + pondSize; px++) {
+                        if (px >= 0 && py >= 0 && px < this.width && py < this.height) {
+                            const dist = Math.sqrt(Math.pow(px - pondX, 2) + Math.pow(py - pondY, 2));
+                            if (dist <= pondSize && this.grid[py][px].room === null) {
+                                this.grid[py][px].type = TILE_TYPES.WATER;
+                                this.grid[py][px].walkable = false;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Add decorative water edges
             for (let y = 0; y < this.height; y++) {
-                if (this.grid[y][0].type === TILE_TYPES.GRASS && Math.random() > 0.7) {
+                if (this.grid[y][0].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
                     this.grid[y][0].type = TILE_TYPES.WATER;
                     this.grid[y][0].walkable = false;
                 }
-                if (this.grid[y][this.width - 1].type === TILE_TYPES.GRASS && Math.random() > 0.7) {
+                if (this.grid[y][this.width - 1].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
                     this.grid[y][this.width - 1].type = TILE_TYPES.WATER;
                     this.grid[y][this.width - 1].walkable = false;
+                }
+            }
+            
+            // Add water to top and bottom edges for atmosphere
+            for (let x = 0; x < this.width; x++) {
+                if (this.grid[0][x].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
+                    this.grid[0][x].type = TILE_TYPES.WATER;
+                    this.grid[0][x].walkable = false;
+                }
+                if (this.grid[this.height - 1][x].type === TILE_TYPES.GRASS && Math.random() > 0.6) {
+                    this.grid[this.height - 1][x].type = TILE_TYPES.WATER;
+                    this.grid[this.height - 1][x].walkable = false;
                 }
             }
         }
@@ -1842,32 +1906,48 @@
             }
         }
         
-        // Add trees at map edges
-        for (let i = 0; i < 5; i++) {
+        // Add more trees at map edges for the bigger map
+        for (let i = 0; i < 12; i++) {
             const edge = Math.floor(Math.random() * 4);
             let x, y;
             
             switch(edge) {
                 case 0: // Top
                     x = Math.random() * CONFIG.GRID_WIDTH;
-                    y = 0.5;
+                    y = 0.5 + Math.random() * 2;
                     break;
                 case 1: // Right
-                    x = CONFIG.GRID_WIDTH - 0.5;
+                    x = CONFIG.GRID_WIDTH - 0.5 - Math.random() * 2;
                     y = Math.random() * CONFIG.GRID_HEIGHT;
                     break;
                 case 2: // Bottom
                     x = Math.random() * CONFIG.GRID_WIDTH;
-                    y = CONFIG.GRID_HEIGHT - 0.5;
+                    y = CONFIG.GRID_HEIGHT - 0.5 - Math.random() * 2;
                     break;
                 case 3: // Left
-                    x = 0.5;
+                    x = 0.5 + Math.random() * 2;
                     y = Math.random() * CONFIG.GRID_HEIGHT;
                     break;
             }
             
-            if (mapData.grid[Math.floor(y)][Math.floor(x)].type !== TILE_TYPES.WATER) {
+            if (Math.floor(y) >= 0 && Math.floor(y) < CONFIG.GRID_HEIGHT &&
+                Math.floor(x) >= 0 && Math.floor(x) < CONFIG.GRID_WIDTH &&
+                mapData.grid[Math.floor(y)][Math.floor(x)].type !== TILE_TYPES.WATER) {
                 gameState.decorations.push(new Decoration(x, y, DECORATION_TYPES.TREE));
+            }
+        }
+        
+        // Add scattered decorations throughout the map
+        for (let i = 0; i < 20; i++) {
+            const x = Math.random() * CONFIG.GRID_WIDTH;
+            const y = Math.random() * CONFIG.GRID_HEIGHT;
+            const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            if (Math.floor(y) >= 0 && Math.floor(y) < CONFIG.GRID_HEIGHT &&
+                Math.floor(x) >= 0 && Math.floor(x) < CONFIG.GRID_WIDTH &&
+                mapData.grid[Math.floor(y)][Math.floor(x)].type === TILE_TYPES.GRASS) {
+                gameState.decorations.push(new Decoration(x, y, type));
             }
         }
         
@@ -1977,25 +2057,32 @@
         
         // Better background gradient with sky effect
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#87CEEB');  // Sky blue
-        gradient.addColorStop(0.4, '#98D8E8'); // Light blue
-        gradient.addColorStop(0.7, '#B8E6F3'); // Pale blue
-        gradient.addColorStop(1, '#C8F0F8');   // Very pale blue
+        gradient.addColorStop(0, '#5DADE2');  // Deeper sky blue
+        gradient.addColorStop(0.3, '#85C1E9'); // Mid blue
+        gradient.addColorStop(0.6, '#AED6F1'); // Light blue
+        gradient.addColorStop(0.9, '#D6EAF8'); // Very light blue
+        gradient.addColorStop(1, '#EBF5FB');   // Almost white
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Add subtle cloud effect
+        // Add enhanced cloud effect with better visuals
         ctx.save();
-        ctx.globalAlpha = 0.3;
-        ctx.fillStyle = '#ffffff';
-        for (let i = 0; i < 3; i++) {
-            const cloudX = (animationTime * 0.00002 * (i + 1) % 1) * canvas.width;
-            const cloudY = 50 + i * 80;
+        ctx.globalAlpha = 0.4;
+        for (let i = 0; i < 5; i++) {
+            const cloudX = (animationTime * 0.00001 * (i + 1) % 1.2) * canvas.width - 100;
+            const cloudY = 30 + i * 60 + Math.sin(animationTime * 0.0001 + i) * 10;
+            
+            // Create gradient for clouds
+            const cloudGradient = ctx.createRadialGradient(cloudX + 30, cloudY, 0, cloudX + 30, cloudY, 50);
+            cloudGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            cloudGradient.addColorStop(1, 'rgba(255, 255, 255, 0.2)');
+            ctx.fillStyle = cloudGradient;
+            
             ctx.beginPath();
-            ctx.arc(cloudX, cloudY, 40, 0, Math.PI * 2);
-            ctx.arc(cloudX + 30, cloudY + 5, 35, 0, Math.PI * 2);
-            ctx.arc(cloudX + 60, cloudY, 40, 0, Math.PI * 2);
-            ctx.arc(cloudX + 25, cloudY - 10, 30, 0, Math.PI * 2);
+            ctx.arc(cloudX, cloudY, 45, 0, Math.PI * 2);
+            ctx.arc(cloudX + 35, cloudY + 5, 40, 0, Math.PI * 2);
+            ctx.arc(cloudX + 70, cloudY, 45, 0, Math.PI * 2);
+            ctx.arc(cloudX + 30, cloudY - 15, 35, 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.restore();
