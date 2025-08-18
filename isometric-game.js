@@ -1,4 +1,4 @@
-// Isometric Wave-Based Game Engine for Smash Impact - Improved Version
+// Isometric Wave-Based Game Engine for Smash Impact - Beautiful Edition
 (function() {
     'use strict';
 
@@ -11,36 +11,63 @@
         PLAYER_SPEED: 5,
         FPS: 60,
         DEBUG: false,
-        CAMERA_SMOOTHING: 0.1,
-        ZOOM_DEFAULT: 1.5,
-        ZOOM_MOBILE: 1.2,
-        VOXEL_HEIGHT: 20
+        CAMERA_SMOOTHING: 0.12,
+        ZOOM_DEFAULT: 1.6,
+        ZOOM_MOBILE: 1.3,
+        VOXEL_HEIGHT: 24,
+        AMBIENT_LIGHT: 0.4,
+        SHADOW_OPACITY: 0.3
+    };
+
+    // Color palette for consistent aesthetics
+    const COLORS = {
+        ground: ['#2d3748', '#4a5568', '#718096'],
+        grass: ['#065f46', '#047857', '#059669'],
+        stone: ['#4b5563', '#6b7280', '#9ca3af'],
+        wood: ['#92400e', '#b45309', '#d97706'],
+        player: '#6366f1',
+        playerGlow: '#818cf8',
+        enemyRed: '#ef4444',
+        enemyOrange: '#f59e0b',
+        enemyPurple: '#8b5cf6',
+        enemyGray: '#6b7280',
+        projectileGlow: '#fbbf24',
+        healthGreen: '#10b981',
+        healthRed: '#ef4444',
+        shieldBlue: '#3b82f6',
+        uiDark: 'rgba(15, 23, 42, 0.9)',
+        uiLight: 'rgba(241, 245, 249, 0.95)'
     };
 
     // Device detection
     const isMobile = () => {
         return ('ontouchstart' in window) || 
                (navigator.maxTouchPoints > 0) || 
-               (navigator.msMaxTouchPoints > 0) ||
                (window.innerWidth <= 768);
     };
 
     // Game state
     let canvas, ctx;
     let visualEffects = null;
+    let animationTime = 0;
     let gameState = {
         players: new Map(),
         enemies: [],
         projectiles: [],
         effects: [],
         obstacles: [],
-        powerUps: [],
+        groundTiles: [],
+        decorations: [],
+        particles: [],
         camera: { 
             x: 0, 
             y: 0, 
             targetX: 0,
             targetY: 0,
-            zoom: isMobile() ? CONFIG.ZOOM_MOBILE : CONFIG.ZOOM_DEFAULT 
+            zoom: isMobile() ? CONFIG.ZOOM_MOBILE : CONFIG.ZOOM_DEFAULT,
+            shake: 0,
+            shakeX: 0,
+            shakeY: 0
         },
         input: {
             keys: {},
@@ -60,6 +87,8 @@
         },
         score: 0,
         currency: 0,
+        combo: 0,
+        maxCombo: 0,
         paused: false,
         gameOver: false,
         lastTime: 0,
@@ -69,6 +98,59 @@
         fpsTime: 0,
         deviceType: isMobile() ? 'mobile' : 'desktop'
     };
+
+    // Particle system
+    class Particle {
+        constructor(x, y, z, options = {}) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.vx = options.vx || (Math.random() - 0.5) * 2;
+            this.vy = options.vy || (Math.random() - 0.5) * 2;
+            this.vz = options.vz || Math.random() * 2;
+            this.color = options.color || '#ffffff';
+            this.size = options.size || 3;
+            this.life = options.life || 1;
+            this.decay = options.decay || 0.02;
+            this.gravity = options.gravity || 0.1;
+            this.glow = options.glow || false;
+        }
+
+        update(deltaTime) {
+            this.x += this.vx * deltaTime * 60;
+            this.y += this.vy * deltaTime * 60;
+            this.z += this.vz * deltaTime * 60;
+            this.vz -= this.gravity * deltaTime * 60;
+            
+            if (this.z < 0) {
+                this.z = 0;
+                this.vz *= -0.5;
+            }
+            
+            this.life -= this.decay * deltaTime * 60;
+            return this.life > 0;
+        }
+
+        draw(ctx) {
+            const iso = cartesianToIsometric(this.x, this.y, this.z);
+            
+            ctx.save();
+            ctx.globalAlpha = this.life;
+            ctx.translate(iso.x, iso.y);
+            
+            if (this.glow) {
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 10;
+            }
+            
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * this.life, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+    }
 
     // Isometric conversion functions
     function cartesianToIsometric(x, y, z = 0) {
@@ -85,8 +167,8 @@
         };
     }
 
-    // Draw voxel-like cube
-    function drawVoxelCube(ctx, x, y, z, width, height, depth, color) {
+    // Enhanced voxel cube with ambient occlusion
+    function drawVoxelCube(ctx, x, y, z, width, height, depth, color, options = {}) {
         const iso = cartesianToIsometric(x, y, z + depth);
         
         ctx.save();
@@ -96,8 +178,29 @@
         const h = height * CONFIG.TILE_HEIGHT / 2;
         const d = depth * CONFIG.VOXEL_HEIGHT;
         
-        // Top face (lighter)
-        ctx.fillStyle = color;
+        // Shadow
+        if (!options.noShadow) {
+            ctx.save();
+            ctx.translate(0, d + 5);
+            ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.SHADOW_OPACITY})`;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, w * 0.8, h * 0.4, 0, 0, Math.PI * 2);
+            ctx.filter = 'blur(4px)';
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        // Ambient light calculation
+        const ambientTop = CONFIG.AMBIENT_LIGHT;
+        const ambientRight = CONFIG.AMBIENT_LIGHT * 0.8;
+        const ambientLeft = CONFIG.AMBIENT_LIGHT * 0.6;
+        
+        // Top face with gradient
+        const topGradient = ctx.createLinearGradient(-w, -d, w, -d + h);
+        topGradient.addColorStop(0, shadeColor(color, 20 * ambientTop));
+        topGradient.addColorStop(1, shadeColor(color, 0));
+        
+        ctx.fillStyle = topGradient;
         ctx.beginPath();
         ctx.moveTo(0, -d);
         ctx.lineTo(w, -d + h/2);
@@ -106,8 +209,12 @@
         ctx.closePath();
         ctx.fill();
         
-        // Right face (darker)
-        ctx.fillStyle = shadeColor(color, -20);
+        // Right face with gradient
+        const rightGradient = ctx.createLinearGradient(0, -d + h, w, h/2);
+        rightGradient.addColorStop(0, shadeColor(color, -10 * ambientRight));
+        rightGradient.addColorStop(1, shadeColor(color, -30 * ambientRight));
+        
+        ctx.fillStyle = rightGradient;
         ctx.beginPath();
         ctx.moveTo(0, -d + h);
         ctx.lineTo(w, -d + h/2);
@@ -116,8 +223,12 @@
         ctx.closePath();
         ctx.fill();
         
-        // Left face (darkest)
-        ctx.fillStyle = shadeColor(color, -40);
+        // Left face with gradient
+        const leftGradient = ctx.createLinearGradient(0, -d + h, -w, h/2);
+        leftGradient.addColorStop(0, shadeColor(color, -20 * ambientLeft));
+        leftGradient.addColorStop(1, shadeColor(color, -40 * ambientLeft));
+        
+        ctx.fillStyle = leftGradient;
         ctx.beginPath();
         ctx.moveTo(0, -d + h);
         ctx.lineTo(-w, -d + h/2);
@@ -126,23 +237,44 @@
         ctx.closePath();
         ctx.fill();
         
-        // Edges
+        // Edges with anti-aliasing
         ctx.strokeStyle = shadeColor(color, -60);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
         // Top edges
+        ctx.beginPath();
         ctx.moveTo(0, -d);
         ctx.lineTo(w, -d + h/2);
         ctx.lineTo(0, -d + h);
         ctx.lineTo(-w, -d + h/2);
         ctx.closePath();
+        ctx.stroke();
+        
         // Vertical edges
+        ctx.beginPath();
         ctx.moveTo(0, -d + h);
         ctx.lineTo(0, h);
+        ctx.stroke();
+        
+        ctx.beginPath();
         ctx.moveTo(w, -d + h/2);
         ctx.lineTo(w, h/2);
+        ctx.stroke();
+        
+        ctx.beginPath();
         ctx.moveTo(-w, -d + h/2);
         ctx.lineTo(-w, h/2);
+        ctx.stroke();
+        
+        // Highlight edge for depth
+        ctx.strokeStyle = shadeColor(color, 40);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.9, -d + h/2 - 2);
+        ctx.lineTo(0, -d - 2);
+        ctx.lineTo(w * 0.9, -d + h/2 - 2);
         ctx.stroke();
         
         ctx.restore();
@@ -159,7 +291,48 @@
                      (B<255?B<1?0:B:255)).toString(16).slice(1);
     }
 
-    // Player class
+    // Ground tile for visual variety
+    function drawGroundTile(ctx, x, y, type = 'stone') {
+        const iso = cartesianToIsometric(x, y, 0);
+        
+        ctx.save();
+        ctx.translate(iso.x, iso.y);
+        
+        const w = CONFIG.TILE_WIDTH / 2;
+        const h = CONFIG.TILE_HEIGHT / 2;
+        
+        // Base tile
+        const colors = type === 'grass' ? COLORS.grass : COLORS.stone;
+        const baseColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(w, h/2);
+        ctx.lineTo(0, h);
+        ctx.lineTo(-w, h/2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Subtle texture
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.05 + Math.random() * 0.1})`;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(w, h/2);
+        ctx.lineTo(0, h);
+        ctx.lineTo(-w, h/2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Edge lines
+        ctx.strokeStyle = shadeColor(baseColor, -20);
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // Player class with enhanced visuals
     class Player {
         constructor(id, x = 12, y = 12) {
             this.id = id;
@@ -172,7 +345,8 @@
             this.maxHealth = 100;
             this.shield = 0;
             this.maxShield = 50;
-            this.color = '#6366f1';
+            this.color = COLORS.player;
+            this.glowColor = COLORS.playerGlow;
             this.radius = 0.4;
             this.angle = 0;
             this.score = 0;
@@ -182,6 +356,8 @@
             this.shootCooldown = 250;
             this.damage = 10;
             this.speed = CONFIG.PLAYER_SPEED;
+            this.bobOffset = 0;
+            this.hitFlash = 0;
         }
 
         update(deltaTime) {
@@ -197,9 +373,22 @@
             this.vx *= 0.9;
             this.vy *= 0.9;
 
+            // Walking animation
+            const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+            if (speed > 0.1) {
+                this.bobOffset = Math.sin(animationTime * 0.01) * 2;
+            } else {
+                this.bobOffset *= 0.9;
+            }
+
             // Regenerate shield slowly
             if (this.shield < this.maxShield) {
                 this.shield = Math.min(this.maxShield, this.shield + 0.1 * deltaTime);
+            }
+
+            // Update hit flash
+            if (this.hitFlash > 0) {
+                this.hitFlash -= deltaTime * 3;
             }
         }
 
@@ -209,10 +398,44 @@
                 const shieldDamage = Math.min(this.shield, amount);
                 this.shield -= shieldDamage;
                 amount -= shieldDamage;
+                
+                // Shield break effect
+                if (this.shield <= 0) {
+                    for (let i = 0; i < 10; i++) {
+                        gameState.particles.push(new Particle(
+                            this.x, this.y, 0.5,
+                            {
+                                color: COLORS.shieldBlue,
+                                vx: (Math.random() - 0.5) * 4,
+                                vy: (Math.random() - 0.5) * 4,
+                                vz: Math.random() * 3,
+                                glow: true
+                            }
+                        ));
+                    }
+                }
             }
             
             // Remaining damage goes to health
             this.health = Math.max(0, this.health - amount);
+            this.hitFlash = 1;
+            
+            // Screen shake
+            gameState.camera.shake = 5;
+            
+            // Damage particles
+            for (let i = 0; i < 5; i++) {
+                gameState.particles.push(new Particle(
+                    this.x, this.y, 0.5,
+                    {
+                        color: '#ff0000',
+                        size: 2,
+                        vx: (Math.random() - 0.5) * 3,
+                        vy: (Math.random() - 0.5) * 3,
+                        vz: Math.random() * 2
+                    }
+                ));
+            }
             
             // Create damage effect
             if (visualEffects && visualEffects.createImpact) {
@@ -228,39 +451,72 @@
         }
 
         draw(ctx) {
-            // Draw as voxel character
-            drawVoxelCube(ctx, this.x - 0.3, this.y - 0.3, 0, 0.6, 0.6, 0.8, this.color);
+            // Draw player as enhanced voxel character
+            const z = this.bobOffset * 0.01;
             
-            const iso = cartesianToIsometric(this.x, this.y, 0.8);
+            // Glow effect when shielded
+            if (this.shield > 0) {
+                const iso = cartesianToIsometric(this.x, this.y, z + 0.4);
+                ctx.save();
+                ctx.translate(iso.x, iso.y);
+                ctx.globalAlpha = this.shield / this.maxShield * 0.3;
+                ctx.fillStyle = COLORS.shieldBlue;
+                ctx.shadowColor = COLORS.shieldBlue;
+                ctx.shadowBlur = 20;
+                ctx.beginPath();
+                ctx.arc(0, 0, 35, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            
+            // Main body
+            const bodyColor = this.hitFlash > 0 ? 
+                shadeColor(this.color, this.hitFlash * 50) : this.color;
+            
+            drawVoxelCube(ctx, this.x - 0.3, this.y - 0.3, z, 0.6, 0.6, 0.8, bodyColor);
+            
+            // Head
+            drawVoxelCube(ctx, this.x - 0.2, this.y - 0.2, z + 0.8, 0.4, 0.4, 0.3, 
+                         shadeColor(bodyColor, 10), { noShadow: true });
+            
+            const iso = cartesianToIsometric(this.x, this.y, z + 1.1);
             
             ctx.save();
             ctx.translate(iso.x, iso.y);
 
-            // Draw health bar
-            const barWidth = 40;
-            const barHeight = 4;
-            const barY = -35;
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(-barWidth/2, barY, barWidth, barHeight);
-
-            ctx.fillStyle = this.health > 30 ? '#10b981' : '#ef4444';
-            ctx.fillRect(-barWidth/2, barY, barWidth * (this.health / this.maxHealth), barHeight);
-
-            // Draw shield bar if has shield
-            if (this.shield > 0) {
-                ctx.fillStyle = '#3b82f6';
-                ctx.fillRect(-barWidth/2, barY - 5, barWidth * (this.shield / this.maxShield), 2);
+            // Name tag with background
+            if (this.isLocal) {
+                ctx.fillStyle = COLORS.uiDark;
+                ctx.fillRect(-25, -55, 50, 18);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('YOU', 0, -42);
             }
 
-            // Draw player name
-            if (this.id && this.isLocal) {
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.shadowColor = 'black';
-                ctx.shadowBlur = 3;
-                ctx.fillText('You', 0, -45);
+            // Health bar with modern design
+            const barWidth = 50;
+            const barHeight = 5;
+            const barY = -35;
+
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(-barWidth/2 - 2, barY - 2, barWidth + 4, barHeight + 4);
+
+            // Health gradient
+            const healthGradient = ctx.createLinearGradient(-barWidth/2, 0, barWidth/2, 0);
+            const healthColor = this.health > 30 ? COLORS.healthGreen : COLORS.healthRed;
+            healthGradient.addColorStop(0, shadeColor(healthColor, -20));
+            healthGradient.addColorStop(1, healthColor);
+            
+            ctx.fillStyle = healthGradient;
+            ctx.fillRect(-barWidth/2, barY, barWidth * (this.health / this.maxHealth), barHeight);
+
+            // Shield bar
+            if (this.shield > 0) {
+                ctx.fillStyle = COLORS.shieldBlue;
+                ctx.fillRect(-barWidth/2, barY - 6, barWidth * (this.shield / this.maxShield), 2);
             }
 
             ctx.restore();
@@ -278,18 +534,33 @@
             
             if (dist === 0) return null;
             
+            // Muzzle flash
+            gameState.particles.push(new Particle(
+                this.x + (dx/dist) * 0.5, 
+                this.y + (dy/dist) * 0.5, 
+                0.5,
+                {
+                    color: COLORS.projectileGlow,
+                    size: 8,
+                    life: 0.3,
+                    decay: 0.1,
+                    glow: true,
+                    gravity: 0
+                }
+            ));
+            
             return new Projectile(
                 this.x, this.y,
                 (dx / dist) * 10,
                 (dy / dist) * 10,
-                this.color,
+                this.glowColor,
                 this.damage,
                 'player'
             );
         }
     }
 
-    // Enemy class
+    // Enemy class with enhanced visuals
     class Enemy {
         constructor(type, x, y) {
             this.type = type;
@@ -308,6 +579,8 @@
             this.lastAttack = 0;
             this.attackCooldown = 1000;
             this.target = null;
+            this.bobOffset = 0;
+            this.hitFlash = 0;
         }
 
         getHealth(type) {
@@ -332,12 +605,12 @@
 
         getColor(type) {
             const colors = {
-                brawler: '#ef4444',
-                archer: '#f59e0b',
-                stalker: '#8b5cf6',
-                bulwark: '#6b7280'
+                brawler: COLORS.enemyRed,
+                archer: COLORS.enemyOrange,
+                stalker: COLORS.enemyPurple,
+                bulwark: COLORS.enemyGray
             };
-            return colors[type] || '#ef4444';
+            return colors[type] || COLORS.enemyRed;
         }
 
         update(deltaTime) {
@@ -382,6 +655,19 @@
             
             this.vx *= 0.95;
             this.vy *= 0.95;
+            
+            // Walking animation
+            const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+            if (speed > 0.1) {
+                this.bobOffset = Math.sin(animationTime * 0.012 + this.x) * 1.5;
+            } else {
+                this.bobOffset *= 0.9;
+            }
+            
+            // Update hit flash
+            if (this.hitFlash > 0) {
+                this.hitFlash -= deltaTime * 3;
+            }
         }
 
         tryAttack(player) {
@@ -393,6 +679,18 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < 1.5 && player && player.takeDamage) {
                 player.takeDamage(this.damage);
+                
+                // Attack effect
+                gameState.particles.push(new Particle(
+                    player.x, player.y, 0.5,
+                    {
+                        color: this.color,
+                        size: 10,
+                        life: 0.3,
+                        decay: 0.15,
+                        gravity: 0
+                    }
+                ));
             }
         }
 
@@ -404,6 +702,7 @@
             const dy = player.y - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist === 0) return;
+            
             const projectile = new Projectile(
                 this.x, this.y,
                 (dx / dist) * 4,
@@ -417,9 +716,46 @@
 
         takeDamage(amount) {
             this.health -= amount;
+            this.hitFlash = 1;
+            
+            // Hit particles
+            for (let i = 0; i < 3; i++) {
+                gameState.particles.push(new Particle(
+                    this.x, this.y, 0.5,
+                    {
+                        color: this.color,
+                        size: 3,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        vz: Math.random() * 2
+                    }
+                ));
+            }
+            
             if (this.health <= 0) {
+                // Death explosion
+                for (let i = 0; i < 15; i++) {
+                    gameState.particles.push(new Particle(
+                        this.x, this.y, 0.5,
+                        {
+                            color: this.color,
+                            size: 5,
+                            vx: (Math.random() - 0.5) * 5,
+                            vy: (Math.random() - 0.5) * 5,
+                            vz: Math.random() * 4,
+                            glow: true
+                        }
+                    ));
+                }
+                
                 gameState.score += this.score;
                 gameState.currency += Math.floor(this.score / 2);
+                
+                // Combo system
+                gameState.combo++;
+                if (gameState.combo > gameState.maxCombo) {
+                    gameState.maxCombo = gameState.combo;
+                }
                 
                 // Visual effect
                 if (visualEffects && visualEffects.createExplosion) {
@@ -437,33 +773,66 @@
         }
 
         draw(ctx) {
-            // Draw as voxel enemy
+            const z = this.bobOffset * 0.01;
+            
+            // Enemy specific shapes
             const size = this.type === 'bulwark' ? 0.5 : 0.4;
             const height = this.type === 'bulwark' ? 0.7 : 0.6;
-            drawVoxelCube(ctx, this.x - size/2, this.y - size/2, 0, size, size, height, this.color);
             
-            const iso = cartesianToIsometric(this.x, this.y, height);
+            const bodyColor = this.hitFlash > 0 ? 
+                shadeColor(this.color, this.hitFlash * 50) : this.color;
+            
+            // Different shapes for different enemy types
+            if (this.type === 'bulwark') {
+                // Tank - wider and taller
+                drawVoxelCube(ctx, this.x - size/2, this.y - size/2, z, size, size, height, bodyColor);
+                // Armor plates
+                drawVoxelCube(ctx, this.x - size/2 - 0.1, this.y - size/2, z + 0.2, 0.1, size, 0.3, 
+                             shadeColor(bodyColor, -20), { noShadow: true });
+                drawVoxelCube(ctx, this.x + size/2, this.y - size/2, z + 0.2, 0.1, size, 0.3, 
+                             shadeColor(bodyColor, -20), { noShadow: true });
+            } else if (this.type === 'archer') {
+                // Archer - slimmer
+                drawVoxelCube(ctx, this.x - 0.15, this.y - 0.15, z, 0.3, 0.3, 0.6, bodyColor);
+                // Bow
+                const iso = cartesianToIsometric(this.x + 0.3, this.y, z + 0.3);
+                ctx.save();
+                ctx.translate(iso.x, iso.y);
+                ctx.strokeStyle = COLORS.wood[1];
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, -Math.PI/4, Math.PI/4);
+                ctx.stroke();
+                ctx.restore();
+            } else {
+                // Standard enemy
+                drawVoxelCube(ctx, this.x - size/2, this.y - size/2, z, size, size, height, bodyColor);
+            }
+            
+            const iso = cartesianToIsometric(this.x, this.y, z + height);
             
             ctx.save();
             ctx.translate(iso.x, iso.y);
 
-            // Draw health bar
-            const barWidth = 30;
+            // Health bar
+            const barWidth = 35;
             const barHeight = 3;
             const barY = -30;
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(-barWidth/2, barY, barWidth, barHeight);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(-barWidth/2 - 1, barY - 1, barWidth + 2, barHeight + 2);
 
             const healthPercent = this.health / this.maxHealth;
-            ctx.fillStyle = healthPercent > 0.5 ? '#ef4444' : '#991b1b';
+            const healthColor = healthPercent > 0.5 ? COLORS.enemyRed : '#991b1b';
+            
+            ctx.fillStyle = healthColor;
             ctx.fillRect(-barWidth/2, barY, barWidth * healthPercent, barHeight);
 
             ctx.restore();
         }
     }
 
-    // Projectile class
+    // Enhanced Projectile class
     class Projectile {
         constructor(x, y, vx, vy, color, damage, team) {
             this.x = x;
@@ -477,11 +846,20 @@
             this.lifetime = 2000;
             this.createdAt = Date.now();
             this.radius = 0.15;
+            this.trail = [];
+            this.rotation = 0;
         }
 
         update(deltaTime) {
+            // Store trail
+            this.trail.push({ x: this.x, y: this.y, z: this.z });
+            if (this.trail.length > 5) {
+                this.trail.shift();
+            }
+            
             this.x += this.vx * deltaTime;
             this.y += this.vy * deltaTime;
+            this.rotation += 0.3;
             
             if (this.x < 0 || this.x > CONFIG.GRID_WIDTH || 
                 this.y < 0 || this.y > CONFIG.GRID_HEIGHT) {
@@ -502,6 +880,7 @@
                             const idx = gameState.enemies.indexOf(enemy);
                             if (idx >= 0) gameState.enemies.splice(idx, 1);
                         }
+                        this.explode();
                         return false;
                     }
                 }
@@ -513,10 +892,30 @@
                         hit = true;
                     }
                 });
-                if (hit) return false;
+                if (hit) {
+                    this.explode();
+                    return false;
+                }
             }
             
             return true;
+        }
+
+        explode() {
+            // Impact particles
+            for (let i = 0; i < 5; i++) {
+                gameState.particles.push(new Particle(
+                    this.x, this.y, this.z,
+                    {
+                        color: this.color,
+                        size: 3,
+                        vx: (Math.random() - 0.5) * 3,
+                        vy: (Math.random() - 0.5) * 3,
+                        vz: Math.random() * 2,
+                        glow: true
+                    }
+                ));
+            }
         }
 
         checkCollision(entity) {
@@ -527,46 +926,94 @@
         }
 
         draw(ctx) {
+            // Draw trail
+            ctx.save();
+            this.trail.forEach((point, index) => {
+                const alpha = (index + 1) / this.trail.length * 0.5;
+                const iso = cartesianToIsometric(point.x, point.y, point.z);
+                
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.translate(iso.x, iso.y);
+                ctx.beginPath();
+                ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.translate(-iso.x, -iso.y);
+            });
+            ctx.restore();
+            
+            // Main projectile
             const iso = cartesianToIsometric(this.x, this.y, this.z);
             
             ctx.save();
             ctx.translate(iso.x, iso.y);
+            ctx.rotate(this.rotation);
             
-            ctx.fillStyle = this.color;
+            // Glow effect
             ctx.shadowColor = this.color;
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 15;
             
+            // Core
+            ctx.fillStyle = 'white';
             ctx.beginPath();
-            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Outer glow
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = 0.7;
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
             ctx.fill();
             
             ctx.restore();
         }
     }
 
-    // Obstacle class for voxel-like blocks
+    // Enhanced Obstacle class
     class Obstacle {
         constructor(x, y, width, height) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
-            this.color = '#4a5568';
             this.z = 0;
-            this.depth = 0.5 + Math.random() * 0.5;
+            this.depth = 0.6 + Math.random() * 0.6;
+            this.type = Math.random() > 0.5 ? 'stone' : 'wood';
+            this.color = this.type === 'stone' ? 
+                COLORS.stone[Math.floor(Math.random() * COLORS.stone.length)] :
+                COLORS.wood[Math.floor(Math.random() * COLORS.wood.length)];
         }
 
         draw(ctx) {
             drawVoxelCube(ctx, this.x, this.y, this.z, this.width, this.height, this.depth, this.color);
+            
+            // Add details based on type
+            if (this.type === 'stone') {
+                // Cracks
+                const iso = cartesianToIsometric(this.x + this.width/2, this.y + this.height/2, this.depth/2);
+                ctx.save();
+                ctx.translate(iso.x, iso.y);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-10, -5);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(5, 8);
+                ctx.stroke();
+                ctx.restore();
+            }
         }
 
         checkCollision(entity) {
-            return entity.x >= this.x && entity.x <= this.x + this.width &&
-                   entity.y >= this.y && entity.y <= this.y + this.height;
+            return entity.x >= this.x - entity.radius && 
+                   entity.x <= this.x + this.width + entity.radius &&
+                   entity.y >= this.y - entity.radius && 
+                   entity.y <= this.y + this.height + entity.radius;
         }
     }
 
-    // Wave Manager
+    // Wave Manager remains similar but with enhanced spawn effects
     class WaveManager {
         constructor() {
             this.waveConfigs = [
@@ -598,6 +1045,7 @@
             
             gameState.wave.spawned = 0;
             gameState.wave.state = 'active';
+            gameState.combo = 0; // Reset combo
             this.lastSpawn = Date.now();
         }
 
@@ -651,6 +1099,22 @@
             gameState.enemies.push(enemy);
             gameState.wave.spawned++;
             
+            // Spawn portal effect
+            for (let i = 0; i < 20; i++) {
+                gameState.particles.push(new Particle(
+                    x, y, 0,
+                    {
+                        color: enemy.color,
+                        size: 5,
+                        vx: (Math.random() - 0.5) * 3,
+                        vy: (Math.random() - 0.5) * 3,
+                        vz: Math.random() * 5,
+                        glow: true,
+                        life: 1.5
+                    }
+                ));
+            }
+            
             if (visualEffects && visualEffects.createExplosion) {
                 const iso = cartesianToIsometric(x, y, 0);
                 visualEffects.createExplosion(iso.x, iso.y, {
@@ -663,7 +1127,28 @@
 
         completeWave() {
             gameState.wave.state = 'complete';
-            gameState.score += 50 * gameState.wave.current;
+            const bonus = 50 * gameState.wave.current;
+            gameState.score += bonus;
+            gameState.currency += bonus;
+            
+            // Victory particles
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * CONFIG.GRID_WIDTH;
+                const y = Math.random() * CONFIG.GRID_HEIGHT;
+                gameState.particles.push(new Particle(
+                    x, y, 0,
+                    {
+                        color: ['#fbbf24', '#34d399', '#60a5fa'][Math.floor(Math.random() * 3)],
+                        size: 8,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        vz: Math.random() * 8,
+                        glow: true,
+                        life: 2,
+                        decay: 0.01
+                    }
+                ));
+            }
             
             setTimeout(() => {
                 this.startPreparation();
@@ -702,7 +1187,7 @@
         }
         
         ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false; // For crisp pixel art look
+        ctx.imageSmoothingEnabled = true;
         
         // Initialize visual effects
         if (window.VisualEffects) {
@@ -753,13 +1238,23 @@
     }
 
     function generateLevel() {
-        gameState.obstacles = [];
+        // Generate ground tiles
+        gameState.groundTiles = [];
+        for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
+            for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {
+                gameState.groundTiles.push({
+                    x, y,
+                    type: Math.random() > 0.8 ? 'grass' : 'stone'
+                });
+            }
+        }
         
-        // Create square and rectangular obstacles
-        for (let i = 0; i < 12; i++) {
+        // Generate obstacles
+        gameState.obstacles = [];
+        for (let i = 0; i < 15; i++) {
             const isSquare = Math.random() > 0.5;
-            const width = isSquare ? 1 : 1 + Math.random();
-            const height = isSquare ? 1 : 1 + Math.random();
+            const width = isSquare ? 1 : 1 + Math.random() * 0.5;
+            const height = isSquare ? 1 : 1 + Math.random() * 0.5;
             
             gameState.obstacles.push(new Obstacle(
                 3 + Math.random() * (CONFIG.GRID_WIDTH - 6 - width),
@@ -786,6 +1281,16 @@
         // Smooth camera movement
         gameState.camera.x += (gameState.camera.targetX - gameState.camera.x) * CONFIG.CAMERA_SMOOTHING;
         gameState.camera.y += (gameState.camera.targetY - gameState.camera.y) * CONFIG.CAMERA_SMOOTHING;
+        
+        // Camera shake
+        if (gameState.camera.shake > 0) {
+            gameState.camera.shakeX = (Math.random() - 0.5) * gameState.camera.shake;
+            gameState.camera.shakeY = (Math.random() - 0.5) * gameState.camera.shake;
+            gameState.camera.shake *= 0.9;
+        } else {
+            gameState.camera.shakeX = 0;
+            gameState.camera.shakeY = 0;
+        }
     }
 
     function setupInputHandlers() {
@@ -914,13 +1419,15 @@
     function handleShoot(screenX, screenY) {
         if (!gameState.localPlayer || gameState.localPlayer.health <= 0) return;
         
-        const worldX = (screenX - gameState.camera.x) / gameState.camera.zoom;
-        const worldY = (screenY - gameState.camera.y) / gameState.camera.zoom;
+        const worldX = (screenX - gameState.camera.x - gameState.camera.shakeX) / gameState.camera.zoom;
+        const worldY = (screenY - gameState.camera.y - gameState.camera.shakeY) / gameState.camera.zoom;
         const target = isometricToCartesian(worldX, worldY);
         
         const projectile = gameState.localPlayer.shoot(target.x, target.y);
         if (projectile) {
             gameState.projectiles.push(projectile);
+            // Small recoil shake
+            gameState.camera.shake = 2;
         }
     }
 
@@ -954,6 +1461,8 @@
     function update(deltaTime) {
         if (gameState.paused || gameState.gameOver) return;
         
+        animationTime += deltaTime * 1000;
+        
         handleInput();
         updateCamera();
         
@@ -977,11 +1486,16 @@
             return projectile.update(deltaTime);
         });
         
+        // Update particles
+        gameState.particles = gameState.particles.filter(particle => {
+            return particle.update(deltaTime);
+        });
+        
         // Obstacle collisions
         gameState.players.forEach(player => {
             gameState.obstacles.forEach(obstacle => {
                 if (obstacle.checkCollision(player)) {
-                    // Simple push back
+                    // Push back
                     const centerX = obstacle.x + obstacle.width / 2;
                     const centerY = obstacle.y + obstacle.height / 2;
                     const dx = player.x - centerX;
@@ -989,8 +1503,9 @@
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     
                     if (dist > 0) {
-                        player.x = centerX + (dx / dist) * (obstacle.width / 2 + player.radius + 0.1);
-                        player.y = centerY + (dy / dist) * (obstacle.height / 2 + player.radius + 0.1);
+                        const pushDist = Math.max(obstacle.width, obstacle.height) / 2 + player.radius + 0.1;
+                        player.x = centerX + (dx / dist) * pushDist;
+                        player.y = centerY + (dy / dist) * pushDist;
                     }
                     
                     player.vx *= 0.5;
@@ -1003,55 +1518,45 @@
         if (visualEffects && visualEffects.update) {
             visualEffects.update(deltaTime);
         }
-    }
-
-    function drawGrid() {
-        ctx.strokeStyle = 'rgba(100, 100, 200, 0.15)';
-        ctx.lineWidth = 1;
         
-        for (let x = 0; x <= CONFIG.GRID_WIDTH; x++) {
-            for (let y = 0; y <= CONFIG.GRID_HEIGHT; y++) {
-                const iso = cartesianToIsometric(x, y, 0);
-                
-                if (x < CONFIG.GRID_WIDTH) {
-                    const nextIso = cartesianToIsometric(x + 1, y, 0);
-                    ctx.beginPath();
-                    ctx.moveTo(iso.x, iso.y);
-                    ctx.lineTo(nextIso.x, nextIso.y);
-                    ctx.stroke();
-                }
-                
-                if (y < CONFIG.GRID_HEIGHT) {
-                    const nextIso = cartesianToIsometric(x, y + 1, 0);
-                    ctx.beginPath();
-                    ctx.moveTo(iso.x, iso.y);
-                    ctx.lineTo(nextIso.x, nextIso.y);
-                    ctx.stroke();
-                }
-            }
+        // Decay combo
+        if (gameState.combo > 0 && Date.now() % 1000 < 20) {
+            gameState.combo = Math.max(0, gameState.combo - 1);
         }
     }
 
     function render() {
-        // Clear with gradient background
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#0a0e27');
-        gradient.addColorStop(1, '#1a1f3a');
+        // Beautiful gradient background
+        const gradient = ctx.createRadialGradient(
+            canvas.width / 2, canvas.height / 2, 0,
+            canvas.width / 2, canvas.height / 2, canvas.width
+        );
+        gradient.addColorStop(0, '#1e293b');
+        gradient.addColorStop(0.5, '#0f172a');
+        gradient.addColorStop(1, '#020617');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         ctx.save();
-        ctx.translate(gameState.camera.x, gameState.camera.y);
+        ctx.translate(
+            gameState.camera.x + gameState.camera.shakeX, 
+            gameState.camera.y + gameState.camera.shakeY
+        );
         ctx.scale(gameState.camera.zoom, gameState.camera.zoom);
         
-        drawGrid();
+        // Draw ground tiles (skip for performance if needed)
+        if (gameState.deviceType === 'desktop') {
+            gameState.groundTiles.forEach(tile => {
+                drawGroundTile(ctx, tile.x, tile.y, tile.type);
+            });
+        }
         
         // Draw obstacles
         gameState.obstacles.forEach(obstacle => {
             obstacle.draw(ctx);
         });
         
-        // Sort entities by Y position for proper depth
+        // Sort entities by depth
         const entities = [
             ...Array.from(gameState.players.values()),
             ...gameState.enemies
@@ -1061,8 +1566,14 @@
             entity.draw(ctx);
         });
         
+        // Draw projectiles
         gameState.projectiles.forEach(projectile => {
             projectile.draw(ctx);
+        });
+        
+        // Draw particles
+        gameState.particles.forEach(particle => {
+            particle.draw(ctx);
         });
         
         // Draw visual effects
@@ -1076,98 +1587,172 @@
     }
 
     function drawUI() {
-        // FPS counter
-        const fpsElement = document.getElementById('fpsCounter');
-        if (fpsElement) {
-            fpsElement.textContent = `FPS: ${Math.round(gameState.fps)}`;
-        }
+        // Modern UI design
+        const padding = 20;
         
-        // Game state UI
+        // Top left - Score and Currency
+        ctx.save();
+        
+        // Background panel
+        const gradient = ctx.createLinearGradient(0, 0, 250, 0);
+        gradient.addColorStop(0, COLORS.uiDark);
+        gradient.addColorStop(1, 'rgba(15, 23, 42, 0.7)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 250, 120);
+        
+        // Score
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 24px "Segoe UI", sans-serif';
+        ctx.fillText('SCORE', padding, 35);
         ctx.fillStyle = 'white';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 3;
+        ctx.font = '32px "Segoe UI", sans-serif';
+        ctx.fillText(gameState.score.toLocaleString(), padding, 70);
         
-        ctx.fillText(`Score: ${gameState.score}`, 10, 30);
-        ctx.fillText(`Currency: ${gameState.currency}`, 10, 50);
+        // Currency
+        ctx.fillStyle = '#34d399';
+        ctx.font = '16px "Segoe UI", sans-serif';
+        ctx.fillText(`💰 ${gameState.currency}`, padding, 100);
         
-        // Wave info
-        if (gameState.wave.state === 'preparing') {
-            ctx.fillStyle = '#22d3ee';
-            ctx.font = 'bold 24px sans-serif';
+        // Combo indicator
+        if (gameState.combo > 1) {
+            ctx.save();
+            ctx.translate(200, 60);
+            ctx.rotate(-0.1);
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = `bold ${20 + gameState.combo * 2}px "Segoe UI", sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(`Wave ${gameState.wave.current + 1} Starting in ${gameState.wave.timer}...`, canvas.width / 2, 100);
-        } else if (gameState.wave.state === 'active') {
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(`Wave ${gameState.wave.current}`, 10, 80);
-            ctx.font = '14px sans-serif';
-            ctx.fillText(`Enemies: ${gameState.enemies.length}/${gameState.wave.enemies.length}`, 10, 100);
+            ctx.shadowColor = '#fbbf24';
+            ctx.shadowBlur = 10;
+            ctx.fillText(`${gameState.combo}x`, 0, 0);
+            ctx.restore();
         }
         
-        // Player health bar (larger, at bottom)
+        ctx.restore();
+        
+        // Wave info - Top center
+        ctx.save();
+        ctx.textAlign = 'center';
+        
+        if (gameState.wave.state === 'preparing') {
+            // Wave countdown
+            const boxWidth = 400;
+            const boxHeight = 80;
+            const boxX = (canvas.width - boxWidth) / 2;
+            const boxY = 20;
+            
+            ctx.fillStyle = COLORS.uiDark;
+            ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            
+            ctx.fillStyle = '#22d3ee';
+            ctx.font = 'bold 28px "Segoe UI", sans-serif';
+            ctx.fillText(`WAVE ${gameState.wave.current + 1} INCOMING`, canvas.width / 2, boxY + 35);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '48px "Segoe UI", sans-serif';
+            ctx.fillText(gameState.wave.timer, canvas.width / 2, boxY + 70);
+        } else if (gameState.wave.state === 'active') {
+            // Wave progress
+            const boxWidth = 300;
+            const boxHeight = 60;
+            const boxX = (canvas.width - boxWidth) / 2;
+            const boxY = 20;
+            
+            ctx.fillStyle = COLORS.uiDark;
+            ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 20px "Segoe UI", sans-serif';
+            ctx.fillText(`WAVE ${gameState.wave.current}`, canvas.width / 2, boxY + 25);
+            
+            // Enemy counter
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '16px "Segoe UI", sans-serif';
+            ctx.fillText(`Enemies: ${gameState.enemies.length} / ${gameState.wave.enemies.length}`, 
+                        canvas.width / 2, boxY + 45);
+        }
+        
+        ctx.restore();
+        
+        // Player health - Bottom center
         if (gameState.localPlayer) {
             const player = gameState.localPlayer;
-            const barWidth = 250;
-            const barHeight = 25;
+            const barWidth = 300;
+            const barHeight = 30;
             const barX = (canvas.width - barWidth) / 2;
-            const barY = canvas.height - 80;
+            const barY = canvas.height - 100;
             
             // Background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+            ctx.fillStyle = COLORS.uiDark;
+            ctx.fillRect(barX - 10, barY - 10, barWidth + 20, barHeight + 30);
             
-            // Health bar
+            // Health bar background
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(barX, barY, barWidth, barHeight);
             
-            const gradient = ctx.createLinearGradient(barX, 0, barX + barWidth, 0);
-            gradient.addColorStop(0, player.health > 30 ? '#10b981' : '#ef4444');
-            gradient.addColorStop(1, player.health > 30 ? '#059669' : '#dc2626');
+            // Health gradient
+            const healthGradient = ctx.createLinearGradient(barX, 0, barX + barWidth, 0);
+            const healthColor = player.health > 30 ? COLORS.healthGreen : COLORS.healthRed;
+            healthGradient.addColorStop(0, shadeColor(healthColor, -20));
+            healthGradient.addColorStop(0.5, healthColor);
+            healthGradient.addColorStop(1, shadeColor(healthColor, -20));
             
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = healthGradient;
             ctx.fillRect(barX, barY, barWidth * (player.health / player.maxHealth), barHeight);
             
             // Shield bar
             if (player.shield > 0) {
-                ctx.fillStyle = '#3b82f6';
-                ctx.fillRect(barX, barY - 5, barWidth * (player.shield / player.maxShield), 3);
+                ctx.fillStyle = COLORS.shieldBlue;
+                ctx.fillRect(barX, barY - 5, barWidth * (player.shield / player.maxShield), 4);
             }
             
             // Health text
             ctx.fillStyle = 'white';
-            ctx.font = 'bold 14px sans-serif';
+            ctx.font = 'bold 16px "Segoe UI", sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(`${Math.ceil(player.health)} / ${player.maxHealth}`, barX + barWidth / 2, barY + 17);
+            ctx.fillText(`${Math.ceil(player.health)} / ${player.maxHealth}`, 
+                        barX + barWidth / 2, barY + 20);
         }
         
-        // Device indicator
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(`Mode: ${gameState.deviceType}`, canvas.width - 10, canvas.height - 10);
+        // FPS counter (top right)
+        const fpsElement = document.getElementById('fpsCounter');
+        if (fpsElement) {
+            fpsElement.textContent = `FPS: ${Math.round(gameState.fps)}`;
+            fpsElement.style.color = gameState.fps > 50 ? '#10b981' : '#ef4444';
+        }
         
         // Game over screen
         if (gameState.gameOver) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            // Dark overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // Game over text
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            
             ctx.fillStyle = '#ef4444';
-            ctx.font = 'bold 48px sans-serif';
+            ctx.font = 'bold 72px "Segoe UI", sans-serif';
             ctx.textAlign = 'center';
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 20;
+            ctx.fillText('GAME OVER', 0, -80);
+            
+            // Stats
+            ctx.fillStyle = 'white';
+            ctx.font = '28px "Segoe UI", sans-serif';
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 5;
-            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 50);
+            ctx.fillText(`Final Score: ${gameState.score.toLocaleString()}`, 0, -20);
+            ctx.fillText(`Waves Survived: ${gameState.wave.current}`, 0, 20);
+            ctx.fillText(`Max Combo: ${gameState.maxCombo}x`, 0, 60);
             
-            ctx.fillStyle = 'white';
-            ctx.font = '24px sans-serif';
-            ctx.fillText(`Final Score: ${gameState.score}`, canvas.width / 2, canvas.height / 2);
-            ctx.fillText(`Waves Completed: ${gameState.wave.current - 1}`, canvas.width / 2, canvas.height / 2 + 30);
+            // Restart hint
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '18px "Segoe UI", sans-serif';
+            ctx.fillText('Press F5 to play again', 0, 120);
             
-            ctx.font = '16px sans-serif';
-            ctx.fillText('Refresh to play again', canvas.width / 2, canvas.height / 2 + 80);
+            ctx.restore();
         }
     }
 
@@ -1175,8 +1760,12 @@
         gameState.deltaTime = Math.min((currentTime - gameState.lastTime) / 1000, 0.1);
         gameState.lastTime = currentTime;
         
-        if (currentTime % 1000 < gameState.deltaTime * 1000) {
-            gameState.fps = Math.round(1 / gameState.deltaTime);
+        // FPS calculation
+        gameState.fpsCounter++;
+        if (currentTime - gameState.fpsTime >= 1000) {
+            gameState.fps = gameState.fpsCounter;
+            gameState.fpsCounter = 0;
+            gameState.fpsTime = currentTime;
         }
         
         update(gameState.deltaTime);
