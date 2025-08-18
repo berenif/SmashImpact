@@ -63,7 +63,11 @@
         // UI
         uiGold: '#f59e0b',
         uiBrown: 'rgba(120, 53, 15, 0.95)',
-        uiGreen: 'rgba(34, 197, 94, 0.95)'
+        uiGreen: 'rgba(34, 197, 94, 0.95)',
+        
+        // Additional colors
+        shieldBlue: '#3b82f6',
+        healthGreen: '#10b981'
     };
 
     // Tile types for Zelda-style map
@@ -239,40 +243,58 @@
         const w = CONFIG.TILE_WIDTH / 2;
         const h = CONFIG.TILE_HEIGHT / 2;
         
-        // Base tile
+        // Add subtle elevation for tiles
+        const elevation = 2;
+        
+        // Draw tile shadow/depth
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.beginPath();
+        ctx.moveTo(0, -h + elevation);
+        ctx.lineTo(w, elevation);
+        ctx.lineTo(0, h + elevation);
+        ctx.lineTo(-w, elevation);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Base tile with better gradients
         let gradient;
         switch(type) {
             case TILE_TYPES.GRASS:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
                 gradient.addColorStop(0, COLORS.grassLight);
-                gradient.addColorStop(0.7, COLORS.grassMid);
+                gradient.addColorStop(0.5, COLORS.grassMid);
                 gradient.addColorStop(1, COLORS.grassDark);
                 break;
             case TILE_TYPES.PATH:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, COLORS.pathSand);
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, '#fde68a');
+                gradient.addColorStop(0.5, COLORS.pathSand);
                 gradient.addColorStop(1, COLORS.pathDirt);
                 break;
             case TILE_TYPES.WATER:
                 gradient = ctx.createLinearGradient(-w, -h, w, h);
-                gradient.addColorStop(0, COLORS.water);
-                gradient.addColorStop(0.5, COLORS.waterDeep);
-                gradient.addColorStop(1, COLORS.water);
+                gradient.addColorStop(0, '#67e8f9');
+                gradient.addColorStop(0.3, COLORS.water);
+                gradient.addColorStop(0.7, COLORS.waterDeep);
+                gradient.addColorStop(1, '#0e7490');
                 break;
             case TILE_TYPES.FLOWER:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, COLORS.grassLight);
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, '#86efac');
+                gradient.addColorStop(0.5, COLORS.grassLight);
                 gradient.addColorStop(1, COLORS.grassMid);
                 break;
             case TILE_TYPES.SAND:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
                 gradient.addColorStop(0, '#fef3c7');
+                gradient.addColorStop(0.5, '#fed7aa');
                 gradient.addColorStop(1, COLORS.pathSand);
                 break;
             default:
                 gradient = COLORS.grassMid;
         }
         
+        // Draw main tile
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(0, -h);
@@ -282,35 +304,91 @@
         ctx.closePath();
         ctx.fill();
         
-        // Tile details
-        if (type === TILE_TYPES.GRASS && Math.random() > 0.8) {
-            // Grass blades
-            ctx.strokeStyle = COLORS.grassDark;
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 3; i++) {
-                const gx = (Math.random() - 0.5) * w;
-                const gy = (Math.random() - 0.5) * h;
-                ctx.beginPath();
-                ctx.moveTo(gx, gy);
-                ctx.lineTo(gx - 2, gy - 5);
-                ctx.stroke();
+        // Add tile edge highlight for depth
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -h);
+        ctx.lineTo(w, 0);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0, -h);
+        ctx.lineTo(-w, 0);
+        ctx.stroke();
+        
+        // Tile details with better visuals
+        if (type === TILE_TYPES.GRASS) {
+            // Random grass texture
+            const seed = x * 100 + y;
+            if ((seed % 5) === 0) {
+                // Grass blades
+                ctx.strokeStyle = COLORS.grassDark;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.6;
+                for (let i = 0; i < 3; i++) {
+                    const gx = (Math.sin(seed + i) * 0.5) * w * 0.6;
+                    const gy = (Math.cos(seed + i) * 0.5) * h * 0.6;
+                    ctx.beginPath();
+                    ctx.moveTo(gx, gy);
+                    ctx.lineTo(gx - 2, gy - 5);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
             }
         } else if (type === TILE_TYPES.FLOWER) {
-            // Small flowers
+            // Small flowers with better placement
+            const seed = x * 100 + y;
             const flowerColors = [COLORS.flowerRed, COLORS.flowerYellow, COLORS.flowerBlue];
-            const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
-            ctx.fillStyle = color;
+            const color = flowerColors[seed % flowerColors.length];
+            
+            // Flower shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.beginPath();
-            ctx.arc(0, 0, 3, 0, Math.PI * 2);
+            ctx.ellipse(0, 2, 4, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Flower petals
+            ctx.fillStyle = color;
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                const px = Math.cos(angle) * 3;
+                const py = Math.sin(angle) * 3;
+                ctx.beginPath();
+                ctx.arc(px, py, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Flower center
+            ctx.fillStyle = COLORS.flowerYellow;
+            ctx.beginPath();
+            ctx.arc(0, 0, 2, 0, Math.PI * 2);
             ctx.fill();
         } else if (type === TILE_TYPES.WATER) {
-            // Water animation
-            const wave = Math.sin(animationTime * 0.002 + x + y) * 0.5 + 0.5;
-            ctx.globalAlpha = wave * 0.3;
-            ctx.fillStyle = '#ffffff';
+            // Better water animation
+            const wave = Math.sin(animationTime * 0.002 + x * 0.5 + y * 0.5) * 0.5 + 0.5;
+            const wave2 = Math.cos(animationTime * 0.003 - x * 0.3 + y * 0.3) * 0.5 + 0.5;
+            
+            // Water ripples
+            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (wave * 0.4) + ')';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(0, 0, w * 0.3, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.arc(0, 0, w * wave * 0.4, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (wave2 * 0.3) + ')';
+            ctx.beginPath();
+            ctx.arc(w * 0.2, h * 0.2, w * wave2 * 0.3, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (type === TILE_TYPES.PATH) {
+            // Path texture
+            const seed = x * 100 + y;
+            if ((seed % 3) === 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.beginPath();
+                ctx.arc((seed % 7 - 3) * 3, (seed % 5 - 2) * 3, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
         
         ctx.restore();
@@ -327,23 +405,60 @@
         const h = height * CONFIG.TILE_HEIGHT / 2;
         const d = depth * CONFIG.VOXEL_HEIGHT;
         
-        // Shadow at ground level
+        // Better shadow at ground level
         if (!options.noShadow) {
             ctx.save();
             const shadowIso = cartesianToIsometric(x + width/2, y + height/2, 0);
-            ctx.translate(shadowIso.x - iso.x, shadowIso.y - iso.y + h);
-            ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.SHADOW_OPACITY})`;
+            ctx.translate(shadowIso.x - iso.x, shadowIso.y - iso.y + d/2);
+            
+            // Multi-layer shadow for better depth
+            const shadowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
+            shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+            shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.2)');
+            shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = shadowGradient;
             ctx.beginPath();
-            ctx.ellipse(0, 0, w * 0.8, h * 0.4, 0, 0, Math.PI * 2);
-            ctx.filter = 'blur(2px)';
+            ctx.ellipse(0, 0, w * 1.2, h * 0.6, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         }
         
-        // Top face - brighter
-        const topGradient = ctx.createLinearGradient(-w, -d, w, -d + h);
-        topGradient.addColorStop(0, shadeColor(color, 25));
-        topGradient.addColorStop(1, shadeColor(color, 10));
+        // Draw voxel faces with better shading
+        
+        // Left face - darker shade with gradient
+        const leftGradient = ctx.createLinearGradient(-w, -d + h/2, -w, h/2);
+        leftGradient.addColorStop(0, shadeColor(color, -15));
+        leftGradient.addColorStop(1, shadeColor(color, -35));
+        
+        ctx.fillStyle = leftGradient;
+        ctx.beginPath();
+        ctx.moveTo(0, -d + h);
+        ctx.lineTo(-w, -d + h/2);
+        ctx.lineTo(-w, h/2);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Right face - medium shade with gradient
+        const rightGradient = ctx.createLinearGradient(w, -d + h/2, w, h/2);
+        rightGradient.addColorStop(0, shadeColor(color, -5));
+        rightGradient.addColorStop(1, shadeColor(color, -20));
+        
+        ctx.fillStyle = rightGradient;
+        ctx.beginPath();
+        ctx.moveTo(0, -d + h);
+        ctx.lineTo(w, -d + h/2);
+        ctx.lineTo(w, h/2);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Top face - brighter with better gradient
+        const topGradient = ctx.createRadialGradient(0, -d + h/2, 0, 0, -d + h/2, w);
+        topGradient.addColorStop(0, shadeColor(color, 30));
+        topGradient.addColorStop(0.5, shadeColor(color, 15));
+        topGradient.addColorStop(1, shadeColor(color, 5));
         
         ctx.fillStyle = topGradient;
         ctx.beginPath();
@@ -354,32 +469,13 @@
         ctx.closePath();
         ctx.fill();
         
-        // Right face - medium shade
-        ctx.fillStyle = shadeColor(color, -10);
-        ctx.beginPath();
-        ctx.moveTo(0, -d + h);
-        ctx.lineTo(w, -d + h/2);
-        ctx.lineTo(w, h/2);
-        ctx.lineTo(0, h);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Left face - darker shade
-        ctx.fillStyle = shadeColor(color, -25);
-        ctx.beginPath();
-        ctx.moveTo(0, -d + h);
-        ctx.lineTo(-w, -d + h/2);
-        ctx.lineTo(-w, h/2);
-        ctx.lineTo(0, h);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Outline for Zelda style
+        // Better outline for Zelda style with anti-aliasing
         if (!options.noOutline) {
-            ctx.strokeStyle = shadeColor(color, -40);
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = shadeColor(color, -50);
+            ctx.lineWidth = 1;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
+            ctx.globalAlpha = 0.8;
             
             // Top edges
             ctx.beginPath();
@@ -1304,57 +1400,157 @@
 
         draw(ctx) {
             const z = 0;
-            const bobZ = this.bobOffset * 0.01;
+            const bobZ = Math.sin(Date.now() * 0.005 + this.x * 10) * 0.02;
             
-            // Ground shadow
+            // Better ground shadow with gradient
             const baseIso = cartesianToIsometric(this.x, this.y, 0);
             ctx.save();
             ctx.translate(baseIso.x, baseIso.y);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            
+            const shadowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+            shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+            shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.2)');
+            shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = shadowGradient;
             ctx.beginPath();
-            ctx.ellipse(0, 0, 18, 9, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, 22, 11, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
             
             const bodyColor = this.hitFlash > 0 ? 
                 shadeColor(this.color, this.hitFlash * 50) : this.color;
             
-            // Different shapes for different enemy types
+            // Different shapes for different enemy types with better details
             if (this.type === 'octorok') {
-                // Octopus-like enemy
-                drawZeldaVoxel(ctx, this.x - 0.3, this.y - 0.3, z + bobZ, 
-                    0.6, 0.6, 0.5, bodyColor, { noShadow: true });
+                // Octopus-like enemy - rounded body
+                const octoIso = cartesianToIsometric(this.x, this.y, z + bobZ + 0.3);
+                ctx.save();
+                ctx.translate(octoIso.x, octoIso.y);
                 
-                // Tentacles
+                // Main body sphere
+                const bodyGradient = ctx.createRadialGradient(0, -5, 0, 0, -5, 20);
+                bodyGradient.addColorStop(0, shadeColor(bodyColor, 30));
+                bodyGradient.addColorStop(0.5, bodyColor);
+                bodyGradient.addColorStop(1, shadeColor(bodyColor, -20));
+                
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, -5, 20, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eye
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.ellipse(-5, -8, 4, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(-4, -8, 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+                
+                // Animated tentacles
                 for (let i = 0; i < 4; i++) {
                     const angle = (Math.PI * 2 / 4) * i + Date.now() * 0.001;
-                    const tx = this.x + Math.cos(angle) * 0.3;
-                    const ty = this.y + Math.sin(angle) * 0.3;
-                    drawZeldaVoxel(ctx, tx - 0.1, ty - 0.1, z, 
-                        0.2, 0.2, 0.1, shadeColor(bodyColor, -20), { noShadow: true });
+                    const tx = this.x + Math.cos(angle) * 0.35;
+                    const ty = this.y + Math.sin(angle) * 0.35;
+                    const tentacleWave = Math.sin(Date.now() * 0.003 + i) * 0.05;
+                    
+                    drawZeldaVoxel(ctx, tx - 0.1, ty - 0.1, z + tentacleWave, 
+                        0.2, 0.2, 0.15, shadeColor(bodyColor, -20), { noShadow: true });
                 }
             } else if (this.type === 'moblin') {
-                // Pig-like enemy
+                // Pig-like enemy with better details
+                // Body
                 drawZeldaVoxel(ctx, this.x - 0.35, this.y - 0.35, z + bobZ, 
-                    0.7, 0.7, 0.8, bodyColor, { noShadow: true });
+                    0.7, 0.7, 0.7, bodyColor, { noShadow: true });
+                
+                // Head
+                drawZeldaVoxel(ctx, this.x - 0.25, this.y - 0.25, z + bobZ + 0.7, 
+                    0.5, 0.5, 0.4, shadeColor(bodyColor, 10), { noShadow: true });
                 
                 // Snout
-                drawZeldaVoxel(ctx, this.x - 0.1, this.y - 0.4, z + bobZ + 0.4, 
-                    0.2, 0.2, 0.1, shadeColor(bodyColor, 20), { noShadow: true });
+                const snoutIso = cartesianToIsometric(this.x, this.y - 0.35, z + bobZ + 0.85);
+                ctx.save();
+                ctx.translate(snoutIso.x, snoutIso.y);
+                ctx.fillStyle = shadeColor(bodyColor, 20);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                
+                // Eyes
+                const eyeIso = cartesianToIsometric(this.x, this.y, z + bobZ + 0.9);
+                ctx.save();
+                ctx.translate(eyeIso.x, eyeIso.y);
+                ctx.fillStyle = '#ff0000';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 5;
+                ctx.beginPath();
+                ctx.arc(-5, -2, 2, 0, Math.PI * 2);
+                ctx.arc(5, -2, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                
             } else if (this.type === 'darknut') {
-                // Armored knight
+                // Armored knight with metallic appearance
+                // Body armor
                 drawZeldaVoxel(ctx, this.x - 0.3, this.y - 0.3, z + bobZ, 
-                    0.6, 0.6, 0.9, bodyColor, { noShadow: true });
+                    0.6, 0.6, 0.8, '#4a5568', { noShadow: true });
                 
-                // Helmet
-                drawZeldaVoxel(ctx, this.x - 0.25, this.y - 0.25, z + bobZ + 0.9, 
-                    0.5, 0.5, 0.3, shadeColor(bodyColor, -30), { noShadow: true });
+                // Shoulder pads
+                drawZeldaVoxel(ctx, this.x - 0.45, this.y - 0.2, z + bobZ + 0.6, 
+                    0.15, 0.4, 0.2, '#374151', { noShadow: true });
+                drawZeldaVoxel(ctx, this.x + 0.3, this.y - 0.2, z + bobZ + 0.6, 
+                    0.15, 0.4, 0.2, '#374151', { noShadow: true });
                 
-                // Shield
-                drawZeldaVoxel(ctx, this.x - 0.4, this.y - 0.1, z + bobZ + 0.3, 
-                    0.1, 0.4, 0.4, '#6b7280', { noShadow: true });
+                // Helmet with visor
+                drawZeldaVoxel(ctx, this.x - 0.25, this.y - 0.25, z + bobZ + 0.8, 
+                    0.5, 0.5, 0.35, '#2d3748', { noShadow: true });
+                
+                // Glowing eyes
+                const knightEyeIso = cartesianToIsometric(this.x, this.y - 0.1, z + bobZ + 0.95);
+                ctx.save();
+                ctx.translate(knightEyeIso.x, knightEyeIso.y);
+                ctx.fillStyle = bodyColor;
+                ctx.shadowColor = bodyColor;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(-4, 0, 2, 0, Math.PI * 2);
+                ctx.arc(4, 0, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                
+                // Shield with emblem
+                const shieldIso = cartesianToIsometric(this.x - 0.35, this.y, z + bobZ + 0.4);
+                ctx.save();
+                ctx.translate(shieldIso.x, shieldIso.y);
+                
+                const shieldGradient = ctx.createLinearGradient(-5, -10, 5, 10);
+                shieldGradient.addColorStop(0, '#6b7280');
+                shieldGradient.addColorStop(0.5, '#9ca3af');
+                shieldGradient.addColorStop(1, '#4b5563');
+                
+                ctx.fillStyle = shieldGradient;
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                ctx.lineTo(8, -5);
+                ctx.lineTo(8, 5);
+                ctx.lineTo(0, 10);
+                ctx.lineTo(-8, 5);
+                ctx.lineTo(-8, -5);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.strokeStyle = '#1f2937';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+                
             } else {
-                // Standard enemy
+                // Standard enemy with better appearance
                 drawZeldaVoxel(ctx, this.x - 0.25, this.y - 0.25, z + bobZ, 
                     0.5, 0.5, 0.6, bodyColor, { noShadow: true });
             }
@@ -1773,14 +1969,36 @@
     }
 
     function render() {
+        // Enable better rendering quality
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Background
+        // Better background gradient with sky effect
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#87ceeb');
-        gradient.addColorStop(1, '#98d8c8');
+        gradient.addColorStop(0, '#87CEEB');  // Sky blue
+        gradient.addColorStop(0.4, '#98D8E8'); // Light blue
+        gradient.addColorStop(0.7, '#B8E6F3'); // Pale blue
+        gradient.addColorStop(1, '#C8F0F8');   // Very pale blue
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add subtle cloud effect
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < 3; i++) {
+            const cloudX = (animationTime * 0.00002 * (i + 1) % 1) * canvas.width;
+            const cloudY = 50 + i * 80;
+            ctx.beginPath();
+            ctx.arc(cloudX, cloudY, 40, 0, Math.PI * 2);
+            ctx.arc(cloudX + 30, cloudY + 5, 35, 0, Math.PI * 2);
+            ctx.arc(cloudX + 60, cloudY, 40, 0, Math.PI * 2);
+            ctx.arc(cloudX + 25, cloudY - 10, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
         
         // Apply camera transform
         ctx.save();
@@ -1886,14 +2104,25 @@
     }
 
     function renderUI() {
-        // Zelda-style HUD
+        // Zelda-style HUD with better styling
         ctx.save();
         
-        // Top bar background
-        ctx.fillStyle = COLORS.uiBrown;
+        // Top bar background with gradient
+        const uiGradient = ctx.createLinearGradient(0, 0, 0, 80);
+        uiGradient.addColorStop(0, 'rgba(26, 31, 58, 0.95)');
+        uiGradient.addColorStop(1, 'rgba(26, 31, 58, 0.8)');
+        ctx.fillStyle = uiGradient;
         ctx.fillRect(0, 0, canvas.width, 80);
         
-        // Hearts
+        // Add subtle border
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 80);
+        ctx.lineTo(canvas.width, 80);
+        ctx.stroke();
+        
+        // Hearts with better rendering
         const heartSize = 30;
         const heartSpacing = 35;
         let x = 20;
@@ -1903,8 +2132,25 @@
             ctx.save();
             ctx.translate(x + i * heartSpacing, y);
             
-            // Heart container
-            ctx.strokeStyle = COLORS.heartRed;
+            // Heart shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(15, 7);
+            ctx.bezierCurveTo(15, 2, 10, 2, 10, 7);
+            ctx.bezierCurveTo(10, 2, 5, 2, 5, 7);
+            ctx.bezierCurveTo(5, 2, 0, 2, 0, 7);
+            ctx.bezierCurveTo(0, 12, 15, 27, 15, 27);
+            ctx.bezierCurveTo(15, 27, 30, 12, 30, 7);
+            ctx.bezierCurveTo(30, 2, 25, 2, 25, 7);
+            ctx.bezierCurveTo(25, 2, 20, 2, 15, 7);
+            ctx.fill();
+            
+            // Heart container with gradient
+            const heartGradient = ctx.createLinearGradient(0, 0, 30, 25);
+            heartGradient.addColorStop(0, '#ff6b6b');
+            heartGradient.addColorStop(1, '#c92a2a');
+            
+            ctx.strokeStyle = heartGradient;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(15, 5);
@@ -1917,40 +2163,77 @@
             ctx.bezierCurveTo(25, 0, 20, 0, 15, 5);
             ctx.stroke();
             
-            // Fill based on health
+            // Fill based on health with better gradient
             if (gameState.localPlayer) {
                 const healthPerHeart = gameState.localPlayer.maxHealth / gameState.maxHearts;
                 const fillAmount = Math.min(1, Math.max(0, 
                     (gameState.localPlayer.health - i * healthPerHeart) / healthPerHeart));
                 
                 if (fillAmount > 0) {
-                    ctx.fillStyle = COLORS.heartRed;
+                    const fillGradient = ctx.createRadialGradient(15, 10, 0, 15, 10, 15);
+                    fillGradient.addColorStop(0, '#ff8787');
+                    fillGradient.addColorStop(0.7, COLORS.heartRed);
+                    fillGradient.addColorStop(1, '#e03131');
+                    
+                    ctx.fillStyle = fillGradient;
                     ctx.globalAlpha = fillAmount;
                     ctx.fill();
+                    
+                    // Add shine effect
+                    if (fillAmount === 1) {
+                        ctx.globalAlpha = 0.4;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.ellipse(8, 6, 3, 2, -Math.PI/4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             }
             
             ctx.restore();
         }
         
-        // Rupees
+        // Rupees with better styling
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
         ctx.fillStyle = COLORS.rupeeGreen;
-        ctx.font = 'bold 24px Arial';
+        ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.fillText(`💎 ${gameState.rupees}`, 20, 60);
         
-        // Score
-        ctx.fillStyle = COLORS.uiGold;
+        // Score with gold gradient
+        const scoreGradient = ctx.createLinearGradient(canvas.width - 150, 20, canvas.width - 50, 40);
+        scoreGradient.addColorStop(0, '#fbbf24');
+        scoreGradient.addColorStop(1, COLORS.uiGold);
+        ctx.fillStyle = scoreGradient;
+        ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.fillText(`Score: ${gameState.score}`, canvas.width - 150, 35);
         
-        // Wave info
+        // Wave info with better visibility
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px Arial';
+        ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        
         if (gameState.wave.state === 'preparing') {
-            ctx.fillText(`Next Wave in: ${Math.ceil(gameState.wave.timer)}`, canvas.width / 2 - 80, 35);
+            // Pulsing effect for wave timer
+            const pulse = Math.sin(Date.now() * 0.003) * 0.2 + 0.8;
+            ctx.globalAlpha = pulse;
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(`Next Wave in: ${Math.ceil(gameState.wave.timer)}`, canvas.width / 2, 35);
+            ctx.globalAlpha = 1;
         } else {
-            ctx.fillText(`Wave ${gameState.wave.current}`, canvas.width / 2 - 40, 35);
-            ctx.fillText(`Enemies: ${gameState.enemies.length}`, canvas.width / 2 - 50, 60);
+            ctx.fillText(`Wave ${gameState.wave.current}`, canvas.width / 2, 35);
+            ctx.fillStyle = gameState.enemies.length > 5 ? '#ef4444' : '#ffffff';
+            ctx.fillText(`Enemies: ${gameState.enemies.length}`, canvas.width / 2, 60);
         }
+        
+        ctx.textAlign = 'left';
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
         
         // Game over screen
         if (gameState.gameOver) {
@@ -2182,8 +2465,9 @@
             return;
         }
         
-        ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
+        ctx = canvas.getContext('2d', { alpha: false });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         
         // Initialize visual effects if available
         if (window.VisualEffects) {
