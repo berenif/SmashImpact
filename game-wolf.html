@@ -388,22 +388,27 @@
         console.log('Wolf Pack Coordinator initialized');
       }
       
-      // Hook into the game update loop
-      const originalUpdate = window.update || function() {};
-      window.update = function(deltaTime) {
-        originalUpdate(deltaTime);
-        updateWolves(deltaTime);
-        updateDebugInfo();
-      };
-      
-      // Hook into the render loop
-      const originalRender = window.render || function() {};
-      window.render = function() {
-        originalRender();
-        if (debugMode) {
-          renderWolfDebug();
-        }
-      };
+      // Hook into the game update loop by overriding the game's internal functions
+      if (window.IsometricGame && window.IsometricGame.gameState) {
+        // Store original functions
+        const originalUpdate = window.IsometricGame.gameState.update;
+        const originalRender = window.IsometricGame.gameState.render;
+        
+        // Override update function
+        window.IsometricGame.gameState.update = function(deltaTime) {
+          if (originalUpdate) originalUpdate.call(this, deltaTime);
+          updateWolves(deltaTime);
+          updateDebugInfo();
+        };
+        
+        // Override render function
+        window.IsometricGame.gameState.render = function() {
+          if (originalRender) originalRender.call(this);
+          if (debugMode) {
+            renderWolfDebug();
+          }
+        };
+      }
       
       // Add keyboard shortcuts
       document.addEventListener('keydown', (e) => {
@@ -454,7 +459,7 @@
           
           // Update score
           gameState.score += wolf.score || 50;
-          gameState.currency += Math.floor((wolf.score || 50) / 2);
+          gameState.rupees += Math.floor((wolf.score || 50) / 2);
           
           continue;
         }
@@ -770,7 +775,9 @@
       document.getElementById('projectileCount').textContent = gameState.projectiles?.length || 0;
       
       // Update FPS
-      document.getElementById('fpsCounter').textContent = `FPS: ${Math.round(gameState.fps || 0)}`;
+      const game = window.IsometricGame;
+      const fps = game ? game.CONFIG.FPS : 60;
+      document.getElementById('fpsCounter').textContent = `FPS: ${fps}`;
     }
     
     function toggleDebugView() {
@@ -821,7 +828,7 @@
       
       // Reset score
       game.gameState.score = 0;
-      game.gameState.currency = 0;
+      game.gameState.rupees = 0;
       
       // Clear debug info
       wolfDebugInfo.clear();
