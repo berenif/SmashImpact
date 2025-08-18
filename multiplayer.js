@@ -9,6 +9,10 @@ class MultiplayerGame {
     this.syncInterval = null;
     this.pingInterval = null;
     this.connectionCheckInterval = null;
+    this.sequenceNumber = 0;
+    this.lastReceivedSeq = {};
+    this.stateBuffer = [];
+    this.maxBufferSize = 3;
     this.gameState = {
       players: {
         host: {
@@ -58,8 +62,9 @@ class MultiplayerGame {
     this.lastPingTime = 0;
     
     // Sync settings
-    this.SYNC_RATE = 30; // 30 Hz - reduced for better performance
+    this.SYNC_RATE = 60; // Base sync rate, will adjust based on connection quality
     this.lastSyncTime = 0;
+    this.adaptiveSyncRate = 60; // Actual sync rate that adapts to network conditions
     
     this.init();
   }
@@ -279,6 +284,7 @@ class MultiplayerGame {
         
       case 'pong':
         this.latency = Date.now() - message.timestamp;
+        this.adjustSyncRate();
         break;
         
       case 'hitConfirmed':
@@ -311,17 +317,40 @@ class MultiplayerGame {
       const now = Date.now();
       
       // Send local player state to remote
-      if (now - this.lastSyncTime > (1000 / this.SYNC_RATE)) {
-        this.syncLocalState();
-        this.lastSyncTime = now;
-      }
+      this.syncLocalState();
+      this.lastSyncTime = now;
       
       // Host sends full state sync periodically to prevent drift
       if (this.role === 'host' && now - this.lastFullSyncTime > FULL_SYNC_INTERVAL) {
         this.sendFullStateSync();
         this.lastFullSyncTime = now;
       }
-    }, 1000 / this.SYNC_RATE);
+    }, 1000 / this.adaptiveSyncRate);
+  }
+  
+  // Adjust sync rate based on network conditions
+  adjustSyncRate() {
+    // Adjust sync rate based on latency
+    if (this.latency < 30) {
+      // Excellent connection - use high sync rate
+      this.adaptiveSyncRate = 60;
+    } else if (this.latency < 60) {
+      // Good connection - slightly reduce sync rate
+      this.adaptiveSyncRate = 45;
+    } else if (this.latency < 100) {
+      // Fair connection - moderate sync rate
+      this.adaptiveSyncRate = 30;
+    } else {
+      // Poor connection - lower sync rate to reduce congestion
+      this.adaptiveSyncRate = 20;
+    }
+    
+    // Restart sync loop with new rate if it changed significantly
+    const rateDiff = Math.abs(this.adaptiveSyncRate - this.SYNC_RATE);
+    if (rateDiff > 10) {
+      this.SYNC_RATE = this.adaptiveSyncRate;
+      this.startSyncLoop(); // Restart with new rate
+    }
   }
   
   // Start ping loop for latency measurement
@@ -347,11 +376,15 @@ class MultiplayerGame {
       this.gameState.players.host : 
       this.gameState.players.player;
     
+    // Increment sequence number for ordering
+    this.sequenceNumber++;
+    
     // Send position and velocity
     this.sendMessage({
       type: 'playerPosition',
       data: {
         role: this.role,
+        seq: this.sequenceNumber,
         x: myPlayer.x,
         y: myPlayer.y,
         vx: myPlayer.vx,
@@ -364,21 +397,31 @@ class MultiplayerGame {
       }
     });
     
-    // Send input state for prediction
-    this.sendMessage({
-      type: 'playerInput',
-      data: {
-        role: this.role,
-        input: this.localInput,
-        timestamp: Date.now()
-      }
-    });
+    // Send input state less frequently for prediction
+    if (this.sequenceNumber % 2 === 0) {  // Send every other frame
+      this.sendMessage({
+        type: 'playerInput',
+        data: {
+          role: this.role,
+          input: this.localInput,
+          timestamp: Date.now()
+        }
+      });
+    }
   }
   
   // Handle position update from remote player
   handlePositionUpdate(data) {
     // Don't update our own player from remote
     if (data.role === this.role) return;
+    
+    // Check sequence number to avoid out-of-order updates
+    if (data.seq && this.lastReceivedSeq[data.role]) {
+      if (data.seq <= this.lastReceivedSeq[data.role]) {
+        return; // Ignore old update
+      }
+    }
+    this.lastReceivedSeq[data.role] = data.seq || 0;
     
     const player = data.role === 'host' ? 
       this.gameState.players.host : 
@@ -398,21 +441,26 @@ class MultiplayerGame {
     
     // Smooth large position jumps with interpolation
     const distance = Math.sqrt(Math.pow(predictedX - prevX, 2) + Math.pow(predictedY - prevY, 2));
-    const maxJump = 50; // Maximum allowed instant jump
+    const maxJump = 100; // Increased threshold for smoother movement
     
     if (distance > maxJump && prevX !== 0 && prevY !== 0) {
-      // Smooth large jumps
-      const smoothFactor = 0.3;
+      // Smooth large jumps with better interpolation
+      const smoothFactor = Math.min(0.5, 30 / distance); // Dynamic smoothing based on distance
       player.x = prevX + (predictedX - prevX) * smoothFactor;
       player.y = prevY + (predictedY - prevY) * smoothFactor;
+      
+      // Also smooth velocity for large jumps
+      player.vx = player.vx * 0.7 + data.vx * 0.3;
+      player.vy = player.vy * 0.7 + data.vy * 0.3;
     } else {
       // Apply position directly for small movements
       player.x = predictedX;
       player.y = predictedY;
+      
+      // Smooth velocity changes
+      player.vx = player.vx * 0.3 + data.vx * 0.7;
+      player.vy = player.vy * 0.3 + data.vy * 0.7;
     }
-    
-    player.vx = data.vx;
-    player.vy = data.vy;
     player.boosting = data.boosting;
     player.attacking = data.attacking || false;
     player.health = data.health !== undefined ? data.health : player.health;
@@ -560,8 +608,13 @@ class MultiplayerGame {
       this.gameState.players.player;
     
     const speed = boost ? 10 : 5;
-    myPlayer.vx = x * speed;
-    myPlayer.vy = y * speed;
+    const targetVx = x * speed;
+    const targetVy = y * speed;
+    
+    // Smooth velocity changes for better feel
+    const smoothing = 0.15; // Higher = more responsive, lower = smoother
+    myPlayer.vx = myPlayer.vx * (1 - smoothing) + targetVx * smoothing;
+    myPlayer.vy = myPlayer.vy * (1 - smoothing) + targetVy * smoothing;
     myPlayer.boosting = boost;
   }
   
@@ -714,6 +767,15 @@ class MultiplayerGame {
     return this.latency;
   }
   
+  // Get connection quality
+  getConnectionQuality() {
+    if (!this.isConnected) return 'disconnected';
+    if (this.latency < 30) return 'excellent';
+    if (this.latency < 60) return 'good';
+    if (this.latency < 100) return 'fair';
+    return 'poor';
+  }
+  
   // Send full state sync (host only)
   sendFullStateSync() {
     if (this.role === 'host') {
@@ -746,26 +808,33 @@ class MultiplayerGame {
       // Update remote player (host) completely
       this.gameState.players.host = data.players.host;
       
-      // For local player, only update non-position properties to avoid jumps
-      // unless the difference is too large (indicating a reset or teleport)
+      // For local player, reconcile state carefully
       const newPlayer = data.players.player;
       const positionDiff = Math.sqrt(
         Math.pow(newPlayer.x - myOldPlayer.x, 2) + 
         Math.pow(newPlayer.y - myOldPlayer.y, 2)
       );
       
-      // If position difference is huge (> 200 pixels), it's likely a reset
-      if (positionDiff > 200) {
+      // Always update critical game state
+      this.gameState.players.player.health = newPlayer.health;
+      this.gameState.players.player.score = newPlayer.score;
+      this.gameState.players.player.radius = newPlayer.radius;
+      this.gameState.players.player.color = newPlayer.color;
+      
+      // If position difference is huge (> 300 pixels), it's likely a reset or teleport
+      if (positionDiff > 300 || !this.gameState.gameActive) {
         // Accept the full state including position
-        this.gameState.players.player = newPlayer;
-      } else {
-        // Keep local position but update other properties
-        this.gameState.players.player.health = newPlayer.health;
-        this.gameState.players.player.score = newPlayer.score;
-        this.gameState.players.player.radius = newPlayer.radius;
-        this.gameState.players.player.color = newPlayer.color;
-        // Don't override local position/velocity for smooth movement
+        this.gameState.players.player.x = newPlayer.x;
+        this.gameState.players.player.y = newPlayer.y;
+        this.gameState.players.player.vx = newPlayer.vx;
+        this.gameState.players.player.vy = newPlayer.vy;
+      } else if (positionDiff > 50) {
+        // Moderate difference - blend positions
+        const blendFactor = 0.2; // Gradual correction
+        this.gameState.players.player.x = myOldPlayer.x * (1 - blendFactor) + newPlayer.x * blendFactor;
+        this.gameState.players.player.y = myOldPlayer.y * (1 - blendFactor) + newPlayer.y * blendFactor;
       }
+      // For small differences, keep local position for smooth movement
     }
   }
   
