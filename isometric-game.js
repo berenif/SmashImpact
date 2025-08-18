@@ -21,25 +21,25 @@
         SHADOW_OPACITY: 0.35 // Stronger shadows for depth
     };
 
-    // Enhanced Zelda-inspired color palette - Updated for cleaner look
+    // Dark Dungeon color palette
     const COLORS = {
-        // Ground and terrain - Brighter and more vibrant
-        grassLight: '#7dd3c0',  // Bright teal-green
-        grassDark: '#10b981',   // Vibrant emerald green
-        grassMid: '#34d399',    // Medium emerald
-        pathSand: '#fde68a',    // Light golden sand
-        pathDirt: '#fbbf24',    // Golden yellow
-        water: '#60a5fa',       // Bright blue
-        waterDeep: '#3b82f6',   // Deeper blue
+        // Dungeon floors and walls
+        stoneLight: '#9ca3af',   // Light stone
+        stoneDark: '#4b5563',    // Dark stone
+        stoneMid: '#6b7280',     // Medium stone
+        dungeonFloor: '#374151', // Dark floor
+        dungeonWall: '#1f2937',  // Very dark wall
+        lava: '#ef4444',         // Bright lava/fire
+        lavaDeep: '#dc2626',     // Deep lava
         
-        // Decorations
-        bushGreen: '#22c55e',
-        bushDark: '#16a34a',
-        flowerRed: '#f87171',
-        flowerYellow: '#fde047',
-        flowerBlue: '#93c5fd',
-        rockGray: '#94a3b8',
-        rockDark: '#64748b',
+        // Dungeon decorations
+        torch: '#fbbf24',        // Torch flame
+        torchGlow: '#fed7aa',    // Torch glow
+        chest: '#92400e',        // Treasure chest
+        chestGold: '#fbbf24',    // Gold trim
+        barrel: '#7c2d12',       // Wooden barrel
+        rockGray: '#6b7280',     // Dungeon rocks
+        rockDark: '#374151',     // Dark rocks
         
         // Structures
         wallStone: '#78716c',
@@ -48,12 +48,12 @@
         woodBrown: '#92400e',
         woodDark: '#78350f',
         
-        // Characters
-        linkGreen: '#22c55e',
-        linkHat: '#16a34a',
-        enemyRed: '#dc2626',
-        enemyBlue: '#2563eb',
-        enemyPurple: '#9333ea',
+        // Characters - Dungeon theme
+        heroArmor: '#6b7280',    // Knight armor
+        heroCloak: '#1e293b',    // Dark cloak
+        skeleton: '#e5e7eb',     // Skeleton white
+        goblin: '#16a34a',       // Goblin green
+        demon: '#dc2626',        // Demon red
         
         // Effects
         heartRed: '#ef4444',
@@ -72,22 +72,24 @@
         healthGreen: '#10b981'
     };
 
-    // Tile types for Zelda-style map
+    // Tile types for Dungeon map
     const TILE_TYPES = {
-        GRASS: 'grass',
-        PATH: 'path',
-        WATER: 'water',
-        FLOWER: 'flower',
-        SAND: 'sand'
+        STONE_FLOOR: 'stone_floor',
+        WALL: 'wall',
+        LAVA: 'lava',
+        CRACKED_FLOOR: 'cracked_floor',
+        DARK_FLOOR: 'dark_floor',
+        PIT: 'pit'
     };
 
-    // Decoration types
+    // Dungeon decoration types
     const DECORATION_TYPES = {
-        BUSH: 'bush',
-        ROCK: 'rock',
-        POT: 'pot',
-        FLOWER: 'flower',
-        TREE: 'tree'
+        TORCH: 'torch',
+        CHEST: 'chest',
+        BARREL: 'barrel',
+        SKULL: 'skull',
+        PILLAR: 'pillar',
+        SPIKES: 'spikes'
     };
 
     // Device detection
@@ -265,23 +267,35 @@
         // Draw thick 3D block sides
         let rightColor, leftColor;
         
-        // Get base colors for sides based on tile type
+        // Get base colors for sides based on dungeon tile type
         switch(type) {
-            case TILE_TYPES.GRASS:
-                rightColor = '#059669';
-                leftColor = '#047857';
+            case TILE_TYPES.STONE_FLOOR:
+                rightColor = '#374151';
+                leftColor = '#1f2937';
                 break;
-            case TILE_TYPES.PATH:
-                rightColor = '#f59e0b';
-                leftColor = '#d97706';
+            case TILE_TYPES.DARK_FLOOR:
+                rightColor = '#111827';
+                leftColor = '#030712';
                 break;
-            case TILE_TYPES.WATER:
-                rightColor = '#2563eb';
-                leftColor = '#1d4ed8';
+            case TILE_TYPES.LAVA:
+                rightColor = '#991b1b';
+                leftColor = '#7f1d1d';
+                break;
+            case TILE_TYPES.CRACKED_FLOOR:
+                rightColor = '#374151';
+                leftColor = '#1f2937';
+                break;
+            case TILE_TYPES.PIT:
+                rightColor = '#000000';
+                leftColor = '#000000';
+                break;
+            case TILE_TYPES.WALL:
+                rightColor = '#111827';
+                leftColor = '#030712';
                 break;
             default:
-                rightColor = '#059669';
-                leftColor = '#047857';
+                rightColor = '#374151';
+                leftColor = '#1f2937';
         }
         
         // Right side (darker) - full height block
@@ -322,63 +336,71 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // Enhanced tile top surface with better gradients and lighting
+        // Dungeon tile gradients with dark atmosphere
         let gradient, baseColor, lightColor, darkColor;
         switch(type) {
-            case TILE_TYPES.GRASS:
-                baseColor = '#34d399';
-                lightColor = '#5eead4';
-                darkColor = '#10b981';
-                // Create more dynamic gradient for grass
+            case TILE_TYPES.STONE_FLOOR:
+                baseColor = COLORS.stoneMid;
+                lightColor = COLORS.stoneLight;
+                darkColor = COLORS.stoneDark;
                 gradient = ctx.createLinearGradient(-w, -h, w, h);
                 gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.3, '#4ade80');
+                gradient.addColorStop(0.3, '#94a3b8');
                 gradient.addColorStop(0.7, baseColor);
                 gradient.addColorStop(1, darkColor);
                 break;
-            case TILE_TYPES.PATH:
-                baseColor = '#fde68a';
-                lightColor = '#fef3c7';
-                darkColor = '#fbbf24';
+            case TILE_TYPES.DARK_FLOOR:
+                baseColor = COLORS.dungeonFloor;
+                lightColor = '#4b5563';
+                darkColor = '#111827';
                 gradient = ctx.createLinearGradient(-w, -h, w, h);
                 gradient.addColorStop(0, lightColor);
                 gradient.addColorStop(0.5, baseColor);
                 gradient.addColorStop(1, darkColor);
                 break;
-            case TILE_TYPES.WATER:
-                baseColor = '#60a5fa';
-                lightColor = '#93c5fd';
-                darkColor = '#3b82f6';
-                // Animated water gradient
-                const waveOffset = Math.sin(animationTime * 0.001 + x * 0.5) * 0.1;
-                gradient = ctx.createLinearGradient(-w, -h, w, h);
+            case TILE_TYPES.LAVA:
+                baseColor = COLORS.lava;
+                lightColor = '#fbbf24';
+                darkColor = COLORS.lavaDeep;
+                // Animated lava glow
+                const glowOffset = Math.sin(animationTime * 0.003 + x * 0.5) * 0.2;
+                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
                 gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.5 + waveOffset, baseColor);
+                gradient.addColorStop(0.5 + glowOffset, baseColor);
                 gradient.addColorStop(1, darkColor);
                 break;
-            case TILE_TYPES.FLOWER:
-                baseColor = '#86efac';
-                lightColor = '#bbf7d0';
-                darkColor = '#34d399';
+            case TILE_TYPES.CRACKED_FLOOR:
+                baseColor = '#6b7280';
+                lightColor = '#9ca3af';
+                darkColor = '#374151';
                 gradient = ctx.createLinearGradient(-w, -h, w, h);
                 gradient.addColorStop(0, lightColor);
                 gradient.addColorStop(0.5, baseColor);
                 gradient.addColorStop(1, darkColor);
                 break;
-            case TILE_TYPES.SAND:
-                baseColor = '#fef3c7';
-                lightColor = '#fef9c3';
-                darkColor = '#fde68a';
+            case TILE_TYPES.PIT:
+                baseColor = '#111827';
+                lightColor = '#1f2937';
+                darkColor = '#000000';
+                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
+                gradient.addColorStop(0, darkColor);
+                gradient.addColorStop(0.7, baseColor);
+                gradient.addColorStop(1, lightColor);
+                break;
+            case TILE_TYPES.WALL:
+                baseColor = COLORS.dungeonWall;
+                lightColor = '#374151';
+                darkColor = '#111827';
                 gradient = ctx.createLinearGradient(-w, -h, w, h);
                 gradient.addColorStop(0, lightColor);
                 gradient.addColorStop(0.5, baseColor);
                 gradient.addColorStop(1, darkColor);
                 break;
             default:
-                gradient = '#34d399';
-                baseColor = '#34d399';
-                lightColor = '#5eead4';
-                darkColor = '#10b981';
+                gradient = COLORS.stoneMid;
+                baseColor = COLORS.stoneMid;
+                lightColor = COLORS.stoneLight;
+                darkColor = COLORS.stoneDark;
         }
         
         // Draw main tile top surface (elevated on the block)
