@@ -7,8 +7,8 @@
         TILE_WIDTH: 64,     // Larger for better 3D blocks
         TILE_HEIGHT: 32,    // Maintain 2:1 ratio
         TILE_DEPTH: 24,     // Significant depth for 3D blocks
-        GRID_WIDTH: 20,     // Smaller for performance with 3D blocks
-        GRID_HEIGHT: 20,    // Smaller for performance with 3D blocks
+        GRID_WIDTH: 200,    // Increased 10x from 20
+        GRID_HEIGHT: 200,   // Increased 10x from 20
         PLAYER_SPEED: 0.15, // Slower for tile-based movement
         MOVE_SPEED: 8,      // Speed of tile-to-tile animation
         FPS: 60,
@@ -18,7 +18,11 @@
         ZOOM_MOBILE: 1.0,   // Adjusted zoom for mobile
         VOXEL_HEIGHT: 20,   // Much higher for 3D blocks
         AMBIENT_LIGHT: 0.7, // Balanced lighting
-        SHADOW_OPACITY: 0.35 // Stronger shadows for depth
+        SHADOW_OPACITY: 0.35, // Stronger shadows for depth
+        // Viewport culling settings
+        VIEWPORT_PADDING: 5, // Extra tiles to render outside viewport
+        CHUNK_SIZE: 20,     // Size of map chunks for optimization
+        MAX_RENDER_DISTANCE: 30 // Maximum tile render distance from camera
     };
 
     // Dark Dungeon color palette
@@ -2681,6 +2685,34 @@
         }
     }
 
+    // Viewport culling helper function
+    function isInViewport(x, y) {
+        // Convert world position to screen position
+        const iso = cartesianToIsometric(x, y, 0);
+        const cameraIso = cartesianToIsometric(gameState.camera.x, gameState.camera.y);
+        const screenX = (iso.x - cameraIso.x) * gameState.camera.zoom + canvas.width / 2;
+        const screenY = (iso.y - cameraIso.y) * gameState.camera.zoom + canvas.height / 2;
+        
+        // Check if tile is within viewport with padding
+        const padding = CONFIG.TILE_WIDTH * CONFIG.VIEWPORT_PADDING * gameState.camera.zoom;
+        return screenX > -padding && screenX < canvas.width + padding &&
+               screenY > -padding && screenY < canvas.height + padding;
+    }
+    
+    // Get visible bounds for efficient culling
+    function getVisibleBounds() {
+        const centerX = gameState.camera.x;
+        const centerY = gameState.camera.y;
+        const range = CONFIG.MAX_RENDER_DISTANCE;
+        
+        return {
+            minX: Math.max(0, Math.floor(centerX - range)),
+            maxX: Math.min(CONFIG.GRID_WIDTH, Math.ceil(centerX + range)),
+            minY: Math.max(0, Math.floor(centerY - range)),
+            maxY: Math.min(CONFIG.GRID_HEIGHT, Math.ceil(centerY + range))
+        };
+    }
+    
     function render() {
         // Enable better rendering quality
         ctx.imageSmoothingEnabled = true;
@@ -2729,32 +2761,43 @@
         // Render order (back to front)
         const renderables = [];
         
-        // Add ground tiles with elevation
+        // Get visible bounds for culling
+        const bounds = getVisibleBounds();
+        
+        // Add ground tiles with elevation (only visible ones)
         if (gameState.groundTiles && Array.isArray(gameState.groundTiles)) {
             for (const tile of gameState.groundTiles) {
                 if (tile && typeof tile.x === 'number' && typeof tile.y === 'number') {
-                    renderables.push({
-                        x: tile.x,
-                        y: tile.y,
-                        z: tile.z || 0,
-                        type: 'tile',
-                        data: tile
-                    });
+                    // Viewport culling - only add tiles within visible bounds
+                    if (tile.x >= bounds.minX && tile.x <= bounds.maxX &&
+                        tile.y >= bounds.minY && tile.y <= bounds.maxY) {
+                        renderables.push({
+                            x: tile.x,
+                            y: tile.y,
+                            z: tile.z || 0,
+                            type: 'tile',
+                            data: tile
+                        });
+                    }
                 }
             }
         }
         
-        // Add decorations
+        // Add decorations (only visible ones)
         if (gameState.decorations && Array.isArray(gameState.decorations)) {
             for (const decoration of gameState.decorations) {
                 if (decoration && typeof decoration.x === 'number' && typeof decoration.y === 'number') {
-                    renderables.push({
-                        x: decoration.x,
-                        y: decoration.y,
-                        z: 0,
-                        type: 'decoration',
-                        data: decoration
-                    });
+                    // Viewport culling for decorations
+                    if (decoration.x >= bounds.minX && decoration.x <= bounds.maxX &&
+                        decoration.y >= bounds.minY && decoration.y <= bounds.maxY) {
+                        renderables.push({
+                            x: decoration.x,
+                            y: decoration.y,
+                            z: 0,
+                            type: 'decoration',
+                            data: decoration
+                        });
+                    }
                 }
             }
         }
