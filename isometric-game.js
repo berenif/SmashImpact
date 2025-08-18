@@ -7,15 +7,15 @@
         TILE_WIDTH: 64,     // Larger for better 3D blocks
         TILE_HEIGHT: 32,    // Maintain 2:1 ratio
         TILE_DEPTH: 24,     // Significant depth for 3D blocks
-        GRID_WIDTH: 20,     // Smaller for performance with 3D blocks
-        GRID_HEIGHT: 20,    // Smaller for performance with 3D blocks
+        GRID_WIDTH: 200,    // Large map - 10x bigger
+        GRID_HEIGHT: 200,   // Large map - 10x bigger
         PLAYER_SPEED: 0.15, // Slower for tile-based movement
         MOVE_SPEED: 8,      // Speed of tile-to-tile animation
         FPS: 60,
         DEBUG: false,
         CAMERA_SMOOTHING: 0.15,
-        ZOOM_DEFAULT: 1.3,  // Adjusted for 3D blocks
-        ZOOM_MOBILE: 1.0,   // Adjusted zoom for mobile
+        ZOOM_DEFAULT: 0.8,  // Lower zoom for larger map
+        ZOOM_MOBILE: 0.6,   // Lower zoom for mobile on larger map
         VOXEL_HEIGHT: 20,   // Much higher for 3D blocks
         AMBIENT_LIGHT: 0.7, // Balanced lighting
         SHADOW_OPACITY: 0.35 // Stronger shadows for depth
@@ -462,6 +462,60 @@
             x: (isoX / (CONFIG.TILE_WIDTH / 2) + isoY / (CONFIG.TILE_HEIGHT / 2)) / 2,
             y: (isoY / (CONFIG.TILE_HEIGHT / 2) - isoX / (CONFIG.TILE_WIDTH / 2)) / 2
         };
+    }
+
+    // Viewport culling function for performance optimization
+    function isInViewport(x, y, camera, zoom, canvasWidth, canvasHeight) {
+        // Convert world position to screen space
+        const iso = cartesianToIsometric(x, y);
+        const cameraIso = cartesianToIsometric(camera.x, camera.y);
+        
+        const screenX = (iso.x - cameraIso.x) * zoom + canvasWidth / 2;
+        const screenY = (iso.y - cameraIso.y) * zoom + canvasHeight / 2;
+        
+        // Add margin for tile size
+        const margin = CONFIG.TILE_WIDTH * zoom;
+        
+        return screenX > -margin && screenX < canvasWidth + margin &&
+               screenY > -margin && screenY < canvasHeight + margin;
+    }
+
+    // Fast tile drawing for distant/small tiles
+    function drawSimpleTile(ctx, x, y, type, elevation = 0) {
+        const baseZ = elevation * CONFIG.TILE_DEPTH;
+        const iso = cartesianToIsometric(x, y, baseZ);
+        
+        const w = CONFIG.TILE_WIDTH / 2;
+        const h = CONFIG.TILE_HEIGHT / 2;
+        
+        // Simple color based on tile type
+        let color;
+        switch(type) {
+            case TILE_TYPES.STONE_FLOOR:
+                color = '#6b7280';
+                break;
+            case TILE_TYPES.DARK_FLOOR:
+                color = '#374151';
+                break;
+            case TILE_TYPES.LAVA:
+                color = '#ef4444';
+                break;
+            case TILE_TYPES.WALL:
+                color = '#1f2937';
+                break;
+            default:
+                color = '#6b7280';
+        }
+        
+        // Simple diamond shape - no save/restore for better performance
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(iso.x, iso.y - h);
+        ctx.lineTo(iso.x + w, iso.y);
+        ctx.lineTo(iso.x, iso.y + h);
+        ctx.lineTo(iso.x - w, iso.y);
+        ctx.closePath();
+        ctx.fill();
     }
 
     // Draw tiles as 3D blocks with significant depth
@@ -2697,23 +2751,23 @@
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Subtle cloud effect for cleaner look
-        ctx.save();
-        ctx.globalAlpha = 0.2;
-        for (let i = 0; i < 3; i++) {
-            const cloudX = (gameState.animationTime * 0.00001 * (i + 1) % 1.2) * canvas.width - 100;
-            const cloudY = 20 + i * 40 + Math.sin(gameState.animationTime * 0.0001 + i) * 5;
-            
-            // Simple cloud shapes
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-            
-            ctx.beginPath();
-            ctx.arc(cloudX, cloudY, 30, 0, Math.PI * 2);
-            ctx.arc(cloudX + 25, cloudY + 3, 25, 0, Math.PI * 2);
-            ctx.arc(cloudX + 50, cloudY, 30, 0, Math.PI * 2);
-            ctx.fill();
+        // Simplified cloud effect for better performance on large maps
+        if (gameState.camera.zoom > 0.5) { // Only render clouds when zoomed in enough
+            ctx.save();
+            ctx.globalAlpha = 0.15;
+            for (let i = 0; i < 2; i++) { // Reduced from 3 to 2 clouds
+                const cloudX = (gameState.animationTime * 0.00001 * (i + 1) % 1.2) * canvas.width - 100;
+                const cloudY = 20 + i * 60;
+                
+                // Simpler cloud shapes
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.beginPath();
+                ctx.arc(cloudX, cloudY, 25, 0, Math.PI * 2);
+                ctx.arc(cloudX + 30, cloudY, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
         }
-        ctx.restore();
         
         // Apply camera transform
         ctx.save();
@@ -2728,33 +2782,41 @@
         
         // Render order (back to front)
         const renderables = [];
+        let tilesRendered = 0;
         
-        // Add ground tiles with elevation
+        // Add ground tiles with elevation (with viewport culling)
         if (gameState.groundTiles && Array.isArray(gameState.groundTiles)) {
             for (const tile of gameState.groundTiles) {
                 if (tile && typeof tile.x === 'number' && typeof tile.y === 'number') {
-                    renderables.push({
-                        x: tile.x,
-                        y: tile.y,
-                        z: tile.z || 0,
-                        type: 'tile',
-                        data: tile
-                    });
+                    // Only render tiles that are visible in viewport
+                    if (isInViewport(tile.x, tile.y, gameState.camera, gameState.camera.zoom, canvas.width, canvas.height)) {
+                        renderables.push({
+                            x: tile.x,
+                            y: tile.y,
+                            z: tile.z || 0,
+                            type: 'tile',
+                            data: tile
+                        });
+                        tilesRendered++;
+                    }
                 }
             }
         }
         
-        // Add decorations
+        // Add decorations (with viewport culling)
         if (gameState.decorations && Array.isArray(gameState.decorations)) {
             for (const decoration of gameState.decorations) {
                 if (decoration && typeof decoration.x === 'number' && typeof decoration.y === 'number') {
-                    renderables.push({
-                        x: decoration.x,
-                        y: decoration.y,
-                        z: 0,
-                        type: 'decoration',
-                        data: decoration
-                    });
+                    // Only render decorations that are visible in viewport
+                    if (isInViewport(decoration.x, decoration.y, gameState.camera, gameState.camera.zoom, canvas.width, canvas.height)) {
+                        renderables.push({
+                            x: decoration.x,
+                            y: decoration.y,
+                            z: 0,
+                            type: 'decoration',
+                            data: decoration
+                        });
+                    }
                 }
             }
         }
@@ -2799,7 +2861,18 @@
         for (const item of renderables) {
             switch(item.type) {
                 case 'tile':
-                    drawZeldaTile(ctx, item.data.x, item.data.y, item.data.type, item.data.z || 0);
+                    // Level of detail: use simple rendering when zoomed out or for distant tiles
+                    // Use faster distance calculation (Manhattan distance)
+                    const playerX = gameState.players?.get?.('player1')?.x || gameState.camera.x;
+                    const playerY = gameState.players?.get?.('player1')?.y || gameState.camera.y;
+                    const distanceFromPlayer = Math.abs(item.data.x - playerX) + Math.abs(item.data.y - playerY);
+                    
+                    // Use simple rendering if zoomed out or tile is far away
+                    if (gameState.camera.zoom < 1.0 || distanceFromPlayer > 20) {
+                        drawSimpleTile(ctx, item.data.x, item.data.y, item.data.type, item.data.z || 0);
+                    } else {
+                        drawZeldaTile(ctx, item.data.x, item.data.y, item.data.type, item.data.z || 0);
+                    }
                     break;
                 case 'decoration':
                     item.data.draw(ctx);
@@ -2837,6 +2910,9 @@
         }
         
         ctx.restore();
+        
+        // Store performance metrics
+        gameState.tilesRendered = tilesRendered;
         
         // UI rendering
         renderUI();
@@ -2990,6 +3066,21 @@
             ctx.fillText(`Waves Survived: ${gameState.wave.current}`, canvas.width / 2, canvas.height / 2 + 50);
             ctx.fillText('Press R to Restart', canvas.width / 2, canvas.height / 2 + 100);
             
+            ctx.textAlign = 'left';
+        }
+        
+        // FPS Counter (top right)
+        if (CONFIG.DEBUG || true) { // Always show FPS for performance monitoring
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(canvas.width - 120, 10, 110, 50);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'right';
+            const fps = Math.round(1 / (gameState.deltaTime || 0.016));
+            const tilesRendered = gameState.tilesRendered || 0;
+            ctx.fillText(`FPS: ${fps}`, canvas.width - 15, 30);
+            ctx.fillText(`Tiles: ${tilesRendered}`, canvas.width - 15, 50);
             ctx.textAlign = 'left';
         }
         
