@@ -1,0 +1,22 @@
+--- isometric-game.js.orig
++++ isometric-game.js
+@@ -27,6 +27,7 @@
+     // Game state
+     let canvas, ctx;
+     let BalanceConfig = null;
++    let visualEffects = null;
+     let gameState = {
+         players: new Map(),
+         enemies: [],
+@@ -974,6 +975,11 @@
+         
+         ctx = canvas.getContext('2d');
+         
++        // Initialize visual effects
++        if (window.VisualEffects) {
++            visualEffects = new window.VisualEffects(canvas, ctx);
++        }
++        
+         // Set canvas size
+         resizeCanvas();
+         window.addEventListener('resize', resizeCanvas);

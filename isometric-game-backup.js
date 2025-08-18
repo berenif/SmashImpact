@@ -142,9 +142,9 @@
             this.health = Math.max(0, this.health - amount);
             
             // Create damage effect
-            if (window.VisualEffects) {
+            if (visualEffects) {
                 const iso = cartesianToIsometric(this.x, this.y);
-                window.VisualEffects.createImpact(iso.x, iso.y, {
+                visualEffects.createImpact(iso.x, iso.y, {
                     color: '#ef4444',
                     particleCount: 15,
                     spread: 180
@@ -275,9 +275,9 @@
                     });
                     
                     // Visual effect
-                    if (window.VisualEffects) {
+                    if (visualEffects) {
                         const iso = cartesianToIsometric(this.x, this.y);
-                        window.VisualEffects.createExplosion(iso.x, iso.y, {
+                        visualEffects.createExplosion(iso.x, iso.y, {
                             color: this.color,
                             particleCount: 50,
                             force: 15,
@@ -616,9 +616,9 @@
             gameState.currency += Math.floor(this.score / 2);
             
             // Visual effect
-            if (window.VisualEffects) {
+            if (visualEffects) {
                 const iso = cartesianToIsometric(this.x, this.y);
-                window.VisualEffects.createExplosion(iso.x, iso.y, {
+                visualEffects.createExplosion(iso.x, iso.y, {
                     color: this.color,
                     particleCount: 30,
                     force: 10
@@ -908,9 +908,9 @@
             gameState.wave.spawned++;
             
             // Spawn effect
-            if (window.VisualEffects) {
+            if (visualEffects) {
                 const iso = cartesianToIsometric(x, y);
-                window.VisualEffects.createSpawnEffect(iso.x, iso.y, {
+                visualEffects.createSpawnEffect(iso.x, iso.y, {
                     color: enemy.color
                 });
             }
@@ -1253,8 +1253,8 @@
         });
         
         // Update visual effects
-        if (window.VisualEffects) {
-            window.VisualEffects.update(deltaTime);
+        if (visualEffects) {
+            visualEffects.update(deltaTime);
         }
     }
 
@@ -1351,8 +1351,8 @@
         });
         
         // Draw effects
-        if (window.VisualEffects) {
-            window.VisualEffects.render(ctx);
+        if (visualEffects) {
+            visualEffects.render(ctx);
         }
         
         ctx.restore();
