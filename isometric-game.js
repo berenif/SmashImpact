@@ -3258,4 +3258,19 @@
     } else {
         init();
     }
+    
+    // Export to global scope for wolf integration
+    window.IsometricGame = { 
+        gameState, 
+        CONFIG, 
+        waveManager: {
+            startWave: startWave,
+            spawnEnemy: spawnEnemy
+        },
+        cartesianToIsometric: cartesianToIsometric
+    };
+    
+    // Also export cartesianToIsometric function globally
+    window.cartesianToIsometric = cartesianToIsometric;
+    
 })();
