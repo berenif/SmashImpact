@@ -313,10 +313,10 @@
 
         createCorridor(startX, startY, endX, endY) {
             // Create L-shaped corridor
-            const midX = startX;
-            const midY = endY;
+            const midX = endX;
+            const midY = startY;
 
-            // Horizontal corridor
+            // Horizontal corridor from start to midpoint
             const minX = Math.min(startX, midX);
             const maxX = Math.max(startX, midX);
             for (let x = minX; x <= maxX; x++) {
@@ -326,7 +326,7 @@
                 }
             }
 
-            // Vertical corridor
+            // Vertical corridor from midpoint to end
             const minY = Math.min(midY, endY);
             const maxY = Math.max(midY, endY);
             for (let y = minY; y <= maxY; y++) {
