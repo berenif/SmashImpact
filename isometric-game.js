@@ -212,7 +212,7 @@
 
     // Helper functions
     function shadeColor(color, percent) {
-        const num = parseInt(color.replace("#",""), 16);
+        if (!color) color = "#808080";         const num = parseInt(color.replace("#",""), 16);
         const amt = Math.round(2.55 * percent);
         const R = (num >> 16) + amt;
         const G = (num >> 8 & 0x00FF) + amt;
@@ -996,11 +996,60 @@
             this.z = 0;
             
             switch(type) {
+                // Dungeon decorations
+                case DECORATION_TYPES.TORCH:
+                    this.width = 0.3;
+                    this.height = 0.3;
+                    this.depth = 1.2;
+                    this.color = COLORS.woodBrown;
+                    this.solid = true;
+                    this.light = true;
+                    break;
+                case DECORATION_TYPES.CHEST:
+                    this.width = 0.8;
+                    this.height = 0.6;
+                    this.depth = 0.6;
+                    this.color = COLORS.chest;
+                    this.solid = true;
+                    this.lootable = true;
+                    break;
+                case DECORATION_TYPES.BARREL:
+                    this.width = 0.5;
+                    this.height = 0.5;
+                    this.depth = 0.7;
+                    this.color = COLORS.barrel;
+                    this.solid = true;
+                    this.breakable = true;
+                    break;
+                case DECORATION_TYPES.SKULL:
+                    this.width = 0.3;
+                    this.height = 0.3;
+                    this.depth = 0.3;
+                    this.color = COLORS.skeleton;
+                    this.solid = false;
+                    break;
+                case DECORATION_TYPES.PILLAR:
+                    this.width = 0.8;
+                    this.height = 0.8;
+                    this.depth = 2.0;
+                    this.color = COLORS.stoneLight;
+                    this.solid = true;
+                    break;
+                case DECORATION_TYPES.SPIKES:
+                    this.width = 0.6;
+                    this.height = 0.6;
+                    this.depth = 0.4;
+                    this.color = COLORS.stoneDark;
+                    this.solid = false;
+                    this.damaging = true;
+                    break;
+                    
+                // Legacy decorations (kept for compatibility)
                 case DECORATION_TYPES.BUSH:
                     this.width = 0.8;
                     this.height = 0.8;
                     this.depth = 0.6;
-                    this.color = COLORS.bushGreen;
+                    this.color = COLORS.bushGreen || COLORS.stoneDark;
                     this.solid = true;
                     break;
                 case DECORATION_TYPES.ROCK:
@@ -1014,7 +1063,7 @@
                     this.width = 0.5;
                     this.height = 0.5;
                     this.depth = 0.6;
-                    this.color = COLORS.woodBrown;
+                    this.color = COLORS.woodBrown || COLORS.barrel;
                     this.solid = true;
                     this.breakable = true;
                     break;
@@ -1022,15 +1071,23 @@
                     this.width = 0.3;
                     this.height = 0.3;
                     this.depth = 0.1;
-                    const flowerColors = [COLORS.flowerRed, COLORS.flowerYellow, COLORS.flowerBlue];
-                    this.color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+                    this.color = COLORS.torch; // Use torch color as fallback for flowers in dungeon
                     this.solid = false;
                     break;
                 case DECORATION_TYPES.TREE:
                     this.width = 1.2;
                     this.height = 1.2;
                     this.depth = 2.5;
-                    this.color = COLORS.bushDark;
+                    this.color = COLORS.bushDark || COLORS.stoneDark;
+                    this.solid = true;
+                    break;
+                    
+                // Default fallback
+                default:
+                    this.width = 0.5;
+                    this.height = 0.5;
+                    this.depth = 0.5;
+                    this.color = COLORS.stoneMid;
                     this.solid = true;
                     break;
             }
