@@ -541,6 +541,8 @@
         this.radius = 60; // Default value
         this.knobRadius = 20; // Default value
         this.maxDistance = 40; // Default value
+        this.deadZone = 0.15; // 15% dead zone for better control
+        this.sensitivity = 1.0; // Sensitivity multiplier
         
         // Store bound event handlers for cleanup
         this.boundHandleStart = this.handleStart.bind(this);
@@ -684,7 +686,21 @@
       }
 
       getVector() {
-        return this.vector;
+        // Apply dead zone
+        const magnitude = Math.sqrt(this.vector.x * this.vector.x + this.vector.y * this.vector.y);
+        if (magnitude < this.deadZone) {
+          return { x: 0, y: 0 };
+        }
+        
+        // Apply sensitivity and remap to remove dead zone gap
+        const adjustedMagnitude = (magnitude - this.deadZone) / (1 - this.deadZone);
+        const normalizedX = this.vector.x / magnitude;
+        const normalizedY = this.vector.y / magnitude;
+        
+        return {
+          x: normalizedX * adjustedMagnitude * this.sensitivity,
+          y: normalizedY * adjustedMagnitude * this.sensitivity
+        };
       }
     }
 
@@ -783,20 +799,25 @@
           y: 0,
           vx: 0,
           vy: 0,
-          radius: 20,
-          color: '#6366f1',
-          speed: 5,
-          boosting: false,
-          lastBoostParticle: 0,
-          trailIndex: -1
+          radius: 15,
+          color: '#22d3ee',
+          health: 100,
+          score: 0,
+          speed: 4, // Base speed
+          boosting: false
         };
         
         this.enemy = {
           x: 0,
           y: 0,
-          radius: 20,
+          vx: 0,
+          vy: 0,
+          radius: 15,
           color: '#ef4444',
-          trailIndex: -1
+          health: 100,
+          score: 0,
+          speed: 4, // Base speed
+          boosting: false
         };
         
         this.score = { you: 0, them: 0 };
@@ -1160,10 +1181,22 @@
           inputY = vector.y;
         } else if (this.keys) {
           // Desktop keyboard input
-          if (this.keys['a'] || this.keys['arrowleft']) inputX -= 1;
-          if (this.keys['d'] || this.keys['arrowright']) inputX += 1;
-          if (this.keys['w'] || this.keys['arrowup']) inputY -= 1;
-          if (this.keys['s'] || this.keys['arrowdown']) inputY += 1;
+          // Add acceleration for smoother control
+          const targetX = ((this.keys['a'] || this.keys['arrowleft']) ? -1 : 0) + 
+                         ((this.keys['d'] || this.keys['arrowright']) ? 1 : 0);
+          const targetY = ((this.keys['w'] || this.keys['arrowup']) ? -1 : 0) + 
+                         ((this.keys['s'] || this.keys['arrowdown']) ? 1 : 0);
+          
+          // Smooth acceleration (0.2 = 20% per frame)
+          const smoothing = 0.2;
+          if (!this.keyboardInput) {
+            this.keyboardInput = { x: 0, y: 0 };
+          }
+          this.keyboardInput.x = this.keyboardInput.x * (1 - smoothing) + targetX * smoothing;
+          this.keyboardInput.y = this.keyboardInput.y * (1 - smoothing) + targetY * smoothing;
+          
+          inputX = this.keyboardInput.x;
+          inputY = this.keyboardInput.y;
           
           // Normalize diagonal movement
           const magnitude = Math.sqrt(inputX * inputX + inputY * inputY);
@@ -1216,9 +1249,14 @@
           }
         } else {
           // Single player movement
-          const speed = this.player.boosting ? this.player.speed * 2 : this.player.speed;
-          this.player.vx = inputX * speed;
-          this.player.vy = inputY * speed;
+          const baseSpeed = 4; // Base speed matching multiplayer
+          const boostMultiplier = 2; // Boost multiplier
+          const speed = this.player.boosting ? baseSpeed * boostMultiplier : baseSpeed;
+          
+          // Apply velocity with smoothing for consistency
+          const smoothing = 0.2;
+          this.player.vx = this.player.vx * (1 - smoothing) + (inputX * speed) * smoothing;
+          this.player.vy = this.player.vy * (1 - smoothing) + (inputY * speed) * smoothing;
           
           this.player.x += this.player.vx;
           this.player.y += this.player.vy;

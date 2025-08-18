@@ -607,12 +607,12 @@ class MultiplayerGame {
       this.gameState.players.host : 
       this.gameState.players.player;
     
-    const speed = boost ? 10 : 5;
+    const speed = boost ? 8 : 4; // Adjusted for better control parity
     const targetVx = x * speed;
     const targetVy = y * speed;
     
     // Smooth velocity changes for better feel
-    const smoothing = 0.15; // Higher = more responsive, lower = smoother
+    const smoothing = 0.2; // Balanced for both desktop and mobile
     myPlayer.vx = myPlayer.vx * (1 - smoothing) + targetVx * smoothing;
     myPlayer.vy = myPlayer.vy * (1 - smoothing) + targetVy * smoothing;
     myPlayer.boosting = boost;
