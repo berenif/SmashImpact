@@ -123,7 +123,8 @@
     const isMobile = () => {
         return ('ontouchstart' in window) || 
                (navigator.maxTouchPoints > 0) || 
-               (window.innerWidth <= 768);
+               (window.innerWidth <= 768) ||
+               (navigator.userAgent.includes('Mobile'));
     };
 
     // Game state
@@ -190,56 +191,81 @@
         }
 
         generate() {
-            // Initialize grid
+            console.log('DungeonGenerator: Starting generation for', this.width, 'x', this.height);
+            
+            // Initialize grid with walls
             for (let y = 0; y < this.height; y++) {
                 this.grid[y] = [];
                 for (let x = 0; x < this.width; x++) {
                     this.grid[y][x] = {
-                        type: TILE_TYPES.STONE_FLOOR,
-                        walkable: true,
+                        type: TILE_TYPES.WALL,
+                        walkable: false,
                         room: null
                     };
                 }
             }
+            
+            console.log('DungeonGenerator: Grid initialized with walls');
 
-            // Create a simple room layout
+            // Create a proper dungeon layout
             const centerX = Math.floor(this.width / 2);
             const centerY = Math.floor(this.height / 2);
             
-            // Main room
-            this.rooms.push({
-                x: centerX - 3,
-                y: centerY - 3,
-                width: 6,
-                height: 6,
+            // Main room (start room)
+            const startRoom = {
+                x: centerX - 2,
+                y: centerY - 2,
+                width: 4,
+                height: 4,
                 type: 'start'
-            });
+            };
+            this.rooms.push(startRoom);
+            this.carveRoom(startRoom);
+            
+            console.log('DungeonGenerator: Start room created at', centerX, centerY);
 
-            // Add some smaller rooms
-            this.rooms.push({
-                x: 2,
-                y: 2,
-                width: 4,
-                height: 4,
-                type: 'normal'
-            });
+            // Create connected rooms in a logical pattern
+            const roomPositions = [
+                // Left room
+                { x: centerX - 8, y: centerY, width: 3, height: 3, type: 'normal' },
+                // Right room
+                { x: centerX + 5, y: centerY, width: 3, height: 3, type: 'normal' },
+                // Top room
+                { x: centerX, y: centerY - 8, width: 3, height: 3, type: 'treasure' },
+                // Bottom room
+                { x: centerX, y: centerY + 5, width: 3, height: 3, type: 'normal' },
+                // Top-left room
+                { x: centerX - 8, y: centerY - 8, width: 3, height: 3, type: 'normal' },
+                // Top-right room
+                { x: centerX + 5, y: centerY - 8, width: 3, height: 3, type: 'normal' },
+                // Bottom-left room
+                { x: centerX - 8, y: centerY + 5, width: 3, height: 3, type: 'normal' },
+                // Bottom-right room
+                { x: centerX + 5, y: centerY + 5, width: 3, height: 3, type: 'boss' }
+            ];
 
-            this.rooms.push({
-                x: this.width - 6,
-                y: this.height - 6,
-                width: 4,
-                height: 4,
-                type: 'normal'
-            });
-
-            // Carve rooms into grid
-            for (const room of this.rooms) {
-                this.carveRoom(room);
+            // Add rooms that fit within bounds
+            for (const pos of roomPositions) {
+                if (pos.x >= 0 && pos.y >= 0 && 
+                    pos.x + pos.width < this.width && 
+                    pos.y + pos.height < this.height) {
+                    this.rooms.push(pos);
+                    this.carveRoom(pos);
+                    console.log('DungeonGenerator: Added room at', pos.x, pos.y, 'type:', pos.type);
+                } else {
+                    console.log('DungeonGenerator: Room at', pos.x, pos.y, 'does not fit bounds');
+                }
             }
+            
+            console.log('DungeonGenerator: Total rooms created:', this.rooms.length);
 
-            // Add some walls and obstacles
-            this.addWalls();
-            this.addPits();
+            // Connect all rooms with corridors
+            this.connectRooms();
+            
+            // Add some decorative elements
+            this.addDecorations();
+            
+            console.log('DungeonGenerator: Generation complete. Grid size:', this.grid.length, 'x', this.grid[0] ? this.grid[0].length : 0);
 
             return {
                 grid: this.grid,
@@ -252,7 +278,15 @@
             for (let y = room.y; y < room.y + room.height; y++) {
                 for (let x = room.x; x < room.x + room.width; x++) {
                     if (x >= 0 && y >= 0 && x < this.width && y < this.height) {
-                        this.grid[y][x].type = TILE_TYPES.STONE_FLOOR;
+                        // Create floor tiles with some variation
+                        if (x === room.x || x === room.x + room.width - 1 || 
+                            y === room.y || y === room.y + room.height - 1) {
+                            // Room edges get a different floor type
+                            this.grid[y][x].type = TILE_TYPES.DARK_FLOOR;
+                        } else {
+                            // Room interior gets stone floor with some cracked variation
+                            this.grid[y][x].type = Math.random() > 0.8 ? TILE_TYPES.CRACKED_FLOOR : TILE_TYPES.STONE_FLOOR;
+                        }
                         this.grid[y][x].walkable = true;
                         this.grid[y][x].room = room;
                     }
@@ -260,29 +294,63 @@
             }
         }
 
-        addWalls() {
-            // Add some random walls
-            for (let i = 0; i < 8; i++) {
-                const x = Math.floor(Math.random() * this.width);
-                const y = Math.floor(Math.random() * this.height);
-                if (y >= 0 && y < this.grid.length && 
-                    x >= 0 && x < this.grid[y].length &&
-                    this.grid[y] && this.grid[y][x]) {
-                    this.grid[y][x].type = TILE_TYPES.WALL;
-                    this.grid[y][x].walkable = false;
+        connectRooms() {
+            // Connect start room to all other rooms
+            const startRoom = this.rooms.find(r => r.type === 'start');
+            if (!startRoom) return;
+
+            for (const room of this.rooms) {
+                if (room !== startRoom) {
+                    this.createCorridor(
+                        Math.floor(startRoom.x + startRoom.width / 2),
+                        Math.floor(startRoom.y + startRoom.height / 2),
+                        Math.floor(room.x + room.width / 2),
+                        Math.floor(room.y + room.height / 2)
+                    );
                 }
             }
         }
 
-        addPits() {
-            // Add some pits
-            for (let i = 0; i < 5; i++) {
-                const x = Math.floor(Math.random() * this.width);
-                const y = Math.floor(Math.random() * this.height);
-                if (y >= 0 && y < this.grid.length && 
-                    x >= 0 && x < this.grid[y].length &&
-                    this.grid[y] && this.grid[y][x] && this.grid[y][x].room === null) {
-                    this.grid[y][x].type = TILE_TYPES.PIT;
+        createCorridor(startX, startY, endX, endY) {
+            // Create L-shaped corridor
+            const midX = startX;
+            const midY = endY;
+
+            // Horizontal corridor
+            const minX = Math.min(startX, midX);
+            const maxX = Math.max(startX, midX);
+            for (let x = minX; x <= maxX; x++) {
+                if (x >= 0 && startY >= 0 && x < this.width && startY < this.height) {
+                    this.grid[startY][x].type = TILE_TYPES.STONE_FLOOR;
+                    this.grid[startY][x].walkable = true;
+                }
+            }
+
+            // Vertical corridor
+            const minY = Math.min(midY, endY);
+            const maxY = Math.max(midY, endY);
+            for (let y = minY; y <= maxY; y++) {
+                if (midX >= 0 && y >= 0 && midX < this.width && y < this.height) {
+                    this.grid[y][midX].type = TILE_TYPES.STONE_FLOOR;
+                    this.grid[y][midX].walkable = true;
+                }
+            }
+        }
+
+        addDecorations() {
+            // Add some lava pits in non-room areas
+            const numPits = 3;
+            for (let i = 0; i < numPits; i++) {
+                let attempts = 0;
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * (this.width - 2)) + 1;
+                    y = Math.floor(Math.random() * (this.height - 2)) + 1;
+                    attempts++;
+                } while (this.grid[y][x].room !== null && attempts < 20);
+
+                if (attempts < 20) {
+                    this.grid[y][x].type = TILE_TYPES.LAVA;
                     this.grid[y][x].walkable = false;
                 }
             }
@@ -1424,11 +1492,16 @@
                 let dx = 0, dy = 0;
                 
                 if (gameState.input.joystick.active) {
-                    if (Math.abs(gameState.input.joystick.x) > 0.5) {
+                    if (Math.abs(gameState.input.joystick.x) > 0.3) {
                         dx = gameState.input.joystick.x > 0 ? 1 : -1;
                     }
-                    if (Math.abs(gameState.input.joystick.y) > 0.5) {
+                    if (Math.abs(gameState.input.joystick.y) > 0.3) {
                         dy = gameState.input.joystick.y > 0 ? 1 : -1;
+                    }
+                    
+                    // Debug joystick input
+                    if (Math.abs(gameState.input.joystick.x) > 0.1 || Math.abs(gameState.input.joystick.y) > 0.1) {
+                        console.log('Joystick input:', gameState.input.joystick.x.toFixed(2), gameState.input.joystick.y.toFixed(2));
                     }
                 } else {
                     if (gameState.input.keys['ArrowLeft'] || gameState.input.keys['a']) dx = -1;
@@ -2402,7 +2475,9 @@
     }
 
     function generateLevel() {
+        console.log('Generating level...');
         const mapData = new DungeonGenerator(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT).generate();
+        console.log('Map data generated:', mapData);
         
         // Add bounds checking to prevent crashes
         if (!mapData || !mapData.grid || !Array.isArray(mapData.grid)) {
@@ -2441,6 +2516,8 @@
                 }
             }
         }
+        
+        console.log('Ground tiles created:', gameState.groundTiles.length);
         
         // Create decorations with bounds checking
         gameState.decorations = [];
@@ -2491,6 +2568,9 @@
                 gameState.decorations.push(new Decoration(x, y, type));
             }
         }
+        
+        console.log('Decorations created:', gameState.decorations.length);
+        console.log('Start position:', mapData.startPosition);
         
         return mapData.startPosition || { x: CONFIG.GRID_WIDTH / 2, y: CONFIG.GRID_HEIGHT / 2 };
     }
@@ -3011,84 +3091,140 @@
     }
 
     function initControls() {
-        // Desktop controls
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mousedown', handleMouseDown);
-        window.addEventListener('mouseup', handleMouseUp);
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
+        // Create joystick for all devices
+        createJoystick();
         
-        // Mobile controls
-        if (isMobile()) {
-            initMobileControls();
+        // Add keyboard joystick simulation for desktop
+        if (!isMobile()) {
+            initKeyboardJoystick();
         }
-        
-        // Prevent context menu
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
     }
 
-    function initMobileControls() {
-        // Create joystick
+    function initKeyboardJoystick() {
+        // Simulate joystick input with keyboard for desktop testing
+        window.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'w':
+                case 'ArrowUp':
+                    gameState.input.joystick.y = -1;
+                    gameState.input.joystick.active = true;
+                    break;
+                case 's':
+                case 'ArrowDown':
+                    gameState.input.joystick.y = 1;
+                    gameState.input.joystick.active = true;
+                    break;
+                case 'a':
+                case 'ArrowLeft':
+                    gameState.input.joystick.x = -1;
+                    gameState.input.joystick.active = true;
+                    break;
+                case 'd':
+                case 'ArrowRight':
+                    gameState.input.joystick.x = 1;
+                    gameState.input.joystick.active = true;
+                    break;
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            switch(e.key) {
+                case 'w':
+                case 's':
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    gameState.input.joystick.y = 0;
+                    break;
+                case 'a':
+                case 'd':
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    gameState.input.joystick.x = 0;
+                    break;
+            }
+            
+            // If no movement keys are pressed, deactivate joystick
+            if (gameState.input.joystick.x === 0 && gameState.input.joystick.y === 0) {
+                gameState.input.joystick.active = false;
+            }
+        });
+    }
+
+    function createJoystick() {
+        // Create joystick container
         const joystickContainer = document.createElement('div');
         joystickContainer.id = 'joystick-container';
         joystickContainer.style.cssText = `
             position: fixed;
-            bottom: 50px;
-            left: 50px;
+            bottom: 80px;
+            left: 80px;
             width: 120px;
             height: 120px;
             z-index: 1000;
+            touch-action: none;
         `;
         document.body.appendChild(joystickContainer);
         
+        // Create joystick base
         const joystickBase = document.createElement('div');
         joystickBase.style.cssText = `
             position: absolute;
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
         `;
         joystickContainer.appendChild(joystickBase);
         
+        // Create joystick knob
         const joystickKnob = document.createElement('div');
         joystickKnob.style.cssText = `
             position: absolute;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.9);
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
             transition: none;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
         `;
         joystickContainer.appendChild(joystickKnob);
         
         // Joystick handling
         let joystickActive = false;
         let joystickStart = { x: 0, y: 0 };
+        let joystickCenter = { x: 0, y: 0 };
         
         joystickContainer.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             joystickActive = true;
             const touch = e.touches[0];
             const rect = joystickContainer.getBoundingClientRect();
-            joystickStart = {
+            joystickCenter = {
                 x: rect.left + rect.width / 2,
                 y: rect.top + rect.height / 2
+            };
+            joystickStart = {
+                x: touch.clientX,
+                y: touch.clientY
             };
         });
         
         window.addEventListener('touchmove', (e) => {
             if (!joystickActive) return;
+            e.preventDefault();
             
             const touch = e.touches[0];
-            const dx = touch.clientX - joystickStart.x;
-            const dy = touch.clientY - joystickStart.y;
+            const dx = touch.clientX - joystickCenter.x;
+            const dy = touch.clientY - joystickCenter.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const maxDistance = 40;
+            const maxDistance = 50;
             
             let x = dx;
             let y = dy;
@@ -3098,15 +3234,18 @@
                 y = (dy / distance) * maxDistance;
             }
             
+            // Update joystick knob position
             joystickKnob.style.left = `${50 + (x / 60) * 50}%`;
             joystickKnob.style.top = `${50 + (y / 60) * 50}%`;
             
+            // Update game input with normalized values
             gameState.input.joystick.x = x / maxDistance;
             gameState.input.joystick.y = y / maxDistance;
             gameState.input.joystick.active = true;
         });
         
-        window.addEventListener('touchend', () => {
+        window.addEventListener('touchend', (e) => {
+            if (!joystickActive) return;
             joystickActive = false;
             joystickKnob.style.left = '50%';
             joystickKnob.style.top = '50%';
@@ -3117,45 +3256,48 @@
         
         // Attack button
         const attackButton = document.createElement('div');
+        attackButton.id = 'attack-button';
         attackButton.style.cssText = `
             position: fixed;
-            bottom: 50px;
-            right: 50px;
+            bottom: 80px;
+            right: 80px;
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: rgba(255, 100, 100, 0.5);
-            border: 2px solid rgba(255, 255, 255, 0.7);
+            background: rgba(239, 68, 68, 0.8);
+            border: 3px solid rgba(239, 68, 68, 0.9);
+            z-index: 1000;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
             color: white;
-            z-index: 1000;
-            user-select: none;
+            font-size: 24px;
+            font-weight: bold;
+            touch-action: none;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
         `;
-        attackButton.innerHTML = '⚔️';
+        attackButton.textContent = '⚔️';
         document.body.appendChild(attackButton);
         
+        // Attack button handling
         attackButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (gameState && gameState.localPlayer && typeof gameState.localPlayer.shoot === 'function' && !gameState.gameOver) {
-                // Shoot in facing direction
-                const dirs = {
-                    'up': { x: 0, y: -1 },
-                    'down': { x: 0, y: 1 },
-                    'left': { x: -1, y: 0 },
-                    'right': { x: 1, y: 0 }
-                };
-                const dir = dirs[gameState.localPlayer.facing];
-                if (dir && typeof gameState.localPlayer.x === 'number' && typeof gameState.localPlayer.y === 'number') {
-                    gameState.localPlayer.shoot(
-                        gameState.localPlayer.x + dir.x * 5,
-                        gameState.localPlayer.y + dir.y * 5
-                    );
-                }
+            e.stopPropagation();
+            // Trigger attack action
+            if (gameState.localPlayer) {
+                gameState.localPlayer.attack();
             }
         });
+        
+        // Add desktop event handlers
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mousedown', handleMouseDown);
+        window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        
+        // Prevent context menu
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
     }
 
     function init() {

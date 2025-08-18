@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Fixes Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        
+        .joystick-test {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border: 2px solid #666;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 20px auto;
+        }
+        
+        .joystick-knob {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+        }
+        
+        .map-preview {
+            display: grid;
+            grid-template-columns: repeat(20, 10px);
+            grid-template-rows: repeat(20, 10px);
+            gap: 1px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+        
+        .tile {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #333;
+        }
+        
+        .tile-wall { background: #4b5563; }
+        .tile-floor { background: #9ca3af; }
+        .tile-dark-floor { background: #6b7280; }
+        .tile-cracked { background: #78716c; }
+        .tile-lava { background: #ef4444; }
+        
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #2563eb;
+        }
+        
+        .debug-info {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Game Fixes Test</h1>
+    
+    <div class="test-section">
+        <h2>Map Generation Test</h2>
+        <button onclick="testMapGeneration()">Generate New Map</button>
+        <div id="mapPreview" class="map-preview"></div>
+        <div id="mapDebug" class="debug-info"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Joystick Test</h2>
+        <div class="joystick-test" id="joystickTest">
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+        <div id="joystickDebug" class="debug-info"></div>
+        <p>Click and drag the joystick to test input</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Input Test</h2>
+        <p>Use WASD or Arrow keys to test keyboard input</p>
+        <div id="inputDebug" class="debug-info"></div>
+    </div>
+
+    <script>
+        // Mock game state for testing
+        const gameState = {
+            input: {
+                joystick: { x: 0, y: 0, active: false },
+                keys: {}
+            }
+        };
+
+        // Mock tile types
+        const TILE_TYPES = {
+            WALL: 'wall',
+            STONE_FLOOR: 'stone_floor',
+            DARK_FLOOR: 'dark_floor',
+            CRACKED_FLOOR: 'cracked_floor',
+            LAVA: 'lava'
+        };
+
+        // Mock DungeonGenerator for testing
+        class DungeonGenerator {
+            constructor(width, height) {
+                this.width = width;
+                this.height = height;
+                this.grid = [];
+                this.rooms = [];
+            }
+
+            generate() {
+                console.log('DungeonGenerator: Starting generation for', this.width, 'x', this.height);
+                
+                // Initialize grid with walls
+                for (let y = 0; y < this.height; y++) {
+                    this.grid[y] = [];
+                    for (let x = 0; x < this.width; x++) {
+                        this.grid[y][x] = {
+                            type: TILE_TYPES.WALL,
+                            walkable: false,
+                            room: null
+                        };
+                    }
+                }
+                
+                console.log('DungeonGenerator: Grid initialized with walls');
+
+                // Create a proper dungeon layout
+                const centerX = Math.floor(this.width / 2);
+                const centerY = Math.floor(this.height / 2);
+                
+                // Main room (start room)
+                const startRoom = {
+                    x: centerX - 2,
+                    y: centerY - 2,
+                    width: 4,
+                    height: 4,
+                    type: 'start'
+                };
+                this.rooms.push(startRoom);
+                this.carveRoom(startRoom);
+                
+                console.log('DungeonGenerator: Start room created at', centerX, centerY);
+
+                // Create connected rooms in a logical pattern
+                const roomPositions = [
+                    // Left room
+                    { x: centerX - 8, y: centerY, width: 3, height: 3, type: 'normal' },
+                    // Right room
+                    { x: centerX + 5, y: centerY, width: 3, height: 3, type: 'normal' },
+                    // Top room
+                    { x: centerX, y: centerY - 8, width: 3, height: 3, type: 'treasure' },
+                    // Bottom room
+                    { x: centerX, y: centerY + 5, width: 3, height: 3, type: 'normal' }
+                ];
+
+                // Add rooms that fit within bounds
+                for (const pos of roomPositions) {
+                    if (pos.x >= 0 && pos.y >= 0 && 
+                        pos.x + pos.width < this.width && 
+                        pos.y + pos.height < this.height) {
+                        this.rooms.push(pos);
+                        this.carveRoom(pos);
+                        console.log('DungeonGenerator: Added room at', pos.x, pos.y, 'type:', pos.type);
+                    } else {
+                        console.log('DungeonGenerator: Room at', pos.x, pos.y, 'does not fit bounds');
+                    }
+                }
+                
+                console.log('DungeonGenerator: Total rooms created:', this.rooms.length);
+
+                // Connect all rooms with corridors
+                this.connectRooms();
+                
+                // Add some decorative elements
+                this.addDecorations();
+                
+                console.log('DungeonGenerator: Generation complete. Grid size:', this.grid.length, 'x', this.grid[0] ? this.grid[0].length : 0);
+
+                return {
+                    grid: this.grid,
+                    rooms: this.rooms,
+                    startPosition: { x: centerX, y: centerY }
+                };
+            }
+
+            carveRoom(room) {
+                for (let y = room.y; y < room.y + room.height; y++) {
+                    for (let x = room.x; x < room.x + room.width; x++) {
+                        if (x >= 0 && y >= 0 && x < this.width && y < this.height) {
+                            // Create floor tiles with some variation
+                            if (x === room.x || x === room.x + room.width - 1 || 
+                                y === room.y || y === room.y + room.height - 1) {
+                                // Room edges get a different floor type
+                                this.grid[y][x].type = TILE_TYPES.DARK_FLOOR;
+                            } else {
+                                // Room interior gets stone floor with some cracked variation
+                                this.grid[y][x].type = Math.random() > 0.8 ? TILE_TYPES.CRACKED_FLOOR : TILE_TYPES.STONE_FLOOR;
+                            }
+                            this.grid[y][x].walkable = true;
+                            this.grid[y][x].room = room;
+                        }
+                    }
+                }
+            }
+
+            connectRooms() {
+                // Connect start room to all other rooms
+                const startRoom = this.rooms.find(r => r.type === 'start');
+                if (!startRoom) return;
+
+                for (const room of this.rooms) {
+                    if (room !== startRoom) {
+                        this.createCorridor(
+                            Math.floor(startRoom.x + startRoom.width / 2),
+                            Math.floor(startRoom.y + startRoom.height / 2),
+                            Math.floor(room.x + room.width / 2),
+                            Math.floor(room.y + room.height / 2)
+                        );
+                    }
+                }
+            }
+
+            createCorridor(startX, startY, endX, endY) {
+                // Create L-shaped corridor
+                const midX = startX;
+                const midY = endY;
+
+                // Horizontal corridor
+                const minX = Math.min(startX, midX);
+                const maxX = Math.max(startX, midX);
+                for (let x = minX; x <= maxX; x++) {
+                    if (x >= 0 && startY >= 0 && x < this.width && startY < this.height) {
+                        this.grid[startY][x].type = TILE_TYPES.STONE_FLOOR;
+                        this.grid[startY][x].walkable = true;
+                    }
+                }
+
+                // Vertical corridor
+                const minY = Math.min(midY, endY);
+                const maxY = Math.max(midY, endY);
+                for (let y = minY; y <= maxY; y++) {
+                    if (midX >= 0 && y >= 0 && midX < this.width && y < this.height) {
+                        this.grid[y][midX].type = TILE_TYPES.STONE_FLOOR;
+                        this.grid[y][midX].walkable = true;
+                    }
+                }
+            }
+
+            addDecorations() {
+                // Add some lava pits in non-room areas
+                const numPits = 3;
+                for (let i = 0; i < numPits; i++) {
+                    let attempts = 0;
+                    let x, y;
+                    do {
+                        x = Math.floor(Math.random() * (this.width - 2)) + 1;
+                        y = Math.floor(Math.random() * (this.height - 2)) + 1;
+                        attempts++;
+                    } while (this.grid[y][x].room !== null && attempts < 20);
+
+                    if (attempts < 20) {
+                        this.grid[y][x].type = TILE_TYPES.LAVA;
+                        this.grid[y][x].walkable = false;
+                    }
+                }
+            }
+        }
+
+        function testMapGeneration() {
+            const mapData = new DungeonGenerator(20, 20).generate();
+            displayMap(mapData);
+            displayDebugInfo(mapData);
+        }
+
+        function displayMap(mapData) {
+            const container = document.getElementById('mapPreview');
+            container.innerHTML = '';
+            
+            for (let y = 0; y < mapData.grid.length; y++) {
+                for (let x = 0; x < mapData.grid[y].length; x++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    
+                    const tileType = mapData.grid[y][x].type;
+                    if (tileType === TILE_TYPES.WALL) tile.classList.add('tile-wall');
+                    else if (tileType === TILE_TYPES.STONE_FLOOR) tile.classList.add('tile-floor');
+                    else if (tileType === TILE_TYPES.DARK_FLOOR) tile.classList.add('tile-dark-floor');
+                    else if (tileType === TILE_TYPES.CRACKED_FLOOR) tile.classList.add('tile-cracked');
+                    else if (tileType === TILE_TYPES.LAVA) tile.classList.add('tile-lava');
+                    
+                    container.appendChild(tile);
+                }
+            }
+        }
+
+        function displayDebugInfo(mapData) {
+            const debug = document.getElementById('mapDebug');
+            debug.innerHTML = `
+                Grid Size: ${mapData.grid.length} x ${mapData.grid[0] ? mapData.grid[0].length : 0}
+                Rooms: ${mapData.rooms.length}
+                Start Position: (${mapData.startPosition.x}, ${mapData.startPosition.y})
+                
+                Room Details:
+                ${mapData.rooms.map(room => 
+                    `- ${room.type} room at (${room.x}, ${room.y}) size: ${room.width}x${room.height}`
+                ).join('\n')}
+            `;
+        }
+
+        // Joystick test
+        function initJoystickTest() {
+            const joystick = document.getElementById('joystickTest');
+            const knob = document.getElementById('joystickKnob');
+            const debug = document.getElementById('joystickDebug');
+            
+            let isActive = false;
+            let startPos = { x: 0, y: 0 };
+            let centerPos = { x: 0, y: 0 };
+            
+            joystick.addEventListener('mousedown', (e) => {
+                isActive = true;
+                const rect = joystick.getBoundingClientRect();
+                centerPos = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
+                startPos = { x: e.clientX, y: e.clientY };
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isActive) return;
+                
+                const dx = e.clientX - centerPos.x;
+                const dy = e.clientY - centerPos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const maxDistance = 70;
+                
+                let x = dx;
+                let y = dy;
+                
+                if (distance > maxDistance) {
+                    x = (dx / distance) * maxDistance;
+                    y = (dy / distance) * maxDistance;
+                }
+                
+                knob.style.left = `${50 + (x / 100) * 50}%`;
+                knob.style.top = `${50 + (y / 100) * 50}%`;
+                
+                // Update game state
+                gameState.input.joystick.x = x / maxDistance;
+                gameState.input.joystick.y = y / maxDistance;
+                gameState.input.joystick.active = true;
+                
+                debug.innerHTML = `
+                    Joystick Active: ${gameState.input.joystick.active}
+                    X: ${gameState.input.joystick.x.toFixed(2)}
+                    Y: ${gameState.input.joystick.y.toFixed(2)}
+                    Raw: (${x.toFixed(1)}, ${y.toFixed(1)})
+                `;
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isActive = false;
+                knob.style.left = '50%';
+                knob.style.top = '50%';
+                gameState.input.joystick.x = 0;
+                gameState.input.joystick.y = 0;
+                gameState.input.joystick.active = false;
+                
+                debug.innerHTML = `
+                    Joystick Active: ${gameState.input.joystick.active}
+                    X: ${gameState.input.joystick.x.toFixed(2)}
+                    Y: ${gameState.input.joystick.y.toFixed(2)}
+                `;
+            });
+        }
+
+        // Input test
+        function initInputTest() {
+            const debug = document.getElementById('inputDebug');
+            
+            document.addEventListener('keydown', (e) => {
+                gameState.input.keys[e.key] = true;
+                updateInputDebug();
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                gameState.input.keys[e.key] = false;
+                updateInputDebug();
+            });
+            
+            function updateInputDebug() {
+                const activeKeys = Object.keys(gameState.input.keys).filter(key => gameState.input.keys[key]);
+                debug.innerHTML = `
+                    Active Keys: ${activeKeys.join(', ') || 'None'}
+                    Joystick: (${gameState.input.joystick.x.toFixed(2)}, ${gameState.input.joystick.y.toFixed(2)})
+                    Joystick Active: ${gameState.input.joystick.active}
+                `;
+            }
+        }
+
+        // Initialize tests
+        window.addEventListener('load', () => {
+            testMapGeneration();
+            initJoystickTest();
+            initInputTest();
+        });
+    </script>
+</body>
+</html>
