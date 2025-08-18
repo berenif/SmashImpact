@@ -1,5 +1,12 @@
 // Visual Effects System for Smash Impact
-class VisualEffects {
+(function() {
+  // Prevent redeclaration if already defined
+  if (typeof window.VisualEffects !== 'undefined') {
+    console.warn('VisualEffects already defined, skipping redeclaration');
+    return;
+  }
+  
+  class VisualEffects {
   constructor(canvas, ctx) {
     this.canvas = canvas;
     this.ctx = ctx;
@@ -522,9 +529,10 @@ class VisualEffects {
   }
 }
 
-// Export for use in game
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = VisualEffects;
-} else {
-  window.VisualEffects = VisualEffects;
-}
+  // Export for use in game
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = VisualEffects;
+  } else {
+    window.VisualEffects = VisualEffects;
+  }
+})();
