@@ -121,6 +121,11 @@
 
     // Device detection
     const isMobile = () => {
+        // Check if we're in a browser environment
+        if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+            return false; // Default to desktop mode in non-browser environments
+        }
+        
         return ('ontouchstart' in window) || 
                (navigator.maxTouchPoints > 0) || 
                (window.innerWidth <= 768) ||
@@ -2827,7 +2832,7 @@
         }
         
         // Render visual effects
-        if (visualEffects) {
+        if (visualEffects && visualEffects.update) {
             visualEffects.render(ctx);
         }
         
