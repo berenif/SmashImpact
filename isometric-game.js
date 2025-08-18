@@ -2689,8 +2689,9 @@
     function isInViewport(x, y) {
         // Convert world position to screen position
         const iso = cartesianToIsometric(x, y, 0);
-        const screenX = (iso.x - gameState.camera.x) * gameState.camera.zoom + canvas.width / 2;
-        const screenY = (iso.y - gameState.camera.y) * gameState.camera.zoom + canvas.height / 2;
+        const cameraIso = cartesianToIsometric(gameState.camera.x, gameState.camera.y);
+        const screenX = (iso.x - cameraIso.x) * gameState.camera.zoom + canvas.width / 2;
+        const screenY = (iso.y - cameraIso.y) * gameState.camera.zoom + canvas.height / 2;
         
         // Check if tile is within viewport with padding
         const padding = CONFIG.TILE_WIDTH * CONFIG.VIEWPORT_PADDING * gameState.camera.zoom;
