@@ -178,14 +178,16 @@
         const h = height * CONFIG.TILE_HEIGHT / 2;
         const d = depth * CONFIG.VOXEL_HEIGHT;
         
-        // Shadow
+        // Ground shadow - positioned at ground level
         if (!options.noShadow) {
             ctx.save();
-            ctx.translate(0, d + 5);
-            ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.SHADOW_OPACITY})`;
+            // Shadow at base of object, not floating
+            const shadowIso = cartesianToIsometric(x + width/2, y + height/2, 0);
+            ctx.translate(shadowIso.x - iso.x, shadowIso.y - iso.y + h);
+            ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.SHADOW_OPACITY * 0.6})`;
             ctx.beginPath();
-            ctx.ellipse(0, 0, w * 0.8, h * 0.4, 0, 0, Math.PI * 2);
-            ctx.filter = 'blur(4px)';
+            ctx.ellipse(0, 0, w * 0.9, h * 0.5, 0, 0, Math.PI * 2);
+            ctx.filter = 'blur(3px)';
             ctx.fill();
             ctx.restore();
         }
@@ -452,11 +454,22 @@
 
         draw(ctx) {
             // Draw player as enhanced voxel character
-            const z = this.bobOffset * 0.01;
+            const z = 0; // Keep at ground level, only bob the character parts
+            const bobZ = this.bobOffset * 0.01;
+            
+            // Ground contact shadow
+            const baseIso = cartesianToIsometric(this.x, this.y, 0);
+            ctx.save();
+            ctx.translate(baseIso.x, baseIso.y);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
             
             // Glow effect when shielded
             if (this.shield > 0) {
-                const iso = cartesianToIsometric(this.x, this.y, z + 0.4);
+                const iso = cartesianToIsometric(this.x, this.y, bobZ + 0.4);
                 ctx.save();
                 ctx.translate(iso.x, iso.y);
                 ctx.globalAlpha = this.shield / this.maxShield * 0.3;
@@ -473,7 +486,7 @@
             const bodyColor = this.hitFlash > 0 ? 
                 shadeColor(this.color, this.hitFlash * 50) : this.color;
             
-            drawVoxelCube(ctx, this.x - 0.3, this.y - 0.3, z, 0.6, 0.6, 0.8, bodyColor);
+            drawVoxelCube(ctx, this.x - 0.3, this.y - 0.3, z + bobZ, 0.6, 0.6, 0.8, bodyColor, { noShadow: true });
             
             // Head
             drawVoxelCube(ctx, this.x - 0.2, this.y - 0.2, z + 0.8, 0.4, 0.4, 0.3, 
@@ -773,7 +786,18 @@
         }
 
         draw(ctx) {
-            const z = this.bobOffset * 0.01;
+            const z = 0; // Keep enemies grounded
+            const bobZ = this.bobOffset * 0.01;
+            
+            // Ground contact shadow
+            const baseIso = cartesianToIsometric(this.x, this.y, 0);
+            ctx.save();
+            ctx.translate(baseIso.x, baseIso.y);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 20, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
             
             // Enemy specific shapes
             const size = this.type === 'bulwark' ? 0.5 : 0.4;
@@ -785,15 +809,15 @@
             // Different shapes for different enemy types
             if (this.type === 'bulwark') {
                 // Tank - wider and taller
-                drawVoxelCube(ctx, this.x - size/2, this.y - size/2, z, size, size, height, bodyColor);
+                drawVoxelCube(ctx, this.x - size/2, this.y - size/2, z + bobZ, size, size, height, bodyColor, { noShadow: true });
                 // Armor plates
-                drawVoxelCube(ctx, this.x - size/2 - 0.1, this.y - size/2, z + 0.2, 0.1, size, 0.3, 
+                drawVoxelCube(ctx, this.x - size/2 - 0.1, this.y - size/2, z + bobZ + 0.2, 0.1, size, 0.3, 
                              shadeColor(bodyColor, -20), { noShadow: true });
-                drawVoxelCube(ctx, this.x + size/2, this.y - size/2, z + 0.2, 0.1, size, 0.3, 
+                drawVoxelCube(ctx, this.x + size/2, this.y - size/2, z + bobZ + 0.2, 0.1, size, 0.3, 
                              shadeColor(bodyColor, -20), { noShadow: true });
             } else if (this.type === 'archer') {
                 // Archer - slimmer
-                drawVoxelCube(ctx, this.x - 0.15, this.y - 0.15, z, 0.3, 0.3, 0.6, bodyColor);
+                drawVoxelCube(ctx, this.x - 0.15, this.y - 0.15, z + bobZ, 0.3, 0.3, 0.6, bodyColor, { noShadow: true });
                 // Bow
                 const iso = cartesianToIsometric(this.x + 0.3, this.y, z + 0.3);
                 ctx.save();
@@ -806,7 +830,7 @@
                 ctx.restore();
             } else {
                 // Standard enemy
-                drawVoxelCube(ctx, this.x - size/2, this.y - size/2, z, size, size, height, bodyColor);
+                drawVoxelCube(ctx, this.x - size/2, this.y - size/2, z + bobZ, size, size, height, bodyColor, { noShadow: true });
             }
             
             const iso = cartesianToIsometric(this.x, this.y, z + height);
@@ -977,8 +1001,11 @@
             this.y = y;
             this.width = width;
             this.height = height;
-            this.z = 0;
-            this.depth = 0.6 + Math.random() * 0.6;
+            this.z = 0; // Firmly on ground
+            // Taller walls for maze
+            this.depth = width > 1.5 || height > 1.5 ? 
+                1.5 + Math.random() * 0.5 : // Large obstacles are taller
+                1.0 + Math.random() * 0.3;   // Small obstacles are shorter
             this.type = Math.random() > 0.5 ? 'stone' : 'wood';
             this.color = this.type === 'stone' ? 
                 COLORS.stone[Math.floor(Math.random() * COLORS.stone.length)] :
@@ -986,21 +1013,54 @@
         }
 
         draw(ctx) {
+            // Draw base connection to ground
+            const baseIso = cartesianToIsometric(this.x, this.y, 0);
+            ctx.save();
+            ctx.translate(baseIso.x, baseIso.y);
+            
+            // Ground connection shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(
+                this.width * CONFIG.TILE_WIDTH / 4, 
+                this.height * CONFIG.TILE_HEIGHT / 4, 
+                this.width * CONFIG.TILE_WIDTH / 2.5, 
+                this.height * CONFIG.TILE_HEIGHT / 2.5, 
+                0, 0, Math.PI * 2
+            );
+            ctx.fill();
+            ctx.restore();
+            
+            // Draw the voxel cube
             drawVoxelCube(ctx, this.x, this.y, this.z, this.width, this.height, this.depth, this.color);
             
             // Add details based on type
-            if (this.type === 'stone') {
-                // Cracks
+            if (this.type === 'stone' && this.width > 1) {
+                // Cracks for larger stones
+                const iso = cartesianToIsometric(this.x + this.width/2, this.y + this.height/2, this.depth/2);
+                ctx.save();
+                ctx.translate(iso.x, iso.y);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-15, -8);
+                ctx.lineTo(0, 0);
+                ctx.lineTo(8, 12);
+                ctx.stroke();
+                ctx.restore();
+            } else if (this.type === 'wood' && this.width > 1) {
+                // Wood grain
                 const iso = cartesianToIsometric(this.x + this.width/2, this.y + this.height/2, this.depth/2);
                 ctx.save();
                 ctx.translate(iso.x, iso.y);
                 ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
                 ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(-10, -5);
-                ctx.lineTo(0, 0);
-                ctx.lineTo(5, 8);
-                ctx.stroke();
+                for (let i = -10; i <= 10; i += 5) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, -15);
+                    ctx.lineTo(i + 2, 15);
+                    ctx.stroke();
+                }
                 ctx.restore();
             }
         }
@@ -1249,18 +1309,123 @@
             }
         }
         
-        // Generate obstacles
+        // Generate maze-like map with larger obstacles
         gameState.obstacles = [];
-        for (let i = 0; i < 15; i++) {
-            const isSquare = Math.random() > 0.5;
-            const width = isSquare ? 1 : 1 + Math.random() * 0.5;
-            const height = isSquare ? 1 : 1 + Math.random() * 0.5;
+        
+        // Create border walls
+        // Top wall
+        for (let x = 0; x < CONFIG.GRID_WIDTH; x += 2) {
+            gameState.obstacles.push(new Obstacle(x, 0, 2, 1));
+        }
+        // Bottom wall
+        for (let x = 0; x < CONFIG.GRID_WIDTH; x += 2) {
+            gameState.obstacles.push(new Obstacle(x, CONFIG.GRID_HEIGHT - 1, 2, 1));
+        }
+        // Left wall
+        for (let y = 1; y < CONFIG.GRID_HEIGHT - 1; y += 2) {
+            gameState.obstacles.push(new Obstacle(0, y, 1, 2));
+        }
+        // Right wall
+        for (let y = 1; y < CONFIG.GRID_HEIGHT - 1; y += 2) {
+            gameState.obstacles.push(new Obstacle(CONFIG.GRID_WIDTH - 1, y, 1, 2));
+        }
+        
+        // Create maze-like interior walls
+        const mazeGrid = [];
+        const cellSize = 4;
+        const mazeCols = Math.floor((CONFIG.GRID_WIDTH - 2) / cellSize);
+        const mazeRows = Math.floor((CONFIG.GRID_HEIGHT - 2) / cellSize);
+        
+        // Initialize maze grid
+        for (let row = 0; row < mazeRows; row++) {
+            mazeGrid[row] = [];
+            for (let col = 0; col < mazeCols; col++) {
+                mazeGrid[row][col] = {
+                    visited: false,
+                    walls: { top: true, right: true, bottom: true, left: true }
+                };
+            }
+        }
+        
+        // Generate maze using recursive backtracking
+        function carveMaze(row, col) {
+            mazeGrid[row][col].visited = true;
             
+            // Get unvisited neighbors in random order
+            const neighbors = [];
+            if (row > 0 && !mazeGrid[row - 1][col].visited) neighbors.push({ r: row - 1, c: col, dir: 'top' });
+            if (col < mazeCols - 1 && !mazeGrid[row][col + 1].visited) neighbors.push({ r: row, c: col + 1, dir: 'right' });
+            if (row < mazeRows - 1 && !mazeGrid[row + 1][col].visited) neighbors.push({ r: row + 1, c: col, dir: 'bottom' });
+            if (col > 0 && !mazeGrid[row][col - 1].visited) neighbors.push({ r: row, c: col - 1, dir: 'left' });
+            
+            // Shuffle neighbors
+            for (let i = neighbors.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
+            }
+            
+            // Visit each neighbor
+            for (const neighbor of neighbors) {
+                if (!mazeGrid[neighbor.r][neighbor.c].visited) {
+                    // Remove walls between current and neighbor
+                    if (neighbor.dir === 'top') {
+                        mazeGrid[row][col].walls.top = false;
+                        mazeGrid[neighbor.r][neighbor.c].walls.bottom = false;
+                    } else if (neighbor.dir === 'right') {
+                        mazeGrid[row][col].walls.right = false;
+                        mazeGrid[neighbor.r][neighbor.c].walls.left = false;
+                    } else if (neighbor.dir === 'bottom') {
+                        mazeGrid[row][col].walls.bottom = false;
+                        mazeGrid[neighbor.r][neighbor.c].walls.top = false;
+                    } else if (neighbor.dir === 'left') {
+                        mazeGrid[row][col].walls.left = false;
+                        mazeGrid[neighbor.r][neighbor.c].walls.right = false;
+                    }
+                    
+                    carveMaze(neighbor.r, neighbor.c);
+                }
+            }
+        }
+        
+        // Start maze generation from center
+        carveMaze(Math.floor(mazeRows / 2), Math.floor(mazeCols / 2));
+        
+        // Convert maze to obstacles
+        for (let row = 0; row < mazeRows; row++) {
+            for (let col = 0; col < mazeCols; col++) {
+                const x = 1 + col * cellSize;
+                const y = 1 + row * cellSize;
+                const cell = mazeGrid[row][col];
+                
+                // Create walls based on maze
+                if (cell.walls.top && Math.random() > 0.2) {
+                    gameState.obstacles.push(new Obstacle(x, y, cellSize, 0.8));
+                }
+                if (cell.walls.left && Math.random() > 0.2) {
+                    gameState.obstacles.push(new Obstacle(x, y, 0.8, cellSize));
+                }
+                
+                // Add some random obstacles for variety
+                if (Math.random() > 0.85) {
+                    const size = 1.5 + Math.random() * 1.5;
+                    gameState.obstacles.push(new Obstacle(
+                        x + Math.random() * (cellSize - size),
+                        y + Math.random() * (cellSize - size),
+                        size,
+                        size
+                    ));
+                }
+            }
+        }
+        
+        // Add some large central obstacles
+        for (let i = 0; i < 3; i++) {
+            const size = 2 + Math.random() * 2;
             gameState.obstacles.push(new Obstacle(
-                3 + Math.random() * (CONFIG.GRID_WIDTH - 6 - width),
-                3 + Math.random() * (CONFIG.GRID_HEIGHT - 6 - height),
-                width,
-                height
+                CONFIG.GRID_WIDTH / 2 - size / 2 + (Math.random() - 0.5) * 8,
+                CONFIG.GRID_HEIGHT / 2 - size / 2 + (Math.random() - 0.5) * 8,
+                size,
+                size
             ));
         }
     }
