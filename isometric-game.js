@@ -4,19 +4,19 @@
 
     // Game configuration
     const CONFIG = {
-        TILE_WIDTH: 48,     // Smaller tiles for cleaner look
-        TILE_HEIGHT: 24,    // Maintain 2:1 ratio
+        TILE_WIDTH: 56,     // Slightly larger for better 3D effect
+        TILE_HEIGHT: 28,    // Maintain 2:1 ratio
         GRID_WIDTH: 30,     // Increased map size
         GRID_HEIGHT: 30,    // Increased map size
         PLAYER_SPEED: 4,
         FPS: 60,
         DEBUG: false,
         CAMERA_SMOOTHING: 0.15,
-        ZOOM_DEFAULT: 1.5,  // Better zoom for cleaner visuals
-        ZOOM_MOBILE: 1.2,   // Adjusted zoom for mobile
-        VOXEL_HEIGHT: 12,   // Lower voxel height for cleaner look
-        AMBIENT_LIGHT: 0.85, // Much brighter ambient light
-        SHADOW_OPACITY: 0.1  // Very soft shadows
+        ZOOM_DEFAULT: 1.4,  // Adjusted for better 3D visibility
+        ZOOM_MOBILE: 1.1,   // Adjusted zoom for mobile
+        VOXEL_HEIGHT: 16,   // Higher for more pronounced 3D effect
+        AMBIENT_LIGHT: 0.75, // Balanced lighting for shadows
+        SHADOW_OPACITY: 0.25 // More visible shadows for depth
     };
 
     // Enhanced Zelda-inspired color palette - Updated for cleaner look
@@ -233,67 +233,120 @@
         };
     }
 
-    // Zelda-style tile drawing - Improved for cleaner visuals
-    function drawZeldaTile(ctx, x, y, type) {
-        const iso = cartesianToIsometric(x, y, 0);
+    // Enhanced 3D tile drawing with proper depth
+    function drawZeldaTile(ctx, x, y, type, elevation = 0) {
+        const iso = cartesianToIsometric(x, y, elevation);
         
         ctx.save();
         ctx.translate(iso.x, iso.y);
         
         const w = CONFIG.TILE_WIDTH / 2;
         const h = CONFIG.TILE_HEIGHT / 2;
+        const tileHeight = 8; // Visible tile thickness for 3D effect
         
-        // Minimal elevation for cleaner look
-        const elevation = 1;
-        
-        // Very subtle shadow for depth
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+        // Draw shadow with offset for better depth
+        ctx.save();
+        ctx.translate(3, 5); // Shadow offset
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.beginPath();
-        ctx.moveTo(0, -h + elevation);
-        ctx.lineTo(w, elevation);
-        ctx.lineTo(0, h + elevation);
-        ctx.lineTo(-w, elevation);
+        ctx.moveTo(0, -h);
+        ctx.lineTo(w, 0);
+        ctx.lineTo(0, h);
+        ctx.lineTo(-w, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.filter = 'blur(2px)';
+        ctx.fill();
+        ctx.filter = 'none';
+        ctx.restore();
+        
+        // Draw tile sides for 3D effect
+        // Right side (darker)
+        const rightSideGradient = ctx.createLinearGradient(w, 0, w, tileHeight);
+        rightSideGradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+        rightSideGradient.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+        ctx.fillStyle = rightSideGradient;
+        ctx.beginPath();
+        ctx.moveTo(w, 0);
+        ctx.lineTo(w, tileHeight);
+        ctx.lineTo(0, h + tileHeight);
+        ctx.lineTo(0, h);
         ctx.closePath();
         ctx.fill();
         
-        // Clean, vibrant tile colors with subtle gradients
-        let gradient;
+        // Left side (medium dark)
+        const leftSideGradient = ctx.createLinearGradient(-w, 0, -w, tileHeight);
+        leftSideGradient.addColorStop(0, 'rgba(0, 0, 0, 0.25)');
+        leftSideGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+        ctx.fillStyle = leftSideGradient;
+        ctx.beginPath();
+        ctx.moveTo(-w, 0);
+        ctx.lineTo(-w, tileHeight);
+        ctx.lineTo(0, h + tileHeight);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Enhanced tile top surface with better gradients and lighting
+        let gradient, baseColor, lightColor, darkColor;
         switch(type) {
             case TILE_TYPES.GRASS:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, '#5eead4');   // Bright teal center
-                gradient.addColorStop(0.6, '#34d399');  // Medium green
-                gradient.addColorStop(1, '#10b981');    // Darker edge
+                baseColor = '#34d399';
+                lightColor = '#5eead4';
+                darkColor = '#10b981';
+                // Create more dynamic gradient for grass
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, lightColor);
+                gradient.addColorStop(0.3, '#4ade80');
+                gradient.addColorStop(0.7, baseColor);
+                gradient.addColorStop(1, darkColor);
                 break;
             case TILE_TYPES.PATH:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, '#fef3c7');    // Light sand
-                gradient.addColorStop(0.6, '#fde68a');  // Medium sand
-                gradient.addColorStop(1, '#fbbf24');    // Golden edge
+                baseColor = '#fde68a';
+                lightColor = '#fef3c7';
+                darkColor = '#fbbf24';
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, lightColor);
+                gradient.addColorStop(0.5, baseColor);
+                gradient.addColorStop(1, darkColor);
                 break;
             case TILE_TYPES.WATER:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, '#93c5fd');    // Light blue center
-                gradient.addColorStop(0.5, '#60a5fa');  // Medium blue
-                gradient.addColorStop(1, '#3b82f6');    // Deep blue edge
+                baseColor = '#60a5fa';
+                lightColor = '#93c5fd';
+                darkColor = '#3b82f6';
+                // Animated water gradient
+                const waveOffset = Math.sin(animationTime * 0.001 + x * 0.5) * 0.1;
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, lightColor);
+                gradient.addColorStop(0.5 + waveOffset, baseColor);
+                gradient.addColorStop(1, darkColor);
                 break;
             case TILE_TYPES.FLOWER:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, '#bbf7d0');    // Light green
-                gradient.addColorStop(0.6, '#86efac');  // Medium green
-                gradient.addColorStop(1, '#34d399');    // Darker green
+                baseColor = '#86efac';
+                lightColor = '#bbf7d0';
+                darkColor = '#34d399';
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, lightColor);
+                gradient.addColorStop(0.5, baseColor);
+                gradient.addColorStop(1, darkColor);
                 break;
             case TILE_TYPES.SAND:
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, '#fef9c3');    // Very light sand
-                gradient.addColorStop(0.6, '#fef3c7');  // Light sand
-                gradient.addColorStop(1, '#fde68a');    // Medium sand
+                baseColor = '#fef3c7';
+                lightColor = '#fef9c3';
+                darkColor = '#fde68a';
+                gradient = ctx.createLinearGradient(-w, -h, w, h);
+                gradient.addColorStop(0, lightColor);
+                gradient.addColorStop(0.5, baseColor);
+                gradient.addColorStop(1, darkColor);
                 break;
             default:
                 gradient = '#34d399';
+                baseColor = '#34d399';
+                lightColor = '#5eead4';
+                darkColor = '#10b981';
         }
         
-        // Draw main tile
+        // Draw main tile top surface
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(0, -h);
@@ -303,27 +356,49 @@
         ctx.closePath();
         ctx.fill();
         
-        // Clean tile edges with minimal highlighting
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 0.5;
+        // Add inner gradient overlay for more depth
+        const innerGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.8);
+        innerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+        innerGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.05)');
+        innerGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+        ctx.fillStyle = innerGradient;
+        ctx.fill();
+        
+        // Strong tile edges for definition
+        // Top-left edge (brightest)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -h);
+        ctx.lineTo(-w, 0);
+        ctx.stroke();
+        
+        // Top-right edge (bright)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, -h);
         ctx.lineTo(w, 0);
         ctx.stroke();
         
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.beginPath();
-        ctx.moveTo(0, -h);
-        ctx.lineTo(-w, 0);
-        ctx.stroke();
-        
-        // Very subtle edge definition
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
-        ctx.lineWidth = 0.5;
+        // Bottom edges (darker for depth)
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(w, 0);
         ctx.lineTo(0, h);
         ctx.lineTo(-w, 0);
+        ctx.stroke();
+        
+        // Add tile border for clear separation
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -h);
+        ctx.lineTo(w, 0);
+        ctx.lineTo(0, h);
+        ctx.lineTo(-w, 0);
+        ctx.closePath();
         ctx.stroke();
         
         // Tile details with better visuals
@@ -403,7 +478,7 @@
         ctx.restore();
     }
 
-    // Clean voxel drawing for 3D objects
+    // Enhanced 3D voxel drawing with proper depth and shading
     function drawZeldaVoxel(ctx, x, y, z, width, height, depth, color, options = {}) {
         const iso = cartesianToIsometric(x, y, z + depth);
         
@@ -412,26 +487,39 @@
         
         const w = width * CONFIG.TILE_WIDTH / 2;
         const h = height * CONFIG.TILE_HEIGHT / 2;
-        const d = depth * CONFIG.VOXEL_HEIGHT;
+        const d = depth * CONFIG.VOXEL_HEIGHT * 1.5; // Increased height for more 3D effect
         
-        // Subtle shadow for cleaner look
+        // Enhanced shadow with offset and blur
         if (!options.noShadow) {
             ctx.save();
             const shadowIso = cartesianToIsometric(x + width/2, y + height/2, 0);
-            ctx.translate(shadowIso.x - iso.x, shadowIso.y - iso.y + d/2);
+            ctx.translate(shadowIso.x - iso.x + 4, shadowIso.y - iso.y + d/2 + 6);
             
-            // Simple soft shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            // Multi-layer shadow for better depth
+            ctx.filter = 'blur(3px)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, w * 1.1, h * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.filter = 'blur(1px)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.beginPath();
             ctx.ellipse(0, 0, w * 0.9, h * 0.5, 0, 0, Math.PI * 2);
             ctx.fill();
+            
+            ctx.filter = 'none';
             ctx.restore();
         }
         
-        // Draw voxel faces with clean, flat shading
+        // Draw voxel faces with enhanced gradients and shading
         
-        // Left face - subtle shading
-        ctx.fillStyle = shadeColor(color, -20);
+        // Left face - darkest with gradient
+        const leftGradient = ctx.createLinearGradient(-w, -d + h/2, -w, h/2);
+        leftGradient.addColorStop(0, shadeColor(color, -25));
+        leftGradient.addColorStop(0.5, shadeColor(color, -35));
+        leftGradient.addColorStop(1, shadeColor(color, -45));
+        ctx.fillStyle = leftGradient;
         ctx.beginPath();
         ctx.moveTo(0, -d + h);
         ctx.lineTo(-w, -d + h/2);
@@ -440,8 +528,17 @@
         ctx.closePath();
         ctx.fill();
         
-        // Right face - slightly darker
-        ctx.fillStyle = shadeColor(color, -10);
+        // Add edge highlight to left face
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        // Right face - medium dark with gradient
+        const rightGradient = ctx.createLinearGradient(w, -d + h/2, w, h/2);
+        rightGradient.addColorStop(0, shadeColor(color, -10));
+        rightGradient.addColorStop(0.5, shadeColor(color, -20));
+        rightGradient.addColorStop(1, shadeColor(color, -30));
+        ctx.fillStyle = rightGradient;
         ctx.beginPath();
         ctx.moveTo(0, -d + h);
         ctx.lineTo(w, -d + h/2);
@@ -450,8 +547,18 @@
         ctx.closePath();
         ctx.fill();
         
-        // Top face - brightest
-        ctx.fillStyle = shadeColor(color, 10);
+        // Add edge highlight to right face
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        // Top face - brightest with radial gradient for rounded look
+        const topGradient = ctx.createRadialGradient(0, -d + h/2, 0, 0, -d + h/2, w);
+        topGradient.addColorStop(0, shadeColor(color, 25));
+        topGradient.addColorStop(0.3, shadeColor(color, 15));
+        topGradient.addColorStop(0.7, shadeColor(color, 5));
+        topGradient.addColorStop(1, shadeColor(color, -5));
+        ctx.fillStyle = topGradient;
         ctx.beginPath();
         ctx.moveTo(0, -d);
         ctx.lineTo(w, -d + h/2);
@@ -460,13 +567,20 @@
         ctx.closePath();
         ctx.fill();
         
-        // Clean, minimal outline
+        // Add specular highlight on top
+        const highlightGradient = ctx.createRadialGradient(-w/4, -d + h/4, 0, -w/4, -d + h/4, w/3);
+        highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+        highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = highlightGradient;
+        ctx.fill();
+        
+        // Strong outline for better definition
         if (!options.noOutline) {
-            ctx.strokeStyle = shadeColor(color, -40);
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = shadeColor(color, -60);
+            ctx.lineWidth = 1.5;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.globalAlpha = 0.6;
+            ctx.globalAlpha = 0.8;
             
             // Top edges
             ctx.beginPath();
@@ -1837,13 +1951,42 @@
         gameState.mapGrid = mapData.grid;
         gameState.rooms = mapData.rooms;
         
-        // Convert grid to tiles
+        // Convert grid to tiles with elevation for 3D effect
         gameState.groundTiles = [];
         for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {
             for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
+                // Add elevation based on position and tile type
+                let elevation = 0;
+                const tileType = mapData.grid[y][x].type;
+                
+                // Create elevated platforms and terrain variation
+                const centerDist = Math.sqrt(Math.pow(x - CONFIG.GRID_WIDTH/2, 2) + 
+                                           Math.pow(y - CONFIG.GRID_HEIGHT/2, 2));
+                
+                // Create raised platforms in certain areas
+                if (tileType === TILE_TYPES.GRASS) {
+                    // Random elevated grass platforms
+                    const noise = Math.sin(x * 0.3) * Math.cos(y * 0.3);
+                    if (noise > 0.5) {
+                        elevation = 0.3;
+                    } else if (noise > 0.2) {
+                        elevation = 0.15;
+                    }
+                } else if (tileType === TILE_TYPES.PATH) {
+                    // Paths are slightly raised
+                    elevation = 0.1;
+                } else if (tileType === TILE_TYPES.WATER) {
+                    // Water is sunken
+                    elevation = -0.2;
+                }
+                
+                // Add some random variation for natural look
+                elevation += (Math.random() - 0.5) * 0.05;
+                
                 gameState.groundTiles.push({
                     x, y,
-                    type: mapData.grid[y][x].type
+                    z: elevation,
+                    type: tileType
                 });
             }
         }
@@ -2074,12 +2217,12 @@
         // Render order (back to front)
         const renderables = [];
         
-        // Add ground tiles
+        // Add ground tiles with elevation
         for (const tile of gameState.groundTiles) {
             renderables.push({
                 x: tile.x,
                 y: tile.y,
-                z: 0,
+                z: tile.z || 0,
                 type: 'tile',
                 data: tile
             });
@@ -2128,7 +2271,7 @@
         for (const item of renderables) {
             switch(item.type) {
                 case 'tile':
-                    drawZeldaTile(ctx, item.data.x, item.data.y, item.data.type);
+                    drawZeldaTile(ctx, item.data.x, item.data.y, item.data.type, item.data.z || 0);
                     break;
                 case 'decoration':
                     item.data.draw(ctx);
