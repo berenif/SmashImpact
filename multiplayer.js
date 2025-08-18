@@ -1,5 +1,12 @@
 // Multiplayer Game Synchronization Module
-class MultiplayerGame {
+(function() {
+  // Prevent redeclaration if already defined
+  if (typeof window.MultiplayerGame !== 'undefined') {
+    console.warn('MultiplayerGame already defined, skipping redeclaration');
+    return;
+  }
+  
+  class MultiplayerGame {
   constructor() {
     this.pc = null;
     this.dataChannel = null;
@@ -934,5 +941,6 @@ class MultiplayerGame {
   }
 }
 
-// Export for use in game
-window.MultiplayerGame = MultiplayerGame;
+  // Export for use in game
+  window.MultiplayerGame = MultiplayerGame;
+})();
