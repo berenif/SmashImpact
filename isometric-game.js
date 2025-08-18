@@ -785,16 +785,25 @@
         }
 
         carveRoom(room) {
-            for (let y = room.y; y < room.y + room.height; y++) {
-                for (let x = room.x; x < room.x + room.width; x++) {
+            // Add bounds checking to prevent array access errors
+            if (!room || typeof room.x !== 'number' || typeof room.y !== 'number' || 
+                typeof room.width !== 'number' || typeof room.height !== 'number') {
+                return;
+            }
+            
+            const minX = Math.max(0, room.x);
+            const maxX = Math.min(this.width - 1, room.x + room.width);
+            const minY = Math.max(0, room.y);
+            const maxY = Math.min(this.height - 1, room.y + room.height);
+            
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
                     if (x >= 0 && y >= 0 && x < this.width && y < this.height) {
-                        // Different tile types for different room types
-                        if (room.type === 'treasure') {
+                        if (x === room.x || x === room.x + room.width - 1 || 
+                            y === room.y || y === room.y + room.height - 1) {
                             this.grid[y][x].type = TILE_TYPES.DARK_FLOOR;
-                        } else if (room.type === 'boss') {
-                            this.grid[y][x].type = (x + y) % 2 === 0 ? TILE_TYPES.CRACKED_FLOOR : TILE_TYPES.STONE_FLOOR;
                         } else {
-                            this.grid[y][x].type = TILE_TYPES.STONE_FLOOR;
+                            this.grid[y][x].type = (x + y) % 2 === 0 ? TILE_TYPES.CRACKED_FLOOR : TILE_TYPES.STONE_FLOOR;
                         }
                         this.grid[y][x].room = room;
                         this.grid[y][x].walkable = true;
@@ -804,76 +813,97 @@
         }
 
         connectRooms() {
-            // Connect all rooms to the start room
+            // Connect start room to all other rooms
             const startRoom = this.rooms.find(r => r.type === 'start');
+            if (!startRoom) return;
             
             for (const room of this.rooms) {
                 if (room !== startRoom) {
-                    this.createPath(startRoom, room);
+                    const start = {
+                        x: Math.floor(startRoom.x + startRoom.width / 2),
+                        y: Math.floor(startRoom.y + startRoom.height / 2)
+                    };
+                    const end = {
+                        x: Math.floor(room.x + room.width / 2),
+                        y: Math.floor(room.y + room.height / 2)
+                    };
+                    this.createPath(start, end);
                 }
             }
             
-            // Add some extra connections for variety
+            // Connect some rooms to each other for variety
             for (let i = 0; i < this.rooms.length - 1; i++) {
                 for (let j = i + 1; j < this.rooms.length; j++) {
-                    if (Math.random() > 0.6) {
-                        this.createPath(this.rooms[i], this.rooms[j]);
+                    if (Math.random() > 0.7) { // 30% chance to connect
+                        const start = {
+                            x: Math.floor(this.rooms[i].x + this.rooms[i].width / 2),
+                            y: Math.floor(this.rooms[i].y + this.rooms[i].height / 2)
+                        };
+                        const end = {
+                            x: Math.floor(this.rooms[j].x + this.rooms[j].width / 2),
+                            y: Math.floor(this.rooms[j].y + this.rooms[j].height / 2)
+                        };
+                        this.createPath(start, end);
                     }
                 }
             }
         }
 
-        createPath(room1, room2) {
-            const start = {
-                x: Math.floor(room1.x + room1.width / 2),
-                y: Math.floor(room1.y + room1.height / 2)
-            };
-            const end = {
-                x: Math.floor(room2.x + room2.width / 2),
-                y: Math.floor(room2.y + room2.height / 2)
-            };
+        createPath(start, end) {
+            // Add bounds checking to prevent array access errors
+            if (!start || !end || typeof start.x !== 'number' || typeof start.y !== 'number' || 
+                typeof end.x !== 'number' || typeof end.y !== 'number') {
+                return;
+            }
             
-            // Create L-shaped path
-            const midX = Math.random() > 0.5 ? start.x : end.x;
+            const minX = Math.min(start.x, end.x);
+            const maxX = Math.max(start.x, end.x);
+            const minY = Math.min(start.y, end.y);
+            const maxY = Math.max(start.y, end.y);
             
-            // Horizontal segment
-            const minX = Math.min(start.x, midX);
-            const maxX = Math.max(start.x, midX);
+            // Horizontal path
             for (let x = minX; x <= maxX; x++) {
                 if (x >= 0 && start.y >= 0 && x < this.width && start.y < this.height) {
                     this.grid[start.y][x].type = TILE_TYPES.STONE_FLOOR;
                     this.grid[start.y][x].walkable = true;
-                    if (start.y > 0) {
+                    
+                    // Add some width to the path
+                    if (start.y - 1 >= 0 && start.y - 1 < this.height) {
                         this.grid[start.y - 1][x].type = TILE_TYPES.STONE_FLOOR;
                         this.grid[start.y - 1][x].walkable = true;
                     }
                 }
             }
             
-            // Vertical segment
-            const minY = Math.min(start.y, end.y);
-            const maxY = Math.max(start.y, end.y);
+            // Vertical path
+            const midX = Math.floor((start.x + end.x) / 2);
             for (let y = minY; y <= maxY; y++) {
                 if (midX >= 0 && y >= 0 && midX < this.width && y < this.height) {
                     this.grid[y][midX].type = TILE_TYPES.STONE_FLOOR;
                     this.grid[y][midX].walkable = true;
-                    if (midX > 0) {
+                    
+                    // Add some width to the path
+                    if (midX - 1 >= 0 && midX - 1 < this.width) {
                         this.grid[y][midX - 1].type = TILE_TYPES.STONE_FLOOR;
                         this.grid[y][midX - 1].walkable = true;
                     }
                 }
             }
             
-            // Final horizontal segment
-            const minX2 = Math.min(midX, end.x);
-            const maxX2 = Math.max(midX, end.x);
-            for (let x = minX2; x <= maxX2; x++) {
-                if (x >= 0 && end.y >= 0 && x < this.width && end.y < this.height) {
-                    this.grid[end.y][x].type = TILE_TYPES.STONE_FLOOR;
-                    this.grid[end.y][x].walkable = true;
-                    if (end.y > 0) {
-                        this.grid[end.y - 1][x].type = TILE_TYPES.STONE_FLOOR;
-                        this.grid[end.y - 1][x].walkable = true;
+            // Connect the paths if they don't meet
+            if (start.x !== end.x && start.y !== end.y) {
+                const minX2 = Math.min(midX, end.x);
+                const maxX2 = Math.max(midX, end.x);
+                for (let x = minX2; x <= maxX2; x++) {
+                    if (x >= 0 && end.y >= 0 && x < this.width && end.y < this.height) {
+                        this.grid[end.y][x].type = TILE_TYPES.STONE_FLOOR;
+                        this.grid[end.y][x].walkable = true;
+                        
+                        // Add some width to the path
+                        if (end.y - 1 >= 0 && end.y - 1 < this.height) {
+                            this.grid[end.y - 1][x].type = TILE_TYPES.STONE_FLOOR;
+                            this.grid[end.y - 1][x].walkable = true;
+                        }
                     }
                 }
             }
@@ -1148,6 +1178,11 @@
 
         checkCollision(entity) {
             if (!this.solid) return false;
+            
+            // Add bounds checking to prevent crashes
+            if (!entity || typeof entity.x !== 'number' || typeof entity.y !== 'number' || typeof entity.radius !== 'number') {
+                return false;
+            }
             
             return entity.x >= this.x - entity.radius && 
                    entity.x <= this.x + this.width + entity.radius &&
@@ -1538,22 +1573,26 @@
         }
 
         update(deltaTime) {
-            // Find nearest player
+            // Find nearest player with proper null checking
             let nearestPlayer = null;
             let minDist = Infinity;
             
-            for (const [id, player] of gameState.players) {
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestPlayer = player;
+            if (gameState.players && gameState.players.size > 0) {
+                for (const [id, player] of gameState.players) {
+                    if (player && typeof player.x === 'number' && typeof player.y === 'number') {
+                        const dx = player.x - this.x;
+                        const dy = player.y - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearestPlayer = player;
+                        }
+                    }
                 }
             }
             
-            if (nearestPlayer) {
+            if (nearestPlayer && typeof nearestPlayer.x === 'number' && typeof nearestPlayer.y === 'number') {
                 const dx = nearestPlayer.x - this.x;
                 const dy = nearestPlayer.y - this.y;
                 
@@ -1587,43 +1626,55 @@
                         const now = Date.now();
                         if (now - this.lastAttack > this.attackRate) {
                             this.lastAttack = now;
-                            nearestPlayer.takeDamage(this.damage);
+                            if (nearestPlayer.takeDamage && typeof nearestPlayer.takeDamage === 'function') {
+                                nearestPlayer.takeDamage(this.damage);
+                            }
                             
                             // Impact effect
-                            for (let i = 0; i < 8; i++) {
-                                gameState.particles.push(new Particle(
-                                    nearestPlayer.x, nearestPlayer.y, 0.3,
-                                    {
-                                        vx: (Math.random() - 0.5) * 4,
-                                        vy: (Math.random() - 0.5) * 4,
-                                        vz: Math.random() * 3,
-                                        color: COLORS.heartRed,
-                                        size: 3,
-                                        life: 0.8,
-                                        decay: 0.04
-                                    }
-                                ));
+                            if (gameState.particles && Array.isArray(gameState.particles)) {
+                                for (let i = 0; i < 8; i++) {
+                                    gameState.particles.push(new Particle(
+                                        nearestPlayer.x, nearestPlayer.y, 0.3,
+                                        {
+                                            vx: (Math.random() - 0.5) * 4,
+                                            vy: (Math.random() - 0.5) * 4,
+                                            vz: Math.random() * 3,
+                                            color: COLORS.heartRed,
+                                            size: 3,
+                                            life: 1,
+                                            decay: 0.05,
+                                            glow: true
+                                        }
+                                    ));
+                                }
                             }
                         }
                     }
                 }
+            } else {
+                // No valid player found, idle behavior
+                this.vx *= 0.9;
+                this.vy *= 0.9;
             }
             
-            // Apply movement
-            this.x += this.vx * deltaTime;
-            this.y += this.vy * deltaTime;
+            // Update position with bounds checking
+            const newX = this.x + this.vx * deltaTime * 60;
+            const newY = this.y + this.vy * deltaTime * 60;
             
-            // Keep in bounds
-            this.x = Math.max(this.radius, Math.min(CONFIG.GRID_WIDTH - this.radius, this.x));
-            this.y = Math.max(this.radius, Math.min(CONFIG.GRID_HEIGHT - this.radius, this.y));
-            
-            // Walking animation
-            if (Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1) {
-                this.bobOffset = Math.sin(Date.now() * 0.008) * 2;
+            // Check bounds before updating position
+            if (newX >= 0 && newX < CONFIG.GRID_WIDTH) {
+                this.x = newX;
+            }
+            if (newY >= 0 && newY < CONFIG.GRID_HEIGHT) {
+                this.y = newY;
             }
             
             // Update effects
-            if (this.hitFlash > 0) this.hitFlash -= deltaTime * 5;
+            if (this.hitFlash > 0) {
+                this.hitFlash -= deltaTime * 1000;
+            }
+            
+            this.bobOffset = Math.sin(Date.now() * 0.003) * 0.1;
         }
 
         shootProjectile(target) {
@@ -1899,34 +1950,70 @@
         }
 
         update(deltaTime) {
-            this.x += this.vx * deltaTime;
-            this.y += this.vy * deltaTime;
-            this.lifetime -= deltaTime;
+            // Update position
+            this.x += this.vx * deltaTime * 60;
+            this.y += this.vy * deltaTime * 60;
+            this.z += this.vz * deltaTime * 60;
             
-            // Trail effect
-            this.trail.push({ x: this.x, y: this.y, life: 1 });
-            if (this.trail.length > 10) this.trail.shift();
-            this.trail.forEach(t => t.life *= 0.9);
+            // Gravity effect
+            this.vz -= 0.1 * deltaTime * 60;
+            
+            // Update trail
+            if (this.trail && Array.isArray(this.trail)) {
+                this.trail.push({
+                    x: this.x,
+                    y: this.y,
+                    z: this.z,
+                    life: 1
+                });
+                
+                if (this.trail.length > 10) this.trail.shift();
+                this.trail.forEach(t => t.life *= 0.9);
+            }
             
             // Check collision with enemies
-            for (let i = gameState.enemies.length - 1; i >= 0; i--) {
-                const enemy = gameState.enemies[i];
-                const dx = enemy.x - this.x;
-                const dy = enemy.y - this.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist < enemy.radius + this.radius) {
-                    if (enemy.takeDamage(this.damage)) {
-                        gameState.enemies.splice(i, 1);
+            if (gameState.enemies && Array.isArray(gameState.enemies)) {
+                for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                    const enemy = gameState.enemies[i];
+                    if (enemy && typeof enemy.x === 'number' && typeof enemy.y === 'number') {
+                        const dx = enemy.x - this.x;
+                        const dy = enemy.y - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < enemy.radius + 0.2) {
+                            // Hit enemy
+                            if (enemy.takeDamage && typeof enemy.takeDamage === 'function') {
+                                enemy.takeDamage(this.damage);
+                            }
+                            
+                            // Impact effect
+                            if (gameState.particles && Array.isArray(gameState.particles)) {
+                                for (let i = 0; i < 6; i++) {
+                                    gameState.particles.push(new Particle(
+                                        enemy.x, enemy.y, 0.3,
+                                        {
+                                            vx: (Math.random() - 0.5) * 3,
+                                            vy: (Math.random() - 0.5) * 3,
+                                            vz: Math.random() * 2,
+                                            color: this.color,
+                                            size: 2,
+                                            life: 0.8,
+                                            decay: 0.04
+                                        }
+                                    ));
+                                }
+                            }
+                            
+                            return false; // Remove projectile
+                        }
                     }
-                    return false;
                 }
             }
             
-            // Check bounds
-            if (this.x < 0 || this.x > CONFIG.GRID_WIDTH || 
-                this.y < 0 || this.y > CONFIG.GRID_HEIGHT || 
-                this.lifetime <= 0) {
+            // Check if out of bounds
+            if (this.x < -1 || this.x > CONFIG.GRID_WIDTH + 1 || 
+                this.y < -1 || this.y > CONFIG.GRID_HEIGHT + 1 || 
+                this.z < -1) {
                 return false;
             }
             
@@ -2061,9 +2148,15 @@
     }
 
     function spawnEnemy() {
-        if (gameState.wave.spawned >= gameState.wave.enemies.length) return;
+        // Add bounds checking to prevent crashes
+        if (!gameState.wave || !gameState.wave.enemies || !Array.isArray(gameState.wave.enemies) || 
+            gameState.wave.spawned >= gameState.wave.enemies.length) {
+            return;
+        }
         
         const type = gameState.wave.enemies[gameState.wave.spawned];
+        if (!type) return;
+        
         const angle = Math.random() * Math.PI * 2;
         const distance = Math.min(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT) * 0.4;
         
@@ -2076,157 +2169,121 @@
             type
         );
         
-        gameState.enemies.push(enemy);
-        gameState.wave.spawned++;
+        // Add bounds checking for gameState arrays
+        if (gameState.enemies && Array.isArray(gameState.enemies)) {
+            gameState.enemies.push(enemy);
+        }
         
-        // Spawn effect
-        for (let i = 0; i < 10; i++) {
-            gameState.particles.push(new Particle(
-                enemy.x, enemy.y, 0,
-                {
-                    vx: (Math.random() - 0.5) * 4,
-                    vy: (Math.random() - 0.5) * 4,
-                    vz: Math.random() * 3,
-                    color: enemy.color,
-                    size: 5,
-                    life: 1,
-                    decay: 0.03,
-                    glow: true
-                }
-            ));
+        if (gameState.wave && typeof gameState.wave.spawned === 'number') {
+            gameState.wave.spawned++;
+        }
+        
+        // Spawn effect with bounds checking
+        if (gameState.particles && Array.isArray(gameState.particles)) {
+            for (let i = 0; i < 10; i++) {
+                gameState.particles.push(new Particle(
+                    enemy.x, enemy.y, 0,
+                    {
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4,
+                        vz: Math.random() * 3,
+                        color: enemy.color || COLORS.enemyRed,
+                        size: 5,
+                        life: 1,
+                        decay: 0.03,
+                        glow: true
+                    }
+                ));
+            }
         }
     }
 
     function generateLevel() {
-        // Generate Zelda-style map
-        const mapGen = new MapGenerator(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT);
-        const mapData = mapGen.generate();
+        const mapData = new DungeonGenerator(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT).generate();
         
-        gameState.mapGrid = mapData.grid;
-        gameState.rooms = mapData.rooms;
+        // Add bounds checking to prevent crashes
+        if (!mapData || !mapData.grid || !Array.isArray(mapData.grid)) {
+            console.error('Failed to generate level data');
+            return { x: CONFIG.GRID_WIDTH / 2, y: CONFIG.GRID_HEIGHT / 2 };
+        }
         
-        // Convert grid to tiles with elevation for 3D effect
+        // Create ground tiles with bounds checking
         gameState.groundTiles = [];
-        for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {
-            for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
-                // Add elevation based on position and tile type
-                let elevation = 0;
-                const tileType = mapData.grid[y][x].type;
-                
-                // Create elevated platforms and terrain variation
-                const centerDist = Math.sqrt(Math.pow(x - CONFIG.GRID_WIDTH/2, 2) + 
-                                           Math.pow(y - CONFIG.GRID_HEIGHT/2, 2));
-                
-                // Create raised platforms in certain areas
-                if (tileType === TILE_TYPES.GRASS) {
-                    // Random elevated grass platforms
-                    const noise = Math.sin(x * 0.3) * Math.cos(y * 0.3);
-                    if (noise > 0.5) {
-                        elevation = 0.3;
-                    } else if (noise > 0.2) {
-                        elevation = 0.15;
+        if (mapData.grid && Array.isArray(mapData.grid)) {
+            for (let y = 0; y < mapData.grid.length && y < CONFIG.GRID_HEIGHT; y++) {
+                if (mapData.grid[y] && Array.isArray(mapData.grid[y])) {
+                    for (let x = 0; x < mapData.grid[y].length && x < CONFIG.GRID_WIDTH; x++) {
+                        const tileType = mapData.grid[y][x] && mapData.grid[y][x].type ? mapData.grid[y][x].type : TILE_TYPES.STONE_FLOOR;
+                        
+                        // Create elevated platforms and terrain variation
+                        let z = 0;
+                        if (tileType === TILE_TYPES.STONE_FLOOR) {
+                            z = Math.random() * 0.2;
+                        }
+                        
+                        // Create raised platforms in certain areas
+                        if (x > CONFIG.GRID_WIDTH * 0.3 && x < CONFIG.GRID_WIDTH * 0.7 && 
+                            y > CONFIG.GRID_HEIGHT * 0.3 && y < CONFIG.GRID_HEIGHT * 0.7) {
+                            z += 0.3;
+                        }
+                        
+                        gameState.groundTiles.push({
+                            x: x,
+                            y: y,
+                            z: z,
+                            type: tileType,
+                            walkable: mapData.grid[y][x] && mapData.grid[y][x].walkable !== undefined ? mapData.grid[y][x].walkable : true
+                        });
                     }
-                } else if (tileType === TILE_TYPES.PATH) {
-                    // Paths are slightly raised
-                    elevation = 0.1;
-                } else if (tileType === TILE_TYPES.WATER) {
-                    // Water is sunken
-                    elevation = -0.2;
                 }
-                
-                // Add some random variation for natural look
-                elevation += (Math.random() - 0.5) * 0.05;
-                
-                gameState.groundTiles.push({
-                    x, y,
-                    z: elevation,
-                    type: tileType
-                });
             }
         }
         
-        // Add decorations
+        // Create decorations with bounds checking
         gameState.decorations = [];
-        for (const room of mapData.rooms) {
-            // Add decorations around room edges
-            if (room.type === 'treasure') {
-                // Treasure room - add pots
-                for (let i = 0; i < 4; i++) {
-                    gameState.decorations.push(new Decoration(
-                        room.x + 0.5 + Math.random() * (room.width - 1),
-                        room.y + 0.5 + Math.random() * (room.height - 1),
-                        DECORATION_TYPES.POT
-                    ));
-                }
-            } else if (room.type === 'boss') {
-                // Boss room - add rocks
-                for (let i = 0; i < 3; i++) {
-                    gameState.decorations.push(new Decoration(
-                        room.x + 0.5 + Math.random() * (room.width - 1),
-                        room.y + 0.5 + Math.random() * (room.height - 1),
-                        DECORATION_TYPES.ROCK
-                    ));
-                }
-            } else if (room.type !== 'start') {
-                // Normal rooms - mixed decorations
-                for (let i = 0; i < 2; i++) {
-                    const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
-                    const type = types[Math.floor(Math.random() * types.length)];
-                    gameState.decorations.push(new Decoration(
-                        room.x + 0.5 + Math.random() * (room.width - 1),
-                        room.y + 0.5 + Math.random() * (room.height - 1),
-                        type
-                    ));
+        if (mapData.rooms && Array.isArray(mapData.rooms)) {
+            for (const room of mapData.rooms) {
+                if (room && typeof room.x === 'number' && typeof room.y === 'number' && 
+                    typeof room.width === 'number' && typeof room.height === 'number') {
+                    
+                    // Add decorations to rooms
+                    const decorationCount = Math.floor(Math.random() * 3) + 1;
+                    for (let i = 0; i < decorationCount; i++) {
+                        const x = room.x + Math.random() * room.width;
+                        const y = room.y + Math.random() * room.height;
+                        
+                        // Check if position is walkable
+                        if (x >= 0 && y >= 0 && x < CONFIG.GRID_WIDTH && y < CONFIG.GRID_HEIGHT &&
+                            mapData.grid[Math.floor(y)] && mapData.grid[Math.floor(y)][Math.floor(x)] &&
+                            mapData.grid[Math.floor(y)][Math.floor(x)].type !== TILE_TYPES.WATER) {
+                            
+                            const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
+                            const type = types[Math.floor(Math.random() * types.length)];
+                            
+                            gameState.decorations.push(new Decoration(x, y, type));
+                        }
+                    }
                 }
             }
         }
         
-        // Add more trees at map edges for the bigger map
-        for (let i = 0; i < 12; i++) {
-            const edge = Math.floor(Math.random() * 4);
-            let x, y;
-            
-            switch(edge) {
-                case 0: // Top
-                    x = Math.random() * CONFIG.GRID_WIDTH;
-                    y = 0.5 + Math.random() * 2;
-                    break;
-                case 1: // Right
-                    x = CONFIG.GRID_WIDTH - 0.5 - Math.random() * 2;
-                    y = Math.random() * CONFIG.GRID_HEIGHT;
-                    break;
-                case 2: // Bottom
-                    x = Math.random() * CONFIG.GRID_WIDTH;
-                    y = CONFIG.GRID_HEIGHT - 0.5 - Math.random() * 2;
-                    break;
-                case 3: // Left
-                    x = 0.5 + Math.random() * 2;
-                    y = Math.random() * CONFIG.GRID_HEIGHT;
-                    break;
-            }
-            
-            if (Math.floor(y) >= 0 && Math.floor(y) < CONFIG.GRID_HEIGHT &&
-                Math.floor(x) >= 0 && Math.floor(x) < CONFIG.GRID_WIDTH &&
-                mapData.grid[Math.floor(y)][Math.floor(x)].type !== TILE_TYPES.WATER) {
-                gameState.decorations.push(new Decoration(x, y, DECORATION_TYPES.TREE));
-            }
-        }
-        
-        // Add scattered decorations throughout the map
-        for (let i = 0; i < 20; i++) {
+        // Add some random decorations in walkable areas
+        for (let i = 0; i < 15; i++) {
             const x = Math.random() * CONFIG.GRID_WIDTH;
             const y = Math.random() * CONFIG.GRID_HEIGHT;
-            const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
-            const type = types[Math.floor(Math.random() * types.length)];
             
-            if (Math.floor(y) >= 0 && Math.floor(y) < CONFIG.GRID_HEIGHT &&
-                Math.floor(x) >= 0 && Math.floor(x) < CONFIG.GRID_WIDTH &&
-                mapData.grid[Math.floor(y)][Math.floor(x)].type === TILE_TYPES.GRASS) {
+            if (x >= 0 && y >= 0 && x < CONFIG.GRID_WIDTH && y < CONFIG.GRID_HEIGHT &&
+                mapData.grid[Math.floor(y)] && mapData.grid[Math.floor(y)][Math.floor(x)] &&
+                mapData.grid[Math.floor(y)][Math.floor(x)].type === TILE_TYPES.STONE_FLOOR) {
+                
+                const types = [DECORATION_TYPES.BUSH, DECORATION_TYPES.ROCK, DECORATION_TYPES.FLOWER];
+                const type = types[Math.floor(Math.random() * types.length)];
+                
                 gameState.decorations.push(new Decoration(x, y, type));
             }
         }
         
-        return mapData.startPosition;
+        return mapData.startPosition || { x: CONFIG.GRID_WIDTH / 2, y: CONFIG.GRID_HEIGHT / 2 };
     }
 
     function resizeCanvas() {
@@ -2256,45 +2313,53 @@
     }
 
     function update(deltaTime) {
-        if (gameState.paused || gameState.gameOver) return;
-        
         // Update animation time
-        animationTime += deltaTime * 1000;
+        gameState.animationTime += deltaTime;
         
         // Update camera
         updateCamera(deltaTime);
         
         // Update player
-        if (gameState.localPlayer) {
+        if (gameState.localPlayer && typeof gameState.localPlayer.update === 'function') {
             gameState.localPlayer.update(deltaTime);
-            
-            // Check game over
-            if (gameState.localPlayer.health <= 0) {
-                gameState.gameOver = true;
+        }
+        
+        // Update enemies with bounds checking
+        if (gameState.enemies && Array.isArray(gameState.enemies)) {
+            for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                const enemy = gameState.enemies[i];
+                if (enemy && typeof enemy.update === 'function') {
+                    enemy.update(deltaTime);
+                }
             }
         }
         
-        // Update enemies
-        for (let i = gameState.enemies.length - 1; i >= 0; i--) {
-            gameState.enemies[i].update(deltaTime);
-        }
-        
-        // Update projectiles
-        for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
-            if (!gameState.projectiles[i].update(deltaTime)) {
-                gameState.projectiles.splice(i, 1);
+        // Update projectiles with bounds checking
+        if (gameState.projectiles && Array.isArray(gameState.projectiles)) {
+            for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
+                const projectile = gameState.projectiles[i];
+                if (projectile && typeof projectile.update === 'function') {
+                    if (!projectile.update(deltaTime)) {
+                        gameState.projectiles.splice(i, 1);
+                    }
+                }
             }
         }
         
-        // Update particles
-        for (let i = gameState.particles.length - 1; i >= 0; i--) {
-            if (!gameState.particles[i].update(deltaTime)) {
-                gameState.particles.splice(i, 1);
+        // Update particles with bounds checking
+        if (gameState.particles && Array.isArray(gameState.particles)) {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const particle = gameState.particles[i];
+                if (particle && typeof particle.update === 'function') {
+                    if (!particle.update(deltaTime)) {
+                        gameState.particles.splice(i, 1);
+                    }
+                }
             }
         }
         
         // Update visual effects
-        if (visualEffects) {
+        if (visualEffects && typeof visualEffects.update === 'function') {
             visualEffects.update(deltaTime);
         }
         
@@ -2305,20 +2370,19 @@
                 startWave(gameState.wave.current + 1);
             }
         } else if (gameState.wave.state === 'active') {
-            // Spawn enemies gradually
+            // Spawn enemies
             if (gameState.wave.spawned < gameState.wave.enemies.length) {
-                if (Math.random() < 0.02) {
+                if (Math.random() < 0.02) { // 2% chance per frame
                     spawnEnemy();
                 }
             }
             
-            // Check wave completion
+            // Check if wave is complete
             if (gameState.wave.spawned >= gameState.wave.enemies.length && 
                 gameState.enemies.length === 0) {
                 gameState.wave.state = 'preparing';
-                gameState.wave.timer = 10;
-                gameState.wave.completed = true;
-                console.log(`Wave ${gameState.wave.current} completed!`);
+                gameState.wave.timer = 3;
+                gameState.wave.current++;
             }
         }
     }
@@ -2615,18 +2679,40 @@
     }
 
     function gameLoop(timestamp) {
+        // Add validation for timestamp to prevent crashes
+        if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+            console.warn('Invalid timestamp received, using fallback');
+            timestamp = performance.now();
+        }
+        
         const deltaTime = Math.min((timestamp - gameState.lastTime) / 1000, 0.1);
         gameState.lastTime = timestamp;
         gameState.deltaTime = deltaTime;
         
-        update(deltaTime);
-        render();
+        // Only update if game is properly initialized
+        if (gameState && typeof update === 'function') {
+            update(deltaTime);
+        }
+        
+        // Only render if canvas and context are valid
+        if (canvas && ctx && typeof render === 'function') {
+            render();
+        }
         
         requestAnimationFrame(gameLoop);
     }
 
     function handleMouseMove(e) {
+        // Add validation to prevent crashes
+        if (!canvas || !ctx || !gameState || !gameState.camera) {
+            return;
+        }
+        
         const rect = canvas.getBoundingClientRect();
+        if (!rect) {
+            return;
+        }
+        
         const x = (e.clientX - rect.left - canvas.width / 2) / gameState.camera.zoom;
         const y = (e.clientY - rect.top - canvas.height / 2) / gameState.camera.zoom;
         
@@ -2637,16 +2723,25 @@
         };
         
         const world = isometricToCartesian(worldIso.x, worldIso.y);
-        gameState.input.mouse.x = world.x;
-        gameState.input.mouse.y = world.y;
+        if (world && typeof world.x === 'number' && typeof world.y === 'number') {
+            gameState.input.mouse.x = world.x;
+            gameState.input.mouse.y = world.y;
+        }
     }
 
     function handleMouseDown(e) {
         if (e.button === 0) {
+            // Add validation to prevent crashes
+            if (!gameState || !gameState.input) {
+                return;
+            }
+            
             gameState.input.mouse.isDown = true;
             
-            if (gameState.localPlayer && !gameState.gameOver) {
-                gameState.localPlayer.shoot(gameState.input.mouse.x, gameState.input.mouse.y);
+            if (gameState.localPlayer && typeof gameState.localPlayer.shoot === 'function' && !gameState.gameOver) {
+                if (gameState.input.mouse && typeof gameState.input.mouse.x === 'number' && typeof gameState.input.mouse.y === 'number') {
+                    gameState.localPlayer.shoot(gameState.input.mouse.x, gameState.input.mouse.y);
+                }
             }
         }
     }
@@ -2658,14 +2753,27 @@
     }
 
     function handleKeyDown(e) {
+        // Add validation to prevent crashes
+        if (!e || !e.key || !gameState || !gameState.input) {
+            return;
+        }
+        
         gameState.input.keys[e.key] = true;
         
         if (e.key === 'r' && gameState.gameOver) {
-            init();
+            // Restart game
+            if (typeof init === 'function') {
+                init();
+            }
         }
     }
 
     function handleKeyUp(e) {
+        // Add validation to prevent crashes
+        if (!e || !e.key || !gameState || !gameState.input) {
+            return;
+        }
+        
         gameState.input.keys[e.key] = false;
     }
 
@@ -2798,7 +2906,7 @@
         
         attackButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (gameState.localPlayer && !gameState.gameOver) {
+            if (gameState && gameState.localPlayer && typeof gameState.localPlayer.shoot === 'function' && !gameState.gameOver) {
                 // Shoot in facing direction
                 const dirs = {
                     'up': { x: 0, y: -1 },
@@ -2807,10 +2915,12 @@
                     'right': { x: 1, y: 0 }
                 };
                 const dir = dirs[gameState.localPlayer.facing];
-                gameState.localPlayer.shoot(
-                    gameState.localPlayer.x + dir.x * 5,
-                    gameState.localPlayer.y + dir.y * 5
-                );
+                if (dir && typeof gameState.localPlayer.x === 'number' && typeof gameState.localPlayer.y === 'number') {
+                    gameState.localPlayer.shoot(
+                        gameState.localPlayer.x + dir.x * 5,
+                        gameState.localPlayer.y + dir.y * 5
+                    );
+                }
             }
         });
     }
@@ -2823,32 +2933,72 @@
         }
         
         ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) {
+            console.error('Failed to get canvas context');
+            return;
+        }
+        
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         
         // Initialize visual effects if available
-        if (window.VisualEffects) {
-            visualEffects = new window.VisualEffects(canvas, ctx);
+        if (window.VisualEffects && typeof window.VisualEffects === 'function') {
+            try {
+                visualEffects = new window.VisualEffects(canvas, ctx);
+            } catch (error) {
+                console.warn('Failed to initialize visual effects:', error);
+                visualEffects = null;
+            }
         }
         
-        // Reset game state
-        gameState.enemies = [];
-        gameState.projectiles = [];
-        gameState.particles = [];
-        gameState.gameOver = false;
-        gameState.score = 0;
-        gameState.rupees = 0;
-        gameState.wave.current = 0;
-        gameState.wave.state = 'preparing';
-        gameState.wave.timer = 5;
+        // Reset game state with proper initialization
+        if (!gameState) {
+            gameState = {
+                enemies: [],
+                projectiles: [],
+                particles: [],
+                gameOver: false,
+                score: 0,
+                rupees: 0,
+                wave: { current: 0, state: 'preparing', timer: 5, spawned: 0, enemies: [] },
+                players: new Map(),
+                input: { keys: {}, mouse: { x: 0, y: 0, isDown: false }, joystick: { x: 0, y: 0, active: false } },
+                camera: { x: 0, y: 0, zoom: CONFIG.ZOOM_DEFAULT },
+                animationTime: 0,
+                deltaTime: 0,
+                lastTime: 0
+            };
+        } else {
+            // Reset existing game state
+            gameState.enemies = [];
+            gameState.projectiles = [];
+            gameState.particles = [];
+            gameState.gameOver = false;
+            gameState.score = 0;
+            gameState.rupees = 0;
+            gameState.wave.current = 0;
+            gameState.wave.state = 'preparing';
+            gameState.wave.timer = 5;
+            gameState.wave.spawned = 0;
+            gameState.wave.enemies = [];
+        }
         
         // Generate level
         const startPos = generateLevel();
+        if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            console.error('Failed to generate valid start position');
+            return;
+        }
         
         // Create local player
         const playerId = 'player1';
-        gameState.localPlayer = new Player(playerId, startPos.x, startPos.y);
-        gameState.players.set(playerId, gameState.localPlayer);
+        try {
+            gameState.localPlayer = new Player(playerId, startPos.x, startPos.y);
+            gameState.players.set(playerId, gameState.localPlayer);
+        } catch (error) {
+            console.error('Failed to create player:', error);
+            return;
+        }
         
         // Setup
         resizeCanvas();
