@@ -4,19 +4,21 @@
 
     // Game configuration
     const CONFIG = {
-        TILE_WIDTH: 56,     // Slightly larger for better 3D effect
-        TILE_HEIGHT: 28,    // Maintain 2:1 ratio
-        GRID_WIDTH: 30,     // Increased map size
-        GRID_HEIGHT: 30,    // Increased map size
-        PLAYER_SPEED: 4,
+        TILE_WIDTH: 64,     // Larger for better 3D blocks
+        TILE_HEIGHT: 32,    // Maintain 2:1 ratio
+        TILE_DEPTH: 24,     // Significant depth for 3D blocks
+        GRID_WIDTH: 20,     // Smaller for performance with 3D blocks
+        GRID_HEIGHT: 20,    // Smaller for performance with 3D blocks
+        PLAYER_SPEED: 0.15, // Slower for tile-based movement
+        MOVE_SPEED: 8,      // Speed of tile-to-tile animation
         FPS: 60,
         DEBUG: false,
         CAMERA_SMOOTHING: 0.15,
-        ZOOM_DEFAULT: 1.4,  // Adjusted for better 3D visibility
-        ZOOM_MOBILE: 1.1,   // Adjusted zoom for mobile
-        VOXEL_HEIGHT: 16,   // Higher for more pronounced 3D effect
-        AMBIENT_LIGHT: 0.75, // Balanced lighting for shadows
-        SHADOW_OPACITY: 0.25 // More visible shadows for depth
+        ZOOM_DEFAULT: 1.3,  // Adjusted for 3D blocks
+        ZOOM_MOBILE: 1.0,   // Adjusted zoom for mobile
+        VOXEL_HEIGHT: 20,   // Much higher for 3D blocks
+        AMBIENT_LIGHT: 0.7, // Balanced lighting
+        SHADOW_OPACITY: 0.35 // Stronger shadows for depth
     };
 
     // Enhanced Zelda-inspired color palette - Updated for cleaner look
@@ -233,59 +235,92 @@
         };
     }
 
-    // Enhanced 3D tile drawing with proper depth
+    // Draw tiles as 3D blocks with significant depth
     function drawZeldaTile(ctx, x, y, type, elevation = 0) {
-        const iso = cartesianToIsometric(x, y, elevation);
+        const baseZ = elevation * CONFIG.TILE_DEPTH;
+        const iso = cartesianToIsometric(x, y, baseZ);
         
         ctx.save();
         ctx.translate(iso.x, iso.y);
         
         const w = CONFIG.TILE_WIDTH / 2;
         const h = CONFIG.TILE_HEIGHT / 2;
-        const tileHeight = 8; // Visible tile thickness for 3D effect
+        const tileHeight = CONFIG.TILE_DEPTH; // Much taller 3D blocks
         
-        // Draw shadow with offset for better depth
+        // Draw strong shadow for 3D blocks
         ctx.save();
-        ctx.translate(3, 5); // Shadow offset
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.translate(6, 10); // Larger shadow offset
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.filter = 'blur(4px)';
         ctx.beginPath();
-        ctx.moveTo(0, -h);
-        ctx.lineTo(w, 0);
-        ctx.lineTo(0, h);
-        ctx.lineTo(-w, 0);
+        ctx.moveTo(0, -h * 0.8);
+        ctx.lineTo(w * 0.9, 0);
+        ctx.lineTo(0, h * 0.8);
+        ctx.lineTo(-w * 0.9, 0);
         ctx.closePath();
-        ctx.fill();
-        ctx.filter = 'blur(2px)';
         ctx.fill();
         ctx.filter = 'none';
         ctx.restore();
         
-        // Draw tile sides for 3D effect
-        // Right side (darker)
-        const rightSideGradient = ctx.createLinearGradient(w, 0, w, tileHeight);
-        rightSideGradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
-        rightSideGradient.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-        ctx.fillStyle = rightSideGradient;
+        // Draw thick 3D block sides
+        let rightColor, leftColor;
+        
+        // Get base colors for sides based on tile type
+        switch(type) {
+            case TILE_TYPES.GRASS:
+                rightColor = '#059669';
+                leftColor = '#047857';
+                break;
+            case TILE_TYPES.PATH:
+                rightColor = '#f59e0b';
+                leftColor = '#d97706';
+                break;
+            case TILE_TYPES.WATER:
+                rightColor = '#2563eb';
+                leftColor = '#1d4ed8';
+                break;
+            default:
+                rightColor = '#059669';
+                leftColor = '#047857';
+        }
+        
+        // Right side (darker) - full height block
+        const rightGradient = ctx.createLinearGradient(w, -tileHeight, w, tileHeight);
+        rightGradient.addColorStop(0, shadeColor(rightColor, -10));
+        rightGradient.addColorStop(0.5, shadeColor(rightColor, -25));
+        rightGradient.addColorStop(1, shadeColor(rightColor, -40));
+        ctx.fillStyle = rightGradient;
         ctx.beginPath();
-        ctx.moveTo(w, 0);
-        ctx.lineTo(w, tileHeight);
-        ctx.lineTo(0, h + tileHeight);
+        ctx.moveTo(w, -tileHeight);
+        ctx.lineTo(w, 0);
         ctx.lineTo(0, h);
+        ctx.lineTo(0, h - tileHeight);
         ctx.closePath();
         ctx.fill();
         
-        // Left side (medium dark)
-        const leftSideGradient = ctx.createLinearGradient(-w, 0, -w, tileHeight);
-        leftSideGradient.addColorStop(0, 'rgba(0, 0, 0, 0.25)');
-        leftSideGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
-        ctx.fillStyle = leftSideGradient;
+        // Add edge line for definition
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Left side (medium dark) - full height block
+        const leftGradient = ctx.createLinearGradient(-w, -tileHeight, -w, tileHeight);
+        leftGradient.addColorStop(0, shadeColor(leftColor, -15));
+        leftGradient.addColorStop(0.5, shadeColor(leftColor, -30));
+        leftGradient.addColorStop(1, shadeColor(leftColor, -45));
+        ctx.fillStyle = leftGradient;
         ctx.beginPath();
-        ctx.moveTo(-w, 0);
-        ctx.lineTo(-w, tileHeight);
-        ctx.lineTo(0, h + tileHeight);
+        ctx.moveTo(-w, -tileHeight);
+        ctx.lineTo(-w, 0);
         ctx.lineTo(0, h);
+        ctx.lineTo(0, h - tileHeight);
         ctx.closePath();
         ctx.fill();
+        
+        // Add edge line for definition
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
         
         // Enhanced tile top surface with better gradients and lighting
         let gradient, baseColor, lightColor, darkColor;
@@ -346,7 +381,10 @@
                 darkColor = '#10b981';
         }
         
-        // Draw main tile top surface
+        // Draw main tile top surface (elevated on the block)
+        ctx.save();
+        ctx.translate(0, -tileHeight);
+        
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(0, -h);
@@ -400,6 +438,8 @@
         ctx.lineTo(-w, 0);
         ctx.closePath();
         ctx.stroke();
+        
+        ctx.restore(); // End of elevated top surface
         
         // Tile details with better visuals
         if (type === TILE_TYPES.GRASS) {
@@ -1044,14 +1084,27 @@
         }
     }
 
-    // Enhanced Player class with Zelda style
+    // Enhanced Player class with tile-based movement
     class Player {
         constructor(id, x, y) {
             this.id = id;
-            this.x = x;
-            this.y = y;
-            this.vx = 0;
-            this.vy = 0;
+            // Grid position (tile coordinates)
+            this.gridX = Math.floor(x);
+            this.gridY = Math.floor(y);
+            // Target grid position for movement
+            this.targetGridX = this.gridX;
+            this.targetGridY = this.gridY;
+            // Actual position for smooth animation
+            this.x = this.gridX;
+            this.y = this.gridY;
+            // Movement state
+            this.isMoving = false;
+            this.moveProgress = 0;
+            this.moveSpeed = CONFIG.MOVE_SPEED || 8;
+            // Previous position for interpolation
+            this.prevX = this.x;
+            this.prevY = this.y;
+            // Other properties
             this.radius = 0.3;
             this.health = 100;
             this.maxHealth = 100;
@@ -1067,44 +1120,96 @@
             this.shotCooldown = 200;
             this.swordSwing = 0;
             this.facing = 'down';
+            this.moveDelay = 0; // Delay between moves
         }
 
         update(deltaTime) {
-            // Movement with joystick or keyboard
-            let dx = 0, dy = 0;
-            
-            if (gameState.input.joystick.active) {
-                dx = gameState.input.joystick.x;
-                dy = gameState.input.joystick.y;
-            } else {
-                if (gameState.input.keys['ArrowLeft'] || gameState.input.keys['a']) dx = -1;
-                if (gameState.input.keys['ArrowRight'] || gameState.input.keys['d']) dx = 1;
-                if (gameState.input.keys['ArrowUp'] || gameState.input.keys['w']) dy = -1;
-                if (gameState.input.keys['ArrowDown'] || gameState.input.keys['s']) dy = 1;
+            // Update move delay
+            if (this.moveDelay > 0) {
+                this.moveDelay -= deltaTime;
             }
             
-            // Update facing direction
-            if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    this.facing = dx > 0 ? 'right' : 'left';
+            // Handle tile-based movement
+            if (this.isMoving) {
+                // Continue moving to target tile
+                this.moveProgress += this.moveSpeed * (deltaTime / 1000);
+                
+                if (this.moveProgress >= 1) {
+                    // Reached target tile
+                    this.moveProgress = 1;
+                    this.gridX = this.targetGridX;
+                    this.gridY = this.targetGridY;
+                    this.x = this.gridX;
+                    this.y = this.gridY;
+                    this.isMoving = false;
+                    this.moveProgress = 0;
+                    this.moveDelay = 100; // Small delay between moves
                 } else {
-                    this.facing = dy > 0 ? 'down' : 'up';
+                    // Interpolate position
+                    this.x = this.prevX + (this.targetGridX - this.prevX) * this.moveProgress;
+                    this.y = this.prevY + (this.targetGridY - this.prevY) * this.moveProgress;
+                }
+            } else if (this.moveDelay <= 0) {
+                // Check for new movement input
+                let dx = 0, dy = 0;
+                
+                if (gameState.input.joystick.active) {
+                    if (Math.abs(gameState.input.joystick.x) > 0.5) {
+                        dx = gameState.input.joystick.x > 0 ? 1 : -1;
+                    }
+                    if (Math.abs(gameState.input.joystick.y) > 0.5) {
+                        dy = gameState.input.joystick.y > 0 ? 1 : -1;
+                    }
+                } else {
+                    if (gameState.input.keys['ArrowLeft'] || gameState.input.keys['a']) dx = -1;
+                    if (gameState.input.keys['ArrowRight'] || gameState.input.keys['d']) dx = 1;
+                    if (gameState.input.keys['ArrowUp'] || gameState.input.keys['w']) dy = -1;
+                    if (gameState.input.keys['ArrowDown'] || gameState.input.keys['s']) dy = 1;
+                }
+                
+                // Prevent diagonal movement - prioritize horizontal
+                if (dx !== 0 && dy !== 0) {
+                    dy = 0;
+                }
+                
+                // Update facing direction
+                if (dx !== 0 || dy !== 0) {
+                    if (dx > 0) this.facing = 'right';
+                    else if (dx < 0) this.facing = 'left';
+                    else if (dy > 0) this.facing = 'down';
+                    else if (dy < 0) this.facing = 'up';
+                    
+                    // Start moving to new tile
+                    const newGridX = this.gridX + dx;
+                    const newGridY = this.gridY + dy;
+                    
+                    // Check bounds
+                    if (newGridX >= 0 && newGridX < CONFIG.GRID_WIDTH &&
+                        newGridY >= 0 && newGridY < CONFIG.GRID_HEIGHT) {
+                        // Check for collision with obstacles
+                        let canMove = true;
+                        for (const obstacle of gameState.obstacles) {
+                            if (Math.floor(obstacle.x) === newGridX && 
+                                Math.floor(obstacle.y) === newGridY) {
+                                canMove = false;
+                                break;
+                            }
+                        }
+                        
+                        if (canMove) {
+                            this.targetGridX = newGridX;
+                            this.targetGridY = newGridY;
+                            this.prevX = this.x;
+                            this.prevY = this.y;
+                            this.isMoving = true;
+                            this.moveProgress = 0;
+                        }
+                    }
                 }
             }
             
-            // Normalize diagonal movement
-            if (dx !== 0 && dy !== 0) {
-                const mag = Math.sqrt(dx * dx + dy * dy);
-                dx /= mag;
-                dy /= mag;
-            }
-            
-            this.vx = dx * CONFIG.PLAYER_SPEED;
-            this.vy = dy * CONFIG.PLAYER_SPEED;
-            
-            // Apply movement
-            const newX = this.x + this.vx * deltaTime;
-            const newY = this.y + this.vy * deltaTime;
+            // Tile-based movement is handled above
+            // No velocity-based movement needed
             
             // Check bounds and collisions
             if (newX >= this.radius && newX <= CONFIG.GRID_WIDTH - this.radius) {
