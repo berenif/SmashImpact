@@ -946,15 +946,14 @@
             }
             
             const minX = Math.max(0, room.x);
-            const maxX = Math.min(this.width - 1, room.x + room.width);
+            const maxX = Math.min(this.width - 1, room.x + room.width - 1);
             const minY = Math.max(0, room.y);
-            const maxY = Math.min(this.height - 1, room.y + room.height);
+            const maxY = Math.min(this.height - 1, room.y + room.height - 1);
             
             for (let y = minY; y <= maxY; y++) {
                 for (let x = minX; x <= maxX; x++) {
                     if (x >= 0 && y >= 0 && x < this.width && y < this.height) {
-                        if (x === room.x || x === room.x + room.width - 1 || 
-                            y === room.y || y === room.y + room.height - 1) {
+                        if (x === minX || x === maxX || y === minY || y === maxY) {
                             this.grid[y][x].type = TILE_TYPES.DARK_FLOOR;
                         } else {
                             this.grid[y][x].type = (x + y) % 2 === 0 ? TILE_TYPES.CRACKED_FLOOR : TILE_TYPES.STONE_FLOOR;
