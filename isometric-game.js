@@ -40,6 +40,11 @@
         barrel: '#7c2d12',       // Wooden barrel
         rockGray: '#6b7280',     // Dungeon rocks
         rockDark: '#374151',     // Dark rocks
+        bushGreen: '#15803d',    // Legacy bush green
+        bushDark: '#14532d',     // Legacy bush dark
+        flowerRed: '#ef4444',    // Legacy flower red
+        flowerYellow: '#fde047', // Legacy flower yellow
+        flowerBlue: '#60a5fa',   // Legacy flower blue
         
         // Structures
         wallStone: '#78716c',
@@ -212,7 +217,23 @@
 
     // Helper functions
     function shadeColor(color, percent) {
-        if (!color) color = "#808080";         const num = parseInt(color.replace("#",""), 16);
+        // Handle undefined or invalid colors
+        if (!color || color === undefined) {
+            color = "#808080"; // Default gray
+        }
+        
+        // Ensure color is a string
+        if (typeof color !== 'string') {
+            color = String(color);
+        }
+        
+        // Remove # if present and ensure valid hex
+        color = color.replace("#", "");
+        if (!/^[0-9A-Fa-f]{6}$/.test(color)) {
+            color = "808080"; // Default if invalid hex
+        }
+        
+        const num = parseInt(color, 16);
         const amt = Math.round(2.55 * percent);
         const R = (num >> 16) + amt;
         const G = (num >> 8 & 0x00FF) + amt;
@@ -1215,7 +1236,7 @@
                     this.y = this.gridY;
                     this.isMoving = false;
                     this.moveProgress = 0;
-                    this.moveDelay = 100; // Small delay between moves
+                    this.moveDelay = 0; // No delay for smoother movement
                 } else {
                     // Interpolate position
                     this.x = this.prevX + (this.targetGridX - this.prevX) * this.moveProgress;
