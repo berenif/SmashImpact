@@ -29,4 +29,3 @@ for file in *.html; do
 done
 
 echo "📦 Cache version update complete!"
-echo "🚀 Files will now bypass browser cache on next deployment"# Test comment

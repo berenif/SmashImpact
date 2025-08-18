@@ -1,0 +1,28 @@
+{
+  "name": "smash-impact",
+  "version": "1.0.0",
+  "description": "Isometric dungeon crawler game",
+  "scripts": {
+    "update-cache": "./update-cache-version.sh",
+    "commit": "./update-cache-version.sh && git add -A && git commit",
+    "push": "npm run commit && git push origin main",
+    "deploy": "npm run update-cache && git add -A && git commit -m 'Deploy with cache update' && git push origin main"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/berenif/SmashImpact.git"
+  },
+  "keywords": [
+    "game",
+    "isometric",
+    "dungeon",
+    "webrtc",
+    "multiplayer"
+  ],
+  "author": "berenif",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/berenif/SmashImpact/issues"
+  },
+  "homepage": "https://berenif.github.io/SmashImpact/"
+}
