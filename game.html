@@ -513,7 +513,7 @@
     </div>
 
     <!-- Debug info -->
-    <div class="debug-info" id="debugInfo">
+    <div class="debug-info active" id="debugInfo">
       <div>FPS: <span id="fps">0</span></div>
       <div>Joystick: <span id="joystickDebug">0, 0</span></div>
       <div>Touch: <span id="touchDebug">none</span></div>
@@ -777,11 +777,24 @@
       constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
+        
+        // Check if context was successfully created
+        if (!this.ctx) {
+          console.error('Failed to get 2D context from canvas');
+          alert('Failed to initialize game canvas. Please refresh the page.');
+          return;
+        }
+        
         this.running = false;
         this.paused = false;
         
-        // Initialize visual effects
-        this.vfx = new window.VisualEffects(canvas, this.ctx);
+        // Initialize visual effects with error handling
+        try {
+          this.vfx = new window.VisualEffects(canvas, this.ctx);
+        } catch (error) {
+          console.error('Failed to initialize visual effects:', error);
+          this.vfx = null; // Continue without visual effects
+        }
         
         // Check for multiplayer
         this.isMultiplayer = sessionStorage.getItem('p2pConnected') === 'true';
@@ -1110,8 +1123,21 @@
 
       resizeCanvas() {
         const container = this.canvas.parentElement;
-        this.canvas.width = container.clientWidth;
-        this.canvas.height = container.clientHeight;
+        const width = container.clientWidth || window.innerWidth;
+        const height = container.clientHeight || window.innerHeight;
+        
+        // Ensure canvas has valid dimensions
+        if (width <= 0 || height <= 0) {
+          console.error('Invalid canvas dimensions:', width, height);
+          // Set default dimensions
+          this.canvas.width = 800;
+          this.canvas.height = 600;
+        } else {
+          this.canvas.width = width;
+          this.canvas.height = height;
+        }
+        
+        console.log('Canvas resized to:', this.canvas.width, 'x', this.canvas.height);
         
         // Reset player position
         if (this.player) {
@@ -1492,6 +1518,12 @@
       }
 
       render() {
+        // Check if context exists
+        if (!this.ctx) {
+          console.error('Canvas context is null in render');
+          return;
+        }
+        
         // Clear canvas
         this.ctx.fillStyle = '#0a0e27';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1687,12 +1719,15 @@
 
     // Initialize game
     let gameInstance = null;
-    window.debugMode = false;
+    window.debugMode = true; // Enable debug mode to show FPS
 
     document.addEventListener('DOMContentLoaded', () => {
       const canvas = document.getElementById('gameCanvas');
       gameInstance = new MobileGame(canvas);
       window.gameInstance = gameInstance;
+      
+      // Initialize and start the game
+      gameInstance.init();
       
       // Update device debug info
       const deviceType = sessionStorage.getItem('deviceType') || 'auto-detected';
