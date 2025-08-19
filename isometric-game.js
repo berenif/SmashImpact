@@ -16,9 +16,9 @@
         CAMERA_SMOOTHING: 0.15,
         ZOOM_DEFAULT: 1.3,  // Adjusted for 3D blocks
         ZOOM_MOBILE: 1.0,   // Adjusted zoom for mobile
-        VOXEL_HEIGHT: 20,   // Much higher for 3D blocks
+        VOXEL_HEIGHT: 8,    // Lower height for walls
         AMBIENT_LIGHT: 0.7, // Balanced lighting
-        SHADOW_OPACITY: 0.35, // Stronger shadows for depth
+        SHADOW_OPACITY: 0.25, // Softer shadows for walls
         // Viewport culling settings
         VIEWPORT_PADDING: 5, // Extra tiles to render outside viewport
         CHUNK_SIZE: 20,     // Size of map chunks for optimization
@@ -478,11 +478,11 @@
         
         const w = CONFIG.TILE_WIDTH / 2;
         const h = CONFIG.TILE_HEIGHT / 2;
-        const tileHeight = CONFIG.TILE_DEPTH; // Much taller 3D blocks
+        const tileHeight = type === TILE_TYPES.WALL ? CONFIG.TILE_DEPTH * 2 : 0; // Only walls have height
         
         // Draw strong shadow for 3D blocks
         ctx.save();
-        ctx.translate(6, 10); // Larger shadow offset
+        ctx.translate(4, 6); // Smaller shadow offset
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.filter = 'blur(4px)';
         ctx.beginPath();
@@ -1216,29 +1216,27 @@
                 }
             }
             
-            // Add walls at edges for dungeon
+            // Add walls only at map boundaries
+            // Only add walls at the very edges
             for (let y = 0; y < this.height; y++) {
-                if (y >= 0 && y < this.grid.length &&
-                    this.grid[y] && this.grid[y][0] && this.grid[y][0].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
-                    this.grid[y][0].type = TILE_TYPES.WALL;
-                    this.grid[y][0].walkable = false;
-                }
-                if (y >= 0 && y < this.grid.length &&
-                    this.grid[y] && this.grid[y][this.width - 1] && this.grid[y][this.width - 1].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
-                    this.grid[y][this.width - 1].type = TILE_TYPES.WALL;
-                    this.grid[y][this.width - 1].walkable = false;
+                if (y === 0 || y === this.height - 1) {
+                    for (let x = 0; x < this.width; x++) {
+                        if (this.grid[y] && this.grid[y][x]) {
+                            this.grid[y][x].type = TILE_TYPES.WALL;
+                            this.grid[y][x].walkable = false;
+                        }
+                    }
                 }
             }
             
-            // Add walls to top and bottom edges
             for (let x = 0; x < this.width; x++) {
-                if (this.grid[0] && this.grid[0][x] && this.grid[0][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
-                    this.grid[0][x].type = TILE_TYPES.WALL;
-                    this.grid[0][x].walkable = false;
-                }
-                if (this.grid[this.height - 1] && this.grid[this.height - 1][x] && this.grid[this.height - 1][x].type === TILE_TYPES.STONE_FLOOR && Math.random() > 0.4) {
-                    this.grid[this.height - 1][x].type = TILE_TYPES.WALL;
-                    this.grid[this.height - 1][x].walkable = false;
+                if (x === 0 || x === this.width - 1) {
+                    for (let y = 1; y < this.height - 1; y++) {
+                        if (this.grid[y] && this.grid[y][x]) {
+                            this.grid[y][x].type = TILE_TYPES.WALL;
+                            this.grid[y][x].walkable = false;
+                        }
+                    }
                 }
             }
         }
