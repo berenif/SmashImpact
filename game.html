@@ -1726,9 +1726,6 @@
       gameInstance = new MobileGame(canvas);
       window.gameInstance = gameInstance;
       
-      // Initialize and start the game
-      gameInstance.init();
-      
       // Update device debug info
       const deviceType = sessionStorage.getItem('deviceType') || 'auto-detected';
       const isMobile = 'ontouchstart' in window;
