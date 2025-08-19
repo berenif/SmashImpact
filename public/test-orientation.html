@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mobile Orientation Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .info-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    
+    .label {
+      font-weight: bold;
+      opacity: 0.9;
+    }
+    
+    .value {
+      font-family: monospace;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-left: 10px;
+    }
+    
+    .status-indicator.active {
+      background: #10b981;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-indicator.inactive {
+      background: #ef4444;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .test-button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid white;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 25px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 20px;
+      transition: all 0.3s;
+    }
+    
+    .test-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    .test-button:active {
+      transform: translateY(0);
+    }
+    
+    .orientation-display {
+      text-align: center;
+      font-size: 3rem;
+      margin: 20px 0;
+      animation: rotate 4s linear infinite;
+    }
+    
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Mobile Orientation Detector Test</h1>
+    
+    <div class="info-card">
+      <h2>Device Information</h2>
+      <div class="info-row">
+        <span class="label">User Agent:</span>
+        <span class="value" id="userAgent">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Touch Support:</span>
+        <span class="value" id="touchSupport">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Screen Size:</span>
+        <span class="value" id="screenSize">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Device Type:</span>
+        <span class="value" id="deviceType">Loading...</span>
+      </div>
+    </div>
+    
+    <div class="info-card">
+      <h2>Orientation Status</h2>
+      <div class="orientation-display" id="orientationIcon">📱</div>
+      <div class="info-row">
+        <span class="label">Current Orientation:</span>
+        <span class="value" id="currentOrientation">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Window Dimensions:</span>
+        <span class="value" id="windowDimensions">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Aspect Ratio:</span>
+        <span class="value" id="aspectRatio">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Overlay Status:</span>
+        <span class="value" id="overlayStatus">Loading...</span>
+        <span class="status-indicator" id="overlayIndicator"></span>
+      </div>
+    </div>
+    
+    <button class="test-button" onclick="testOverlay()">Force Show Overlay (Test)</button>
+    <button class="test-button" onclick="refreshInfo()">Refresh Information</button>
+  </div>
+  
+  <!-- Include the mobile orientation detector -->
+  <script src="mobile-orientation.js"></script>
+  
+  <script>
+    function updateDeviceInfo() {
+      // User Agent
+      const userAgent = navigator.userAgent;
+      document.getElementById('userAgent').textContent = userAgent.substring(0, 50) + '...';
+      
+      // Touch Support
+      const touchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      document.getElementById('touchSupport').textContent = touchSupport ? 'Yes' : 'No';
+      
+      // Screen Size
+      document.getElementById('screenSize').textContent = `${window.innerWidth} x ${window.innerHeight}`;
+      
+      // Device Type
+      if (window.mobileOrientationDetector) {
+        const state = window.mobileOrientationDetector.getState();
+        document.getElementById('deviceType').textContent = state.isMobile ? 'Mobile' : 'Desktop';
+      }
+    }
+    
+    function updateOrientationInfo() {
+      // Window dimensions
+      document.getElementById('windowDimensions').textContent = `${window.innerWidth} x ${window.innerHeight}`;
+      
+      // Aspect ratio
+      const aspectRatio = (window.innerWidth / window.innerHeight).toFixed(2);
+      document.getElementById('aspectRatio').textContent = aspectRatio;
+      
+      // Current orientation
+      const isPortrait = window.innerWidth < window.innerHeight;
+      document.getElementById('currentOrientation').textContent = isPortrait ? 'Portrait' : 'Landscape';
+      document.getElementById('orientationIcon').textContent = isPortrait ? '📱' : '📱';
+      document.getElementById('orientationIcon').style.transform = isPortrait ? 'rotate(0deg)' : 'rotate(90deg)';
+      
+      // Overlay status
+      if (window.mobileOrientationDetector) {
+        const state = window.mobileOrientationDetector.getState();
+        document.getElementById('overlayStatus').textContent = state.isOverlayVisible ? 'Visible' : 'Hidden';
+        
+        const indicator = document.getElementById('overlayIndicator');
+        if (state.isOverlayVisible) {
+          indicator.classList.add('active');
+          indicator.classList.remove('inactive');
+        } else {
+          indicator.classList.add('inactive');
+          indicator.classList.remove('active');
+        }
+      }
+    }
+    
+    function refreshInfo() {
+      updateDeviceInfo();
+      updateOrientationInfo();
+    }
+    
+    function testOverlay() {
+      if (window.mobileOrientationDetector) {
+        // Temporarily override isMobile for testing
+        const originalIsMobile = window.mobileOrientationDetector.isMobile;
+        window.mobileOrientationDetector.isMobile = true;
+        window.mobileOrientationDetector.isPortrait = true;
+        window.mobileOrientationDetector.showOverlay();
+        
+        // Reset after 3 seconds
+        setTimeout(() => {
+          window.mobileOrientationDetector.isMobile = originalIsMobile;
+          window.mobileOrientationDetector.hideOverlay();
+          window.mobileOrientationDetector.checkOrientation();
+        }, 3000);
+      }
+    }
+    
+    // Initial update
+    refreshInfo();
+    
+    // Update on resize/orientation change
+    window.addEventListener('resize', refreshInfo);
+    window.addEventListener('orientationchange', refreshInfo);
+    
+    // Listen for custom events
+    window.addEventListener('orientationOverlayShown', (e) => {
+      console.log('Overlay shown event received', e.detail);
+      updateOrientationInfo();
+    });
+    
+    window.addEventListener('orientationOverlayHidden', (e) => {
+      console.log('Overlay hidden event received', e.detail);
+      updateOrientationInfo();
+    });
+    
+    // Auto-refresh every second
+    setInterval(updateOrientationInfo, 1000);
+  </script>
+</body>
+</html>

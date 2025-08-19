@@ -2384,5 +2384,30 @@
       });
     }
   </script>
+  
+  <!-- Mobile Orientation Detection -->
+  <script src="mobile-orientation.js"></script>
+  <script>
+    // Integration with game system
+    if (window.mobileOrientationDetector) {
+      // Listen for orientation changes to pause/resume game if needed
+      window.addEventListener('orientationOverlayShown', (e) => {
+        console.log('Orientation overlay shown - game should pause if running');
+        // If game instance exists and is running, pause it
+        if (window.gameInstance && window.gameInstance.isRunning && !window.gameInstance.isPaused) {
+          window.gameInstance.pause();
+        }
+      });
+      
+      window.addEventListener('orientationOverlayHidden', (e) => {
+        console.log('Orientation overlay hidden - game can resume');
+        // Optionally auto-resume game when rotated to landscape
+        // Uncomment if you want auto-resume:
+        // if (window.gameInstance && window.gameInstance.isPaused) {
+        //   window.gameInstance.resume();
+        // }
+      });
+    }
+  </script>
 </body>
 </html>

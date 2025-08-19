@@ -839,5 +839,21 @@
       }, 500);
     }
   </script>
+  <!-- Mobile Orientation Detection -->
+  <script src="mobile-orientation.js"></script>
+  <script>
+    // Integration with game system
+    if (window.mobileOrientationDetector) {
+      // Listen for orientation changes
+      window.addEventListener('orientationOverlayShown', (e) => {
+        console.log('Orientation overlay shown - game should pause if running');
+        // Pause game logic can be added here if needed
+      });
+      
+      window.addEventListener('orientationOverlayHidden', (e) => {
+        console.log('Orientation overlay hidden - game can resume');
+      });
+    }
+  </script>
 </body>
 </html>

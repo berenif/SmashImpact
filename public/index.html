@@ -867,5 +867,18 @@
       }
     });
   </script>
+  
+  <!-- Mobile Orientation Detection -->
+  <script src="mobile-orientation.js"></script>
+  <script>
+    // Integration for menu page
+    if (window.mobileOrientationDetector) {
+      // On the menu/index page, we just show the overlay
+      // No game to pause here
+      window.addEventListener('orientationOverlayShown', (e) => {
+        console.log('Please rotate device to landscape for better experience');
+      });
+    }
+  </script>
 </body>
 </html>
