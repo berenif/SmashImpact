@@ -576,10 +576,12 @@
     </div>
   </div>
 
-  <!-- Multiplayer synchronization -->
-  <script src="multiplayer.js"></script>
-  <!-- Visual effects system -->
+  <!-- Game Dependencies -->
   <script src="visual-effects.js"></script>
+  <script src="multiplayer.js"></script>
+  <script src="wolf-ai.js"></script>
+  <!-- Unified Game System -->
+  <script src="unified-game.js"></script>
   
   <script type="module">
     // Mobile joystick controller
@@ -2210,7 +2212,14 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       const canvas = document.getElementById('gameCanvas');
-      gameInstance = new MobileGame(canvas);
+      // Use UnifiedGame if available, fallback to MobileGame
+      if (window.UnifiedGame) {
+        gameInstance = new window.UnifiedGame(canvas);
+        console.log('✅ Using UnifiedGame system');
+      } else {
+        gameInstance = new MobileGame(canvas);
+        console.log('📦 Using MobileGame fallback');
+      }
       window.gameInstance = gameInstance;
       
       // Update device debug info

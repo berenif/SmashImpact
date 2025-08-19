@@ -14,6 +14,7 @@ const urlsToCache = [
   './visual-effects.js',
   './wolf-ai.js',
   './wolf-integration-fix.js',
+  './unified-game.js',
   './vendor/qrcode.js',
   './vendor/jsqr.js',
   './manifest.json'
