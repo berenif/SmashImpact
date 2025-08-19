@@ -20,6 +20,15 @@
     PLAYER_BOOST_DURATION: 200,
     PLAYER_BOOST_COOLDOWN: 1000,
     
+    // Block settings
+    BLOCK_DURATION: 500,
+    BLOCK_COOLDOWN: 300,
+    PERFECT_PARRY_WINDOW: 100, // 100ms window for perfect parry
+    BLOCK_DAMAGE_REDUCTION: 0.5, // Normal block reduces damage by 50%
+    PERFECT_PARRY_DAMAGE_REDUCTION: 1.0, // Perfect parry negates all damage
+    PERFECT_PARRY_STUN_DURATION: 1000, // Stun enemy on perfect parry
+    PERFECT_PARRY_ENERGY_RESTORE: 20,
+    
     // Enemy settings
     ENEMY_RADIUS: 15,
     ENEMY_SPEED: 2,
@@ -126,7 +135,9 @@
       this.initPlayer();
       
       // Initialize visual effects
-      if (window.VisualEffectsManager) {
+      if (window.VFXSystem) {
+        this.vfx = new window.VFXSystem(this.ctx);
+      } else if (window.VisualEffectsManager) {
         this.vfx = new window.VisualEffectsManager(this.ctx, this.canvas);
       }
       
@@ -170,7 +181,14 @@
         lastBoostParticle: 0,
         invulnerable: false,
         powerUps: [],
-        trail: []
+        trail: [],
+        // Block properties
+        blocking: false,
+        blockStartTime: 0,
+        blockCooldown: 0,
+        perfectParryWindow: false,
+        lastPerfectParry: 0,
+        blockHeldTime: 0
       };
     }
     
@@ -271,6 +289,12 @@
             this.nextWave();
           }
           break;
+        case 'shift':
+        case ' ': // Space bar as alternative block key
+          if (this.state === 'playing' && !this.player.blocking && this.player.blockCooldown <= 0) {
+            this.startBlock();
+          }
+          break;
         case '4':
           if (this.state === 'playing') {
             this.giveShield();
@@ -289,6 +313,16 @@
     
     handleKeyUp(e) {
       this.input.keys[e.key.toLowerCase()] = false;
+      
+      // Handle block release
+      switch(e.key.toLowerCase()) {
+        case 'shift':
+        case ' ': // Space bar as alternative block key
+          if (this.player.blocking) {
+            this.endBlock();
+          }
+          break;
+      }
     }
     
     handleMouseMove(e) {
@@ -568,9 +602,131 @@
         this.player.trail = [];
       }
       
-      // Handle boost button
-      if (this.input.keys[' '] || (this.input.buttons.boost && this.input.buttons.boost.isPressed())) {
+      // Handle boost button (only if not blocking)
+      if (!this.player.blocking && (this.input.keys['e'] || (this.input.buttons.boost && this.input.buttons.boost.isPressed()))) {
         this.handleBoost();
+      }
+      
+      // Update block cooldown
+      if (this.player.blockCooldown > 0) {
+        this.player.blockCooldown -= deltaTime;
+      }
+      
+      // Update block state
+      if (this.player.blocking) {
+        this.player.blockHeldTime += deltaTime;
+        
+        // Check if perfect parry window has expired
+        if (this.player.perfectParryWindow && 
+            (performance.now() - this.player.blockStartTime) > CONFIG.PERFECT_PARRY_WINDOW) {
+          this.player.perfectParryWindow = false;
+        }
+        
+        // Reduce movement speed while blocking
+        this.player.vx *= 0.5;
+        this.player.vy *= 0.5;
+      }
+    }
+    
+    startBlock() {
+      if (this.player.blockCooldown > 0 || this.player.blocking) return;
+      
+      this.player.blocking = true;
+      this.player.blockStartTime = performance.now();
+      this.player.perfectParryWindow = true; // Perfect parry window active at start
+      this.player.blockHeldTime = 0;
+      
+      // Visual feedback for block start
+      if (this.vfx) {
+        // Create shield effect particles
+        for (let i = 0; i < 10; i++) {
+          const angle = (Math.PI * 2 * i) / 10;
+          this.vfx.createParticle(
+            this.player.x + Math.cos(angle) * this.player.radius,
+            this.player.y + Math.sin(angle) * this.player.radius,
+            Math.cos(angle) * 2,
+            Math.sin(angle) * 2,
+            '#4444ff',
+            30
+          );
+        }
+      }
+    }
+    
+    endBlock() {
+      if (!this.player.blocking) return;
+      
+      this.player.blocking = false;
+      this.player.perfectParryWindow = false;
+      this.player.blockCooldown = CONFIG.BLOCK_COOLDOWN;
+      
+      // Visual feedback for block end
+      if (this.vfx) {
+        // Create dissipating shield particles
+        for (let i = 0; i < 5; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          this.vfx.createParticle(
+            this.player.x,
+            this.player.y,
+            Math.cos(angle) * 1,
+            Math.sin(angle) * 1,
+            '#2222ff',
+            20
+          );
+        }
+      }
+    }
+    
+    handlePerfectParry(attacker) {
+      // Perfect parry successful!
+      this.player.lastPerfectParry = performance.now();
+      
+      // Restore energy
+      this.player.energy = Math.min(this.player.maxEnergy, 
+                                    this.player.energy + CONFIG.PERFECT_PARRY_ENERGY_RESTORE);
+      
+      // Stun the attacker
+      if (attacker) {
+        attacker.stunned = true;
+        attacker.stunnedUntil = performance.now() + CONFIG.PERFECT_PARRY_STUN_DURATION;
+        
+        // Knockback the attacker
+        const dx = attacker.x - this.player.x;
+        const dy = attacker.y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0) {
+          attacker.vx = (dx / dist) * 10;
+          attacker.vy = (dy / dist) * 10;
+        }
+      }
+      
+      // Visual feedback for perfect parry
+      if (this.vfx) {
+        // Create golden flash effect
+        for (let i = 0; i < 20; i++) {
+          const angle = (Math.PI * 2 * i) / 20;
+          this.vfx.createParticle(
+            this.player.x + Math.cos(angle) * this.player.radius * 1.5,
+            this.player.y + Math.sin(angle) * this.player.radius * 1.5,
+            Math.cos(angle) * 5,
+            Math.sin(angle) * 5,
+            '#ffdd00',
+            40
+          );
+        }
+        
+        // Screen shake for impact
+        if (this.vfx.startScreenShake) {
+          this.vfx.startScreenShake(5, 200);
+        }
+      }
+      
+      // Score bonus for perfect parry
+      this.score += 50;
+      
+      // Play sound effect if available
+      if (this.audio && this.audio.playSound) {
+        this.audio.playSound('perfectParry');
       }
     }
     
@@ -581,15 +737,28 @@
         // Skip wolves (handled separately)
         if (enemy.type === 'wolf') continue;
         
-        // Simple AI: move towards player
-        if (this.player) {
-          const dx = this.player.x - enemy.x;
-          const dy = this.player.y - enemy.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist > 0) {
-            enemy.vx = (dx / dist) * enemy.speed;
-            enemy.vy = (dy / dist) * enemy.speed;
+        // Check if enemy is stunned
+        if (enemy.stunned && enemy.stunnedUntil) {
+          if (performance.now() < enemy.stunnedUntil) {
+            // Enemy is still stunned - reduce velocity
+            enemy.vx *= 0.9;
+            enemy.vy *= 0.9;
+          } else {
+            // Stun expired
+            enemy.stunned = false;
+            enemy.stunnedUntil = null;
+          }
+        } else {
+          // Simple AI: move towards player
+          if (this.player) {
+            const dx = this.player.x - enemy.x;
+            const dy = this.player.y - enemy.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 0) {
+              enemy.vx = (dx / dist) * enemy.speed;
+              enemy.vy = (dy / dist) * enemy.speed;
+            }
           }
         }
         
@@ -698,6 +867,22 @@
     updateWolfSimple(wolf, deltaTime) {
       if (!this.player) return;
       
+      // Check if wolf is stunned
+      if (wolf.stunned && wolf.stunnedUntil) {
+        if (performance.now() < wolf.stunnedUntil) {
+          // Wolf is still stunned - reduce velocity and skip AI
+          wolf.vx *= 0.85;
+          wolf.vy *= 0.85;
+          wolf.x += wolf.vx * deltaTime / 16;
+          wolf.y += wolf.vy * deltaTime / 16;
+          return;
+        } else {
+          // Stun expired
+          wolf.stunned = false;
+          wolf.stunnedUntil = null;
+        }
+      }
+      
       const dx = this.player.x - wolf.x;
       const dy = this.player.y - wolf.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -754,22 +939,55 @@
       const dist = Math.sqrt(dx * dx + dy * dy);
       
       if (dist < CONFIG.WOLF_ATTACK_RADIUS) {
-        this.player.health -= CONFIG.WOLF_DAMAGE;
-        this.timers.invulnerability = CONFIG.INVULNERABILITY_DURATION;
+        let damage = CONFIG.WOLF_DAMAGE;
+        let blocked = false;
         
-        // Knockback
-        this.player.vx += (dx / dist) * 10;
-        this.player.vy += (dy / dist) * 10;
-        
-        // Visual effect
-        if (this.vfx) {
-          this.vfx.createImpactEffect(this.player.x, this.player.y, '#ff0000');
-          this.vfx.shakeScreen(10, 200);
+        // Check if player is blocking
+        if (this.player.blocking) {
+          blocked = true;
+          
+          // Check for perfect parry
+          if (this.player.perfectParryWindow) {
+            // Perfect parry!
+            this.handlePerfectParry(wolf);
+            damage = 0; // No damage on perfect parry
+            
+            // Visual feedback
+            if (this.vfx) {
+              this.vfx.createImpactEffect(this.player.x, this.player.y, '#ffdd00');
+            }
+            return; // Exit early, perfect parry handled everything
+          } else {
+            // Normal block - reduce damage
+            damage *= (1 - CONFIG.BLOCK_DAMAGE_REDUCTION);
+            
+            // Visual feedback for normal block
+            if (this.vfx) {
+              this.vfx.createImpactEffect(this.player.x, this.player.y, '#4444ff');
+            }
+          }
         }
         
-        // Check if player died
-        if (this.player.health <= 0) {
-          this.playerDeath();
+        // Apply damage (if any)
+        if (damage > 0) {
+          this.player.health -= damage;
+          this.timers.invulnerability = CONFIG.INVULNERABILITY_DURATION;
+          
+          // Reduced knockback if blocking
+          const knockbackMultiplier = blocked ? 0.3 : 1.0;
+          this.player.vx += (dx / dist) * 10 * knockbackMultiplier;
+          this.player.vy += (dy / dist) * 10 * knockbackMultiplier;
+          
+          // Visual effect
+          if (this.vfx && !blocked) {
+            this.vfx.createImpactEffect(this.player.x, this.player.y, '#ff0000');
+            this.vfx.shakeScreen(10, 200);
+          }
+          
+          // Check if player died
+          if (this.player.health <= 0) {
+            this.playerDeath();
+          }
         }
       }
     }
@@ -855,20 +1073,57 @@
         
         if (dist < this.player.radius + enemy.radius) {
           if (!this.player.invulnerable) {
-            this.player.health -= 10;
-            this.timers.invulnerability = CONFIG.INVULNERABILITY_DURATION;
+            let damage = 10;
+            let blocked = false;
             
-            // Knockback
-            this.player.vx += (dx / dist) * 5;
-            this.player.vy += (dy / dist) * 5;
-            
-            // Visual effect
-            if (this.vfx) {
-              this.vfx.createImpactEffect(this.player.x, this.player.y, '#ff0000');
+            // Check if player is blocking
+            if (this.player.blocking) {
+              blocked = true;
+              
+              // Check for perfect parry
+              if (this.player.perfectParryWindow) {
+                // Perfect parry!
+                this.handlePerfectParry(enemy);
+                damage = 0; // No damage on perfect parry
+                
+                // Destroy the enemy on perfect parry
+                enemy.health = 0;
+                this.score += CONFIG.SCORE_PER_KILL * 2; // Double score for perfect parry kill
+                
+                // Visual feedback
+                if (this.vfx) {
+                  this.vfx.createExplosion(enemy.x, enemy.y, '#ffdd00');
+                }
+                continue; // Skip to next enemy
+              } else {
+                // Normal block - reduce damage
+                damage *= (1 - CONFIG.BLOCK_DAMAGE_REDUCTION);
+                
+                // Visual feedback for normal block
+                if (this.vfx) {
+                  this.vfx.createImpactEffect(this.player.x, this.player.y, '#4444ff');
+                }
+              }
             }
             
-            if (this.player.health <= 0) {
-              this.playerDeath();
+            // Apply damage (if any)
+            if (damage > 0) {
+              this.player.health -= damage;
+              this.timers.invulnerability = CONFIG.INVULNERABILITY_DURATION;
+              
+              // Reduced knockback if blocking
+              const knockbackMultiplier = blocked ? 0.3 : 1.0;
+              this.player.vx += (dx / dist) * 5 * knockbackMultiplier;
+              this.player.vy += (dy / dist) * 5 * knockbackMultiplier;
+              
+              // Visual effect
+              if (this.vfx && !blocked) {
+                this.vfx.createImpactEffect(this.player.x, this.player.y, '#ff0000');
+              }
+              
+              if (this.player.health <= 0) {
+                this.playerDeath();
+              }
             }
           }
         }
@@ -976,7 +1231,9 @@
         health: 50 + this.waveNumber * 10,
         maxHealth: 50 + this.waveNumber * 10,
         color: '#ff0000',
-        type: 'basic'
+        type: 'basic',
+        stunned: false,
+        stunnedUntil: null
       });
     }
     
@@ -1051,7 +1308,9 @@
         color: '#8B4513',
         type: 'wolf',
         state: 'idle',
-        lastAttack: 0
+        lastAttack: 0,
+        stunned: false,
+        stunnedUntil: null
       };
       
       this.wolves.push(wolf);
@@ -1312,10 +1571,36 @@
       for (const enemy of this.enemies) {
         ctx.save();
         
+        // Check if enemy is stunned
+        if (enemy.stunned) {
+          // Draw stun effect
+          ctx.strokeStyle = '#ffdd00';
+          ctx.lineWidth = 3;
+          ctx.shadowColor = '#ffdd00';
+          ctx.shadowBlur = 15;
+          ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.01) * 0.3;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, enemy.radius + 5, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Draw spinning stars around stunned enemy
+          ctx.globalAlpha = 1;
+          const starCount = 3;
+          for (let i = 0; i < starCount; i++) {
+            const angle = (Math.PI * 2 * i / starCount) + Date.now() * 0.003;
+            const starX = enemy.x + Math.cos(angle) * (enemy.radius + 10);
+            const starY = enemy.y + Math.sin(angle) * (enemy.radius + 10);
+            ctx.fillStyle = '#ffdd00';
+            ctx.font = '16px Arial';
+            ctx.fillText('⭐', starX - 8, starY + 6);
+          }
+        }
+        
         // Draw enemy
-        ctx.fillStyle = enemy.color;
-        ctx.shadowColor = enemy.color;
-        ctx.shadowBlur = 10;
+        ctx.globalAlpha = enemy.stunned ? 0.7 : 1;
+        ctx.fillStyle = enemy.stunned ? '#888888' : enemy.color;
+        ctx.shadowColor = enemy.stunned ? '#ffdd00' : enemy.color;
+        ctx.shadowBlur = enemy.stunned ? 5 : 10;
         ctx.beginPath();
         ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -1360,6 +1645,49 @@
         ctx.restore();
       }
       
+      // Draw block shield if active
+      if (this.player.blocking) {
+        ctx.save();
+        
+        // Shield color based on perfect parry window
+        if (this.player.perfectParryWindow) {
+          // Golden shield for perfect parry window
+          ctx.strokeStyle = '#ffdd00';
+          ctx.shadowColor = '#ffdd00';
+          ctx.lineWidth = 4;
+          ctx.shadowBlur = 20;
+        } else {
+          // Blue shield for normal block
+          ctx.strokeStyle = '#4444ff';
+          ctx.shadowColor = '#4444ff';
+          ctx.lineWidth = 3;
+          ctx.shadowBlur = 15;
+        }
+        
+        // Draw shield circle
+        ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.005) * 0.2;
+        ctx.beginPath();
+        ctx.arc(this.player.x, this.player.y, this.player.radius + 10, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Draw shield segments for visual effect
+        const segments = 6;
+        for (let i = 0; i < segments; i++) {
+          const angle = (Math.PI * 2 * i) / segments + Date.now() * 0.001;
+          const x1 = this.player.x + Math.cos(angle) * (this.player.radius + 5);
+          const y1 = this.player.y + Math.sin(angle) * (this.player.radius + 5);
+          const x2 = this.player.x + Math.cos(angle) * (this.player.radius + 15);
+          const y2 = this.player.y + Math.sin(angle) * (this.player.radius + 15);
+          
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
+      
       // Draw player
       ctx.save();
       
@@ -1368,9 +1696,21 @@
         ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.01) * 0.3;
       }
       
-      ctx.fillStyle = this.player.color;
-      ctx.shadowColor = this.player.color;
-      ctx.shadowBlur = this.player.boosting ? 20 : 10;
+      // Modify player color if blocking
+      if (this.player.blocking) {
+        if (this.player.perfectParryWindow) {
+          ctx.fillStyle = '#ffff88'; // Lighter color during perfect parry window
+        } else {
+          ctx.fillStyle = '#88ff88'; // Slightly different color during normal block
+        }
+      } else {
+        ctx.fillStyle = this.player.color;
+      }
+      
+      ctx.shadowColor = this.player.blocking ? 
+                        (this.player.perfectParryWindow ? '#ffdd00' : '#4444ff') : 
+                        this.player.color;
+      ctx.shadowBlur = this.player.boosting ? 20 : (this.player.blocking ? 15 : 10);
       ctx.beginPath();
       ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
       ctx.fill();
@@ -1397,6 +1737,18 @@
       
       ctx.fillStyle = '#00ffff';
       ctx.fillRect(this.player.x - barWidth / 2, energyBarY, barWidth * energyPercent, 3);
+      
+      // Draw block cooldown indicator
+      if (this.player.blockCooldown > 0) {
+        const cooldownPercent = this.player.blockCooldown / CONFIG.BLOCK_COOLDOWN;
+        const cooldownBarY = energyBarY - 7;
+        
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(this.player.x - barWidth / 2, cooldownBarY, barWidth, 3);
+        
+        ctx.fillStyle = '#8888ff';
+        ctx.fillRect(this.player.x - barWidth / 2, cooldownBarY, barWidth * (1 - cooldownPercent), 3);
+      }
       
       ctx.restore();
     }
@@ -1426,6 +1778,41 @@
       if (this.player && this.player.boostCooldown > 0) {
         ctx.fillStyle = '#ffff00';
         ctx.fillText(`Boost: ${Math.ceil(this.player.boostCooldown / 1000)}s`, 20, 180);
+      }
+      
+      // Block status
+      if (this.player) {
+        if (this.player.blocking) {
+          if (this.player.perfectParryWindow) {
+            ctx.fillStyle = '#ffdd00';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('PERFECT PARRY!', 20, 210);
+          } else {
+            ctx.fillStyle = '#4444ff';
+            ctx.font = '18px Arial';
+            ctx.fillText('BLOCKING', 20, 210);
+          }
+        } else if (this.player.blockCooldown > 0) {
+          ctx.fillStyle = '#8888ff';
+          ctx.font = '16px Arial';
+          ctx.fillText(`Block: ${Math.ceil(this.player.blockCooldown / 100) / 10}s`, 20, 210);
+        } else {
+          ctx.fillStyle = '#88ff88';
+          ctx.font = '16px Arial';
+          ctx.fillText('Block Ready (SHIFT/SPACE)', 20, 210);
+        }
+        
+        // Perfect parry indicator
+        if (this.player.lastPerfectParry && 
+            (performance.now() - this.player.lastPerfectParry) < 1000) {
+          ctx.save();
+          ctx.fillStyle = '#ffdd00';
+          ctx.font = 'bold 32px Arial';
+          ctx.textAlign = 'center';
+          ctx.globalAlpha = 1 - (performance.now() - this.player.lastPerfectParry) / 1000;
+          ctx.fillText('PERFECT!', this.canvas.width / 2, this.canvas.height / 2 - 100);
+          ctx.restore();
+        }
       }
       
       // Wave transition
