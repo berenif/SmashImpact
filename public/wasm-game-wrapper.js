@@ -259,7 +259,7 @@ export class WasmGameAdapter {
                     this.game.player.x,
                     this.game.player.y
                 );
-                this.entityMapping.set(playerId, this.game.player);
+                this.entityMapping.set(this.game.player, playerId);
             }
             
             console.log('✓ WebAssembly adapter initialized');
