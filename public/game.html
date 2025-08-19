@@ -1693,17 +1693,17 @@
           this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
         }
         
-        // Create boost trail effect
+                  // Create boost trail effect
         if (this.player.boosting || (this.buttons.boost && this.buttons.boost.isPressed())) {
-          const now = performance.now();
-          if (now - this.player.lastBoostParticle > 30) {
+          const boostNow = performance.now();
+          if (boostNow - this.player.lastBoostParticle > 30) {
             this.vfx.createBoostTrail(
               this.player.x, 
               this.player.y, 
               this.player.color,
               { x: this.player.vx, y: this.player.vy }
             );
-            this.player.lastBoostParticle = now;
+            this.player.lastBoostParticle = boostNow;
           }
         }
         
@@ -1736,10 +1736,10 @@
           }
           
           // Spawn new wolves periodically
-          const now = Date.now();
-          if (now - this.lastWolfSpawn > this.wolfSpawnInterval) {
+          const wolfSpawnNow = Date.now();
+          if (wolfSpawnNow - this.lastWolfSpawn > this.wolfSpawnInterval) {
             this.spawnWolf();
-            this.lastWolfSpawn = now;
+            this.lastWolfSpawn = wolfSpawnNow;
             
             // Increase difficulty over time
             if (this.wolves.length === 0) {
@@ -1835,10 +1835,10 @@
           }
           
           // Spawn new power-ups periodically
-          const now = Date.now();
-          if (now - this.lastPowerUpSpawn > 5000 && this.powerUps.length < 5) {
+          const powerUpNow = Date.now();
+          if (powerUpNow - this.lastPowerUpSpawn > 5000 && this.powerUps.length < 5) {
             this.spawnPowerUp();
-            this.lastPowerUpSpawn = now;
+            this.lastPowerUpSpawn = powerUpNow;
           }
         }
         
