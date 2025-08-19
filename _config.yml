@@ -1,0 +1,35 @@
+# GitHub Pages Configuration for SmashImpact
+# This is an isometric multiplayer game
+
+# Site settings
+title: SmashImpact
+description: Enter a mystical dungeon arena where warriors clash in epic P2P battles
+author: berenif
+email: 
+url: https://berenif.github.io
+baseurl: /SmashImpact
+
+# GitHub Pages settings
+theme: null  # We're using custom HTML/CSS/JS, no Jekyll theme
+plugins: []
+
+# Build settings
+markdown: kramdown
+exclude:
+  - README.md
+  - package.json
+  - package-lock.json
+  - node_modules
+  - .git
+  - .gitignore
+  - "*.sh"
+  - "*.backup.js"
+  - "*.old.js"
+  - "*.previous.js"
+  - src/testing
+  - src/debug
+  - test-*.html
+  - BUG_REPORT_COMPLETE.md
+
+# GitHub Pages will serve index.html as the main page
+# The game files will be served as static assets
