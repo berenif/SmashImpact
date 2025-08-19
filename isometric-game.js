@@ -6,7 +6,7 @@
     const CONFIG = {
         TILE_WIDTH: 64,     // Larger for better 3D blocks
         TILE_HEIGHT: 32,    // Maintain 2:1 ratio
-        TILE_DEPTH: 24,     // Significant depth for 3D blocks
+        TILE_DEPTH: 8,     // Significant depth for 3D blocks
         GRID_WIDTH: 200,    // Increased 10x from 20
         GRID_HEIGHT: 200,   // Increased 10x from 20
         PLAYER_SPEED: 0.15, // Slower for tile-based movement
