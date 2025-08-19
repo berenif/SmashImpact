@@ -154,8 +154,11 @@
       if (!this.player) return;
       
       // Apply velocity
-      const newX = this.player.x + this.player.vx * this.deltaTime / 1000;
-      const newY = this.player.y + this.player.vy * this.deltaTime / 1000;
+      if (this.player.vx === undefined) this.player.vx = 0;
+      const dt = this.deltaTime / 1000;
+      const newX = this.player.x + this.player.vx * dt;
+      if (this.player.vy === undefined) this.player.vy = 0;
+      const newY = this.player.y + this.player.vy * dt;
       
       // Check collision with map boundaries
       if (newX >= 0 && newX < CONFIG.GRID_WIDTH && 
@@ -179,8 +182,9 @@
       }
       
       // Apply friction
-      this.player.vx *= 0.9;
-      this.player.vy *= 0.9;
+      const frictionFactor = Math.pow(0.9, this.deltaTime / 16.67);
+      this.player.vx *= frictionFactor;
+      this.player.vy *= frictionFactor;
       
       // Update moving state
       this.player.isMoving = Math.abs(this.player.vx) > 0.1 || Math.abs(this.player.vy) > 0.1;
@@ -468,8 +472,29 @@
     // Public methods for external control
     movePlayer(dx, dy) {
       if (this.player) {
-        this.player.vx = dx * this.player.speed;
-        this.player.vy = dy * this.player.speed;
+        // Initialize velocity if undefined
+        if (this.player.vx === undefined) this.player.vx = 0;
+        if (this.player.vy === undefined) this.player.vy = 0;
+        
+        // Normalize diagonal movement
+        if (dx !== 0 && dy !== 0) {
+          const mag = Math.sqrt(dx * dx + dy * dy);
+          dx /= mag;
+          dy /= mag;
+        }
+        
+        // Apply movement with acceleration
+        const acceleration = 2.0;
+        this.player.vx += dx * this.player.speed * acceleration;
+        this.player.vy += dy * this.player.speed * acceleration;
+        
+        // Limit maximum speed
+        const maxSpeed = this.player.speed * 1.5;
+        const currentSpeed = Math.sqrt(this.player.vx * this.player.vx + this.player.vy * this.player.vy);
+        if (currentSpeed > maxSpeed) {
+          this.player.vx = (this.player.vx / currentSpeed) * maxSpeed;
+          this.player.vy = (this.player.vy / currentSpeed) * maxSpeed;
+        }
       }
     }
 
