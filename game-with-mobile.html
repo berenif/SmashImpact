@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SmashImpact - Mobile & Desktop</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+        }
+        #startScreen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #startScreen button {
+            padding: 15px 30px;
+            font-size: 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        #startScreen button:hover {
+            background: #45a049;
+        }
+        .controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #mobileWarning {
+            display: none;
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 165, 0, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>SmashImpact</h1>
+        <button onclick="startGame()">Start Game</button>
+        <div class="controls-info">
+            <p><strong>Desktop:</strong> WASD/Arrows to move, Mouse to aim, Click to shoot, Space to boost</p>
+            <p><strong>Mobile:</strong> Virtual joystick to move, Touch buttons to shoot and boost</p>
+        </div>
+    </div>
+    
+    <div id="mobileWarning">
+        For best experience, rotate your device to landscape mode
+    </div>
+    
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Load visual effects -->
+    <script src="public/visual-effects.js"></script>
+    
+    <!-- Load mobile controls -->
+    <script src="public/mobile-controls.js"></script>
+    
+    <!-- Load the unified game with improved movement patch -->
+    <script src="public/unified-game.js"></script>
+    
+    <!-- Movement improvements patch -->
+    <script>
+        // Patch the UnifiedGame to add mobile controls support
+        if (typeof UnifiedGame !== 'undefined') {
+            const originalInit = UnifiedGame.prototype.init;
+            UnifiedGame.prototype.init = function() {
+                // Call original init
+                originalInit.call(this);
+                
+                // Initialize mobile controls
+                if (typeof MobileControls !== 'undefined') {
+                    this.mobileControls = new MobileControls(this.canvas, this);
+                }
+            };
+            
+            const originalRender = UnifiedGame.prototype.render;
+            UnifiedGame.prototype.render = function() {
+                // Call original render
+                originalRender.call(this);
+                
+                // Render mobile controls
+                if (this.mobileControls) {
+                    this.mobileControls.render(this.ctx);
+                }
+            };
+            
+            // Improve player movement
+            const originalUpdatePlayer = UnifiedGame.prototype.updatePlayer;
+            UnifiedGame.prototype.updatePlayer = function(deltaTime) {
+                if (!this.player) return;
+                
+                // Handle input
+                let dx = 0, dy = 0;
+                
+                // Keyboard input
+                if (this.input.keys['w'] || this.input.keys['arrowup']) dy -= 1;
+                if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
+                if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
+                if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+                
+                // Joystick input (for mobile)
+                if (this.input.joystick) {
+                    const joystickInput = this.input.joystick.getInput();
+                    // Only use joystick if there's actual input
+                    if (Math.abs(joystickInput.x) > 0.01 || Math.abs(joystickInput.y) > 0.01) {
+                        dx = joystickInput.x;
+                        dy = joystickInput.y;
+                    }
+                }
+                
+                // Normalize diagonal movement
+                if (dx !== 0 && dy !== 0) {
+                    const mag = Math.sqrt(dx * dx + dy * dy);
+                    if (mag > 1) {
+                        dx /= mag;
+                        dy /= mag;
+                    }
+                }
+                
+                // Apply acceleration with better responsiveness
+                if (!this.player.boosting) {
+                    const accel = CONFIG.PLAYER_ACCELERATION * 1.5; // Increased for better response
+                    this.player.vx += dx * accel;
+                    this.player.vy += dy * accel;
+                    
+                    // Limit speed
+                    const speed = Math.sqrt(this.player.vx * this.player.vx + this.player.vy * this.player.vy);
+                    if (speed > CONFIG.PLAYER_MAX_SPEED) {
+                        this.player.vx = (this.player.vx / speed) * CONFIG.PLAYER_MAX_SPEED;
+                        this.player.vy = (this.player.vy / speed) * CONFIG.PLAYER_MAX_SPEED;
+                    }
+                }
+                
+                // Apply friction
+                this.player.vx *= CONFIG.PLAYER_FRICTION;
+                this.player.vy *= CONFIG.PLAYER_FRICTION;
+                
+                // Update position
+                this.player.x += this.player.vx * deltaTime / 16;
+                this.player.y += this.player.vy * deltaTime / 16;
+                
+                // Keep player in bounds
+                this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
+                this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+                
+                // Update trail
+                if (this.player.boosting) {
+                    this.player.trail.push({ x: this.player.x, y: this.player.y });
+                    if (this.player.trail.length > CONFIG.TRAIL_LENGTH) {
+                        this.player.trail.shift();
+                    }
+                    
+                    // Create boost particles
+                    const now = performance.now();
+                    if (now - this.player.lastBoostParticle > 30) {
+                        if (this.vfx) {
+                            this.vfx.createBoostTrail(
+                                this.player.x,
+                                this.player.y,
+                                this.player.color,
+                                { x: this.player.vx, y: this.player.vy }
+                            );
+                        }
+                        this.player.lastBoostParticle = now;
+                    }
+                } else {
+                    this.player.trail = [];
+                }
+                
+                // Handle boost button
+                if (this.input.keys[' '] || (this.input.buttons.boost && this.input.buttons.boost.isPressed())) {
+                    this.handleBoost();
+                }
+            };
+        }
+    </script>
+    
+    <script>
+        // Initialize game
+        const canvas = document.getElementById('gameCanvas');
+        let game;
+        
+        // Check for mobile and show warning if portrait
+        function checkOrientation() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const warning = document.getElementById('mobileWarning');
+            
+            if (isMobile && window.innerHeight > window.innerWidth) {
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+            }
+        }
+        
+        // Initialize the game
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            
+            if (typeof UnifiedGame !== 'undefined') {
+                game = new UnifiedGame(canvas);
+                game.init();
+            } else {
+                console.error('UnifiedGame not found. Make sure unified-game.js is loaded.');
+            }
+        }
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            checkOrientation();
+            if (game && game.resizeCanvas) {
+                game.resizeCanvas();
+            }
+        });
+        
+        window.addEventListener('orientationchange', checkOrientation);
+        
+        // Initial check
+        checkOrientation();
+        
+        // Prevent scrolling on mobile
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Prevent context menu on long press
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
