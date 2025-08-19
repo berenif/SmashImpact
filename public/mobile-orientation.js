@@ -50,6 +50,12 @@ class MobileOrientationDetector {
     window.addEventListener('orientationchange', this.handleOrientationChange);
     window.addEventListener('resize', this.checkOrientation);
     
+    // Add fullscreen change listener
+    document.addEventListener('fullscreenchange', this.handleFullscreenChange.bind(this));
+    document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange.bind(this));
+    document.addEventListener('mozfullscreenchange', this.handleFullscreenChange.bind(this));
+    document.addEventListener('MSFullscreenChange', this.handleFullscreenChange.bind(this));
+    
     // Check initial orientation
     this.checkOrientation();
   }
@@ -334,8 +340,15 @@ class MobileOrientationDetector {
     // Show or hide overlay based on orientation
     if (this.isPortrait) {
       this.showOverlay();
+      this.exitFullscreen();
     } else {
-      this.hideOverlay();
+      // In landscape mode
+      if (this.isVisible) {
+        this.hideOverlay();
+      } else {
+        // If already in landscape on load or refresh, enter fullscreen
+        this.enterFullscreen();
+      }
     }
   }
   
@@ -347,6 +360,23 @@ class MobileOrientationDetector {
     setTimeout(() => {
       this.checkOrientation();
     }, 100);
+  }
+  
+  /**
+   * Handle fullscreen change event
+   */
+  handleFullscreenChange() {
+    const isFullscreen = !!(document.fullscreenElement || 
+                           document.webkitFullscreenElement || 
+                           document.mozFullScreenElement || 
+                           document.msFullscreenElement);
+    
+    if (!isFullscreen && this.isMobile && !this.isPortrait) {
+      // User manually exited fullscreen while in landscape
+      console.log('User exited fullscreen mode manually');
+      // Optionally re-enter fullscreen after a delay
+      // setTimeout(() => this.enterFullscreen(), 1000);
+    }
   }
   
   /**
@@ -376,13 +406,80 @@ class MobileOrientationDetector {
     this.overlay.classList.remove('visible');
     this.isVisible = false;
     
+    // Enter fullscreen when mobile and landscape
+    this.enterFullscreen();
+    
     // Dispatch custom event
     window.dispatchEvent(new CustomEvent('orientationOverlayHidden', {
       detail: { isPortrait: false }
     }));
     
     // Log for debugging
-    console.log('Device rotated to landscape mode - hiding overlay');
+    console.log('Device rotated to landscape mode - hiding overlay and entering fullscreen');
+  }
+  
+  /**
+   * Enter fullscreen mode
+   */
+  enterFullscreen() {
+    if (!this.isMobile) return;
+    
+    const elem = document.documentElement;
+    
+    // Check if already in fullscreen
+    if (document.fullscreenElement || 
+        document.webkitFullscreenElement || 
+        document.mozFullScreenElement || 
+        document.msFullscreenElement) {
+      return;
+    }
+    
+    // Request fullscreen using the appropriate method
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch(err => {
+        console.log('Error attempting to enable fullscreen:', err.message);
+      });
+    } else if (elem.webkitRequestFullscreen) {
+      // Safari/old Chrome
+      elem.webkitRequestFullscreen();
+    } else if (elem.mozRequestFullScreen) {
+      // Old Firefox
+      elem.mozRequestFullScreen();
+    } else if (elem.msRequestFullscreen) {
+      // Old IE/Edge
+      elem.msRequestFullscreen();
+    }
+    
+    console.log('Entering fullscreen mode for mobile landscape');
+  }
+  
+  /**
+   * Exit fullscreen mode
+   */
+  exitFullscreen() {
+    if (!document.fullscreenElement && 
+        !document.webkitFullscreenElement && 
+        !document.mozFullScreenElement && 
+        !document.msFullscreenElement) {
+      return;
+    }
+    
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(err => {
+        console.log('Error attempting to exit fullscreen:', err.message);
+      });
+    } else if (document.webkitExitFullscreen) {
+      // Safari/old Chrome
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      // Old Firefox
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      // Old IE/Edge
+      document.msExitFullscreen();
+    }
+    
+    console.log('Exiting fullscreen mode');
   }
   
   /**
@@ -403,6 +500,12 @@ class MobileOrientationDetector {
     
     window.removeEventListener('orientationchange', this.handleOrientationChange);
     window.removeEventListener('resize', this.checkOrientation);
+    
+    // Remove fullscreen event listeners
+    document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
+    document.removeEventListener('mozfullscreenchange', this.handleFullscreenChange);
+    document.removeEventListener('MSFullscreenChange', this.handleFullscreenChange);
     
     const styles = document.getElementById('orientation-styles');
     if (styles) {
