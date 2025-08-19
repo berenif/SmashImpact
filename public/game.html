@@ -572,6 +572,8 @@
       <div><span class="key">4</span> Give Shield</div>
       <div><span class="key">5</span> Spawn Power-up</div>
       <div><span class="key">0</span> Reset Game</div>
+      <div><span class="key">Q</span> Toggle WASM/JS</div>
+      <div><span class="key">P</span> Performance Stats</div>
       <div><span class="key">ESC</span> Pause Menu</div>
     </div>
   </div>
@@ -580,8 +582,12 @@
   <script src="visual-effects.js"></script>
   <script src="multiplayer.js"></script>
   <script src="wolf-ai.js"></script>
-  <!-- Unified Game System -->
-  <script src="unified-game.js"></script>
+  
+  <!-- WebAssembly Game Wrapper -->
+  <script type="module" src="wasm-game-wrapper.js"></script>
+  
+  <!-- Unified Game System with WebAssembly Acceleration -->
+  <script src="unified-game-wasm.js"></script>
   
   <script type="module">
     // Mobile joystick controller
@@ -2210,10 +2216,14 @@
     let gameInstance = null;
     window.debugMode = true; // Enable debug mode to show FPS
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       const canvas = document.getElementById('gameCanvas');
-      // Use UnifiedGame if available, fallback to MobileGame
-      if (window.UnifiedGame) {
+      
+      // Try to use WebAssembly-enhanced version first
+      if (window.UnifiedGameWasm) {
+        gameInstance = new window.UnifiedGameWasm(canvas);
+        console.log('🚀 Using WebAssembly-accelerated UnifiedGame system');
+      } else if (window.UnifiedGame) {
         gameInstance = new window.UnifiedGame(canvas);
         console.log('✅ Using UnifiedGame system');
       } else {
@@ -2226,6 +2236,28 @@
       const deviceType = sessionStorage.getItem('deviceType') || 'auto-detected';
       const isMobile = 'ontouchstart' in window;
       document.getElementById('deviceDebug').textContent = `${deviceType} (${isMobile ? 'touch' : 'no-touch'})`;
+      
+      // Add WebAssembly status indicator
+      if (window.UnifiedGameWasm && gameInstance instanceof window.UnifiedGameWasm) {
+        // Wait a bit for WASM to initialize
+        setTimeout(() => {
+          const wasmStatus = gameInstance.useWasm ? '⚡ WASM Active' : '🌐 JS Mode';
+          const statusColor = gameInstance.useWasm ? '#00ff00' : '#ffff00';
+          
+          // Add to debug info
+          const debugInfo = document.getElementById('debugInfo');
+          if (debugInfo) {
+            const wasmStatusDiv = document.createElement('div');
+            wasmStatusDiv.innerHTML = `<span style="color: ${statusColor}; font-weight: bold;">${wasmStatus}</span>`;
+            debugInfo.insertBefore(wasmStatusDiv, debugInfo.firstChild);
+          }
+          
+          // Show notification
+          if (gameInstance.useWasm) {
+            console.log('✅ WebAssembly acceleration enabled for maximum performance!');
+          }
+        }, 1000);
+      }
       
       // Debug keyboard shortcuts
       document.addEventListener('keydown', (e) => {
@@ -2284,6 +2316,32 @@
                 document.getElementById('scoreYou').textContent = '0';
                 document.getElementById('scoreThem').textContent = '0';
                 console.log('🔄 Debug: Game reset');
+              }
+              break;
+            case 'q': // Toggle WebAssembly mode
+            case 'Q':
+              e.preventDefault();
+              if (gameInstance && gameInstance.useWasm !== undefined) {
+                gameInstance.useWasm = !gameInstance.useWasm;
+                const mode = gameInstance.useWasm ? 'WebAssembly' : 'JavaScript';
+                console.log(`🔄 Switched to ${mode} mode`);
+                
+                // Update status indicator
+                const wasmStatus = gameInstance.useWasm ? '⚡ WASM Active' : '🌐 JS Mode';
+                const statusColor = gameInstance.useWasm ? '#00ff00' : '#ffff00';
+                
+                // Show notification
+                if (gameInstance.showNotification) {
+                  gameInstance.showNotification(`Switched to ${mode} mode`, statusColor);
+                }
+              }
+              break;
+            case 'p': // Toggle performance stats
+            case 'P':
+              e.preventDefault();
+              if (gameInstance && gameInstance.performance) {
+                gameInstance.performance.showStats = !gameInstance.performance.showStats;
+                console.log(`📊 Performance stats: ${gameInstance.performance.showStats ? 'ON' : 'OFF'}`);
               }
               break;
           }
