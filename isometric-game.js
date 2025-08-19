@@ -4,9 +4,6 @@
 
     // Game configuration
     const CONFIG = {
-        TILE_WIDTH: 64,     // Larger for better 3D blocks
-        TILE_HEIGHT: 32,    // Maintain 2:1 ratio
-        TILE_DEPTH: 8,     // Significant depth for 3D blocks
         GRID_WIDTH: 200,    // Increased 10x from 20
         GRID_HEIGHT: 200,   // Increased 10x from 20
         PLAYER_SPEED: 0.15, // Slower for tile-based movement
@@ -20,9 +17,9 @@
         AMBIENT_LIGHT: 0.7, // Balanced lighting
         SHADOW_OPACITY: 0.25, // Softer shadows for walls
         // Viewport culling settings
-        VIEWPORT_PADDING: 5, // Extra tiles to render outside viewport
+        VIEWPORT_PADDING: 5, // Extra viewport padding
         CHUNK_SIZE: 20,     // Size of map chunks for optimization
-        MAX_RENDER_DISTANCE: 30 // Maximum tile render distance from camera
+        MAX_RENDER_DISTANCE: 30 // Maximum render distance from camera
     };
 
     // Dark Dungeon color palette
@@ -97,16 +94,7 @@
         woodDark: '#78350f'
     };
 
-    // Tile types for Dungeon map
-    const TILE_TYPES = {
-        STONE_FLOOR: 'stone_floor',
-        WALL: 'wall',
-        LAVA: 'lava',
-        CRACKED_FLOOR: 'cracked_floor',
-        DARK_FLOOR: 'dark_floor',
-        PIT: 'pit',
-        WATER: 'water'
-    };
+
 
     // Dungeon decoration types
     const DECORATION_TYPES = {
@@ -145,7 +133,6 @@
         projectiles: [],
         effects: [],
         obstacles: [],
-        groundTiles: [],
         decorations: [],
         particles: [],
         mapGrid: [],
@@ -456,313 +443,19 @@
 
     function cartesianToIsometric(x, y, z = 0) {
         return {
-            x: (x - y) * CONFIG.TILE_WIDTH / 2,
-            y: (x + y) * CONFIG.TILE_HEIGHT / 2 - z * CONFIG.VOXEL_HEIGHT
+            x: (x - y) * 32,  // Using fixed value instead of TILE_WIDTH
+            y: (x + y) * 16 - z * CONFIG.VOXEL_HEIGHT  // Using fixed value instead of TILE_HEIGHT
         };
     }
 
     function isometricToCartesian(isoX, isoY) {
         return {
-            x: (isoX / (CONFIG.TILE_WIDTH / 2) + isoY / (CONFIG.TILE_HEIGHT / 2)) / 2,
-            y: (isoY / (CONFIG.TILE_HEIGHT / 2) - isoX / (CONFIG.TILE_WIDTH / 2)) / 2
+            x: (isoX / 32 + isoY / 16) / 2,
+            y: (isoY / 16 - isoX / 32) / 2
         };
     }
 
-    // Draw tiles as 3D blocks with significant depth
-    function drawZeldaTile(ctx, x, y, type, elevation = 0) {
-        const baseZ = elevation * CONFIG.TILE_DEPTH;
-        const iso = cartesianToIsometric(x, y, baseZ);
-        
-        ctx.save();
-        ctx.translate(iso.x, iso.y);
-        
-        const w = CONFIG.TILE_WIDTH / 2;
-        const h = CONFIG.TILE_HEIGHT / 2;
-        const tileHeight = type === TILE_TYPES.WALL ? CONFIG.TILE_DEPTH * 2 : 0; // Only walls have height
-        
-        // Draw strong shadow for 3D blocks
-        ctx.save();
-        ctx.translate(4, 6); // Smaller shadow offset
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.filter = 'blur(4px)';
-        ctx.beginPath();
-        ctx.moveTo(0, -h * 0.8);
-        ctx.lineTo(w * 0.9, 0);
-        ctx.lineTo(0, h * 0.8);
-        ctx.lineTo(-w * 0.9, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.filter = 'none';
-        ctx.restore();
-        
-        // Draw thick 3D block sides
-        let rightColor, leftColor;
-        
-        // Get base colors for sides based on dungeon tile type
-        switch(type) {
-            case TILE_TYPES.STONE_FLOOR:
-                rightColor = '#374151';
-                leftColor = '#1f2937';
-                break;
-            case TILE_TYPES.DARK_FLOOR:
-                rightColor = '#111827';
-                leftColor = '#030712';
-                break;
-            case TILE_TYPES.LAVA:
-                rightColor = '#991b1b';
-                leftColor = '#7f1d1d';
-                break;
-            case TILE_TYPES.CRACKED_FLOOR:
-                rightColor = '#374151';
-                leftColor = '#1f2937';
-                break;
-            case TILE_TYPES.PIT:
-                rightColor = '#000000';
-                leftColor = '#000000';
-                break;
-            case TILE_TYPES.WALL:
-                rightColor = '#111827';
-                leftColor = '#030712';
-                break;
-            default:
-                rightColor = '#374151';
-                leftColor = '#1f2937';
-        }
-        
-        // Right side (darker) - full height block
-        const rightGradient = ctx.createLinearGradient(w, -tileHeight, w, tileHeight);
-        rightGradient.addColorStop(0, shadeColor(rightColor, -10));
-        rightGradient.addColorStop(0.5, shadeColor(rightColor, -25));
-        rightGradient.addColorStop(1, shadeColor(rightColor, -40));
-        ctx.fillStyle = rightGradient;
-        ctx.beginPath();
-        ctx.moveTo(w, -tileHeight);
-        ctx.lineTo(w, 0);
-        ctx.lineTo(0, h);
-        ctx.lineTo(0, h - tileHeight);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add edge line for definition
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // Left side (medium dark) - full height block
-        const leftGradient = ctx.createLinearGradient(-w, -tileHeight, -w, tileHeight);
-        leftGradient.addColorStop(0, shadeColor(leftColor, -15));
-        leftGradient.addColorStop(0.5, shadeColor(leftColor, -30));
-        leftGradient.addColorStop(1, shadeColor(leftColor, -45));
-        ctx.fillStyle = leftGradient;
-        ctx.beginPath();
-        ctx.moveTo(-w, -tileHeight);
-        ctx.lineTo(-w, 0);
-        ctx.lineTo(0, h);
-        ctx.lineTo(0, h - tileHeight);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add edge line for definition
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // Dungeon tile gradients with dark atmosphere
-        let gradient, baseColor, lightColor, darkColor;
-        switch(type) {
-            case TILE_TYPES.STONE_FLOOR:
-                baseColor = COLORS.stoneMid;
-                lightColor = COLORS.stoneLight;
-                darkColor = COLORS.stoneDark;
-                gradient = ctx.createLinearGradient(-w, -h, w, h);
-                gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.3, '#94a3b8');
-                gradient.addColorStop(0.7, baseColor);
-                gradient.addColorStop(1, darkColor);
-                break;
-            case TILE_TYPES.DARK_FLOOR:
-                baseColor = COLORS.dungeonFloor;
-                lightColor = '#4b5563';
-                darkColor = '#111827';
-                gradient = ctx.createLinearGradient(-w, -h, w, h);
-                gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.5, baseColor);
-                gradient.addColorStop(1, darkColor);
-                break;
-            case TILE_TYPES.LAVA:
-                baseColor = COLORS.lava;
-                lightColor = '#fbbf24';
-                darkColor = COLORS.lavaDeep;
-                // Animated lava glow
-                const glowOffset = Math.sin(gameState.animationTime * 0.003 + x * 0.5) * 0.2;
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.5 + glowOffset, baseColor);
-                gradient.addColorStop(1, darkColor);
-                break;
-            case TILE_TYPES.CRACKED_FLOOR:
-                baseColor = '#6b7280';
-                lightColor = '#9ca3af';
-                darkColor = '#374151';
-                gradient = ctx.createLinearGradient(-w, -h, w, h);
-                gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.5, baseColor);
-                gradient.addColorStop(1, darkColor);
-                break;
-            case TILE_TYPES.PIT:
-                baseColor = '#111827';
-                lightColor = '#1f2937';
-                darkColor = '#000000';
-                gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
-                gradient.addColorStop(0, darkColor);
-                gradient.addColorStop(0.7, baseColor);
-                gradient.addColorStop(1, lightColor);
-                break;
-            case TILE_TYPES.WALL:
-                baseColor = COLORS.dungeonWall;
-                lightColor = '#374151';
-                darkColor = '#111827';
-                gradient = ctx.createLinearGradient(-w, -h, w, h);
-                gradient.addColorStop(0, lightColor);
-                gradient.addColorStop(0.5, baseColor);
-                gradient.addColorStop(1, darkColor);
-                break;
-            default:
-                gradient = COLORS.stoneMid;
-                baseColor = COLORS.stoneMid;
-                lightColor = COLORS.stoneLight;
-                darkColor = COLORS.stoneDark;
-        }
-        
-        // Draw main tile top surface (elevated on the block)
-        ctx.save();
-        ctx.translate(0, -tileHeight);
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(0, -h);
-        ctx.lineTo(w, 0);
-        ctx.lineTo(0, h);
-        ctx.lineTo(-w, 0);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add inner gradient overlay for more depth
-        const innerGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.8);
-        innerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
-        innerGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.05)');
-        innerGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
-        ctx.fillStyle = innerGradient;
-        ctx.fill();
-        
-        // Strong tile edges for definition
-        // Top-left edge (brightest)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, -h);
-        ctx.lineTo(-w, 0);
-        ctx.stroke();
-        
-        // Top-right edge (bright)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, -h);
-        ctx.lineTo(w, 0);
-        ctx.stroke();
-        
-        // Bottom edges (darker for depth)
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(w, 0);
-        ctx.lineTo(0, h);
-        ctx.lineTo(-w, 0);
-        ctx.stroke();
-        
-        // Add tile border for clear separation
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(0, -h);
-        ctx.lineTo(w, 0);
-        ctx.lineTo(0, h);
-        ctx.lineTo(-w, 0);
-        ctx.closePath();
-        ctx.stroke();
-        
-        ctx.restore(); // End of elevated top surface
-        
-        // Tile details for dungeon theme
-        if (type === TILE_TYPES.CRACKED_FLOOR) {
-            // Cracks in the floor
-            const seed = x * 100 + y;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(-w * 0.3, -h * 0.2);
-            ctx.lineTo(0, 0);
-            ctx.lineTo(w * 0.2, h * 0.3);
-            ctx.stroke();
-            
-            if ((seed % 3) === 0) {
-                ctx.beginPath();
-                ctx.moveTo(w * 0.2, -h * 0.3);
-                ctx.lineTo(0, 0);
-                ctx.lineTo(-w * 0.3, h * 0.2);
-                ctx.stroke();
-            }
-        } else if (type === TILE_TYPES.LAVA) {
-            // Lava glow animation
-            const glow = Math.sin(gameState.animationTime * 0.003 + x * 0.5 + y * 0.5) * 0.3 + 0.7;
-            
-            ctx.save();
-            ctx.globalAlpha = glow;
-            ctx.shadowColor = COLORS.lava;
-            ctx.shadowBlur = 10;
-            ctx.fillStyle = COLORS.lava;
-            ctx.beginPath();
-            ctx.moveTo(0, -h * 0.8);
-            ctx.lineTo(w * 0.8, 0);
-            ctx.lineTo(0, h * 0.8);
-            ctx.lineTo(-w * 0.8, 0);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-            
-            // Bubbles
-            const bubble = Math.sin(gameState.animationTime * 0.004 + x + y) * 0.5 + 0.5;
-            if (bubble > 0.8) {
-                ctx.fillStyle = COLORS.torch;
-                ctx.globalAlpha = bubble;
-                ctx.beginPath();
-                ctx.arc(0, 0, 3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
-        } else if (type === TILE_TYPES.DARK_FLOOR) {
-            // Dark floor details
-            const seed = x * 100 + y;
-            if ((seed % 7) === 0) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                ctx.beginPath();
-                ctx.arc((seed % 5 - 2) * 4, (seed % 3 - 1) * 4, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        } else if (type === TILE_TYPES.STONE_FLOOR) {
-            // Stone floor texture
-            const seed = x * 100 + y;
-            if ((seed % 4) === 0) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-                ctx.beginPath();
-                ctx.arc((seed % 7 - 3) * 3, (seed % 5 - 2) * 3, 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-        
-        ctx.restore();
-    }
+
 
     // Enhanced 3D voxel drawing with proper depth and shading
     function drawZeldaVoxel(ctx, x, y, z, width, height, depth, color, options = {}) {
@@ -771,8 +464,8 @@
         ctx.save();
         ctx.translate(iso.x, iso.y);
         
-        const w = width * CONFIG.TILE_WIDTH / 2;
-        const h = height * CONFIG.TILE_HEIGHT / 2;
+        const w = width * 32;  // Using fixed value instead of TILE_WIDTH
+        const h = height * 16;  // Using fixed value instead of TILE_HEIGHT
         const d = depth * CONFIG.VOXEL_HEIGHT * 1.5; // Increased height for more 3D effect
         
         // Enhanced shadow with offset and blur
@@ -2492,39 +2185,7 @@
             return { x: CONFIG.GRID_WIDTH / 2, y: CONFIG.GRID_HEIGHT / 2 };
         }
         
-        // Create ground tiles with bounds checking
-        gameState.groundTiles = [];
-        if (mapData.grid && Array.isArray(mapData.grid)) {
-            for (let y = 0; y < mapData.grid.length && y < CONFIG.GRID_HEIGHT; y++) {
-                if (mapData.grid[y] && Array.isArray(mapData.grid[y])) {
-                    for (let x = 0; x < mapData.grid[y].length && x < CONFIG.GRID_WIDTH; x++) {
-                        const tileType = mapData.grid[y][x] && mapData.grid[y][x].type ? mapData.grid[y][x].type : TILE_TYPES.STONE_FLOOR;
-                        
-                        // Create elevated platforms and terrain variation
-                        let z = 0;
-                        if (tileType === TILE_TYPES.STONE_FLOOR) {
-                            z = Math.random() * 0.2;
-                        }
-                        
-                        // Create raised platforms in certain areas
-                        if (x > CONFIG.GRID_WIDTH * 0.3 && x < CONFIG.GRID_WIDTH * 0.7 && 
-                            y > CONFIG.GRID_HEIGHT * 0.3 && y < CONFIG.GRID_HEIGHT * 0.7) {
-                            z += 0.3;
-                        }
-                        
-                        gameState.groundTiles.push({
-                            x: x,
-                            y: y,
-                            z: z,
-                            type: tileType,
-                            walkable: mapData.grid[y][x] && mapData.grid[y][x].walkable !== undefined ? mapData.grid[y][x].walkable : true
-                        });
-                    }
-                }
-            }
-        }
-        
-        console.log('Ground tiles created:', gameState.groundTiles.length);
+
         
         // Create decorations with bounds checking
         gameState.decorations = [];
@@ -2762,24 +2423,6 @@
         // Get visible bounds for culling
         const bounds = getVisibleBounds();
         
-        // Add ground tiles with elevation (only visible ones)
-        if (gameState.groundTiles && Array.isArray(gameState.groundTiles)) {
-            for (const tile of gameState.groundTiles) {
-                if (tile && typeof tile.x === 'number' && typeof tile.y === 'number') {
-                    // Viewport culling - only add tiles within visible bounds
-                    if (tile.x >= bounds.minX && tile.x <= bounds.maxX &&
-                        tile.y >= bounds.minY && tile.y <= bounds.maxY) {
-                        renderables.push({
-                            x: tile.x,
-                            y: tile.y,
-                            z: tile.z || 0,
-                            type: 'tile',
-                            data: tile
-                        });
-                    }
-                }
-            }
-        }
         
         // Add decorations (only visible ones)
         if (gameState.decorations && Array.isArray(gameState.decorations)) {
@@ -2839,9 +2482,7 @@
         // Render everything
         for (const item of renderables) {
             switch(item.type) {
-                case 'tile':
-                    drawZeldaTile(ctx, item.data.x, item.data.y, item.data.type, item.data.z || 0);
-                    break;
+
                 case 'decoration':
                     item.data.draw(ctx);
                     break;
