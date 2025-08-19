@@ -6,7 +6,7 @@ const urlsToCache = [
   './menu.html',
   './connect.html',
   './game.html',
-  './game-iso.html',
+
   './game-wolf.html',
   './game-backup.html',
   './multiplayer.js',
