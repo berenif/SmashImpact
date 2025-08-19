@@ -7,9 +7,13 @@ const urlsToCache = [
   './connect.html',
   './game.html',
   './game-iso.html',
+  './game-wolf.html',
+  './game-backup.html',
   './multiplayer.js',
   './isometric-game.js',
   './visual-effects.js',
+  './wolf-ai.js',
+  './wolf-integration-fix.js',
   './vendor/qrcode.js',
   './vendor/jsqr.js',
   './manifest.json'
