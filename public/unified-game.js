@@ -34,8 +34,9 @@
     WOLF_ALERT_RADIUS: 150,
     WOLF_ATTACK_RADIUS: 30,
     WOLF_ATTACK_COOLDOWN: 1000,
-    MAX_WOLVES: 5,
+    MAX_WOLVES: 20, // Increased for wave system
     WOLF_SPAWN_INTERVAL: 10000,
+    WOLF_WAVE_SPAWN_DELAY: 500, // Delay between wolf spawns in a wave
     
     // Power-up settings
     POWERUP_RADIUS: 15,
@@ -77,6 +78,10 @@
       this.score = 0;
       this.lives = CONFIG.INITIAL_LIVES;
       this.waveNumber = 1;
+      this.wolfWaveNumber = 1; // Separate wave counter for wolves
+      this.wolvesSpawnedThisWave = 0;
+      this.wolvesRequiredThisWave = 1; // Start with 1 wolf
+      this.isWolfWaveActive = false;
       this.frameCount = 0;
       this.lastTime = performance.now();
       this.deltaTime = 0;
@@ -973,6 +978,44 @@
         color: '#ff0000',
         type: 'basic'
       });
+    }
+    
+    calculateWolvesForWave(waveNumber) {
+      // Wave 1: 1 wolf
+      // Wave 2: 3 wolves
+      // Wave 3+: multiply by 2 each wave
+      if (waveNumber === 1) return 1;
+      if (waveNumber === 2) return 3;
+      
+      // For wave 3 and beyond, start with 3 and multiply by 2 for each wave after 2
+      let wolves = 3;
+      for (let i = 2; i < waveNumber; i++) {
+        wolves *= 2;
+      }
+      return Math.min(wolves, CONFIG.MAX_WOLVES); // Cap at max wolves
+    }
+    
+    startWolfWave() {
+      this.wolfWaveNumber++;
+      this.wolvesRequiredThisWave = this.calculateWolvesForWave(this.wolfWaveNumber);
+      this.wolvesSpawnedThisWave = 0;
+      this.isWolfWaveActive = true;
+      
+      // Show wave notification
+      if (this.vfx) {
+        this.vfx.createScreenFlash('#ff0000', 0.3);
+      }
+      
+      console.log(`🐺 Wolf Wave ${this.wolfWaveNumber} Started! Spawning ${this.wolvesRequiredThisWave} wolves`);
+      
+      // Spawn wolves with delay between each
+      for (let i = 0; i < this.wolvesRequiredThisWave; i++) {
+        setTimeout(() => {
+          if (this.state === 'playing') {
+            this.spawnWolf();
+          }
+        }, i * CONFIG.WOLF_WAVE_SPAWN_DELAY);
+      }
     }
     
     spawnWolf() {

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf Wave System Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            font-family: 'Arial Black', Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        canvas {
+            display: block;
+            background: linear-gradient(135deg, #0f0f1e, #1a1a2e);
+            border: 2px solid #333;
+        }
+        
+        #ui {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 1000;
+        }
+        
+        .stat-line {
+            margin: 5px 0;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 5px;
+            border-left: 3px solid #ff6600;
+        }
+        
+        #controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ff6600, #ff4444);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255,100,0,0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        #wave-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #ff6600;
+            min-width: 200px;
+            z-index: 1000;
+        }
+        
+        .wave-title {
+            font-size: 24px;
+            color: #ff6600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,100,0,0.3);
+        }
+        
+        .info-label {
+            color: #aaa;
+        }
+        
+        .info-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .wolf {
+            transition: all 0.1s;
+        }
+        
+        @keyframes spawn {
+            0% { transform: scale(0) rotate(0deg); }
+            50% { transform: scale(1.5) rotate(180deg); }
+            100% { transform: scale(1) rotate(360deg); }
+        }
+        
+        .spawning {
+            animation: spawn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="stat-line">👤 Player Health: <span id="playerHealth">100</span></div>
+        <div class="stat-line">🎯 Score: <span id="score">0</span></div>
+        <div class="stat-line">⚡ Energy: <span id="energy">100</span></div>
+    </div>
+    
+    <div id="wave-info">
+        <div class="wave-title">Wave <span id="waveNumber">0</span></div>
+        <div class="info-item">
+            <span class="info-label">Wolves Spawned:</span>
+            <span class="info-value" id="wolvesSpawned">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Wolves Required:</span>
+            <span class="info-value" id="wolvesRequired">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Wolves Remaining:</span>
+            <span class="info-value" id="wolvesRemaining">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Next Wave:</span>
+            <span class="info-value" id="nextWaveCount">0</span>
+        </div>
+    </div>
+    
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="controls">
+        <button id="startWaveBtn" onclick="startNextWave()">Start Wave 1</button>
+        <button onclick="killAllWolves()">Kill All Wolves</button>
+        <button onclick="togglePause()">Pause/Resume</button>
+        <button onclick="resetGame()">Reset</button>
+    </div>
+    
+    <!-- Load dependencies -->
+    <script src="wolf-ai.js"></script>
+    <script src="visual-effects.js"></script>
+    <script src="wolf-wave-system.js"></script>
+    
+    <script>
+        // Game setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Game state
+        const gameState = {
+            canvas: canvas,
+            ctx: ctx,
+            player: {
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                radius: 20,
+                health: 100,
+                maxHealth: 100,
+                energy: 100,
+                maxEnergy: 100,
+                speed: 5,
+                color: '#00ff00'
+            },
+            wolves: [],
+            enemies: [],
+            particles: [],
+            score: 0,
+            paused: false,
+            keys: {},
+            vfx: null
+        };
+        
+        // Initialize visual effects if available
+        if (window.VisualEffectsManager) {
+            gameState.vfx = new window.VisualEffectsManager(ctx, canvas);
+        }
+        
+        // Initialize Wolf Wave Manager
+        const waveManager = new WolfWaveManager(gameState);
+        
+        // Input handling
+        window.addEventListener('keydown', (e) => {
+            gameState.keys[e.key] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            gameState.keys[e.key] = false;
+        });
+        
+        // Game functions
+        function startNextWave() {
+            const waveInfo = waveManager.startNextWave();
+            document.getElementById('startWaveBtn').textContent = `Start Wave ${waveManager.currentWave + 1}`;
+            document.getElementById('startWaveBtn').disabled = true;
+            
+            // Re-enable button when wave is complete
+            setTimeout(() => {
+                document.getElementById('startWaveBtn').disabled = false;
+            }, 10000);
+        }
+        
+        function killAllWolves() {
+            gameState.wolves.forEach(wolf => {
+                wolf.health = 0;
+                wolf.state = 'dead';
+                
+                // Add death effect
+                if (gameState.vfx) {
+                    gameState.vfx.createExplosion(wolf.x, wolf.y, '#ff0000', 30);
+                }
+                
+                // Add score
+                gameState.score += 100 * (wolf.waveNumber || 1);
+            });
+            
+            // Clear wolves array
+            gameState.wolves = gameState.wolves.filter(w => w.health > 0);
+            gameState.enemies = gameState.enemies.filter(e => !e.isWolf || e.health > 0);
+        }
+        
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+        }
+        
+        function resetGame() {
+            gameState.wolves = [];
+            gameState.enemies = [];
+            gameState.particles = [];
+            gameState.score = 0;
+            gameState.player.health = 100;
+            gameState.player.energy = 100;
+            waveManager.reset();
+            document.getElementById('startWaveBtn').textContent = 'Start Wave 1';
+            document.getElementById('startWaveBtn').disabled = false;
+        }
+        
+        function updatePlayer(deltaTime) {
+            if (gameState.paused) return;
+            
+            // Movement
+            let dx = 0, dy = 0;
+            if (gameState.keys['w'] || gameState.keys['ArrowUp']) dy = -1;
+            if (gameState.keys['s'] || gameState.keys['ArrowDown']) dy = 1;
+            if (gameState.keys['a'] || gameState.keys['ArrowLeft']) dx = -1;
+            if (gameState.keys['d'] || gameState.keys['ArrowRight']) dx = 1;
+            
+            // Normalize diagonal movement
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.707;
+                dy *= 0.707;
+            }
+            
+            // Apply movement
+            gameState.player.x += dx * gameState.player.speed;
+            gameState.player.y += dy * gameState.player.speed;
+            
+            // Keep player in bounds
+            gameState.player.x = Math.max(gameState.player.radius, 
+                Math.min(canvas.width - gameState.player.radius, gameState.player.x));
+            gameState.player.y = Math.max(gameState.player.radius, 
+                Math.min(canvas.height - gameState.player.radius, gameState.player.y));
+        }
+        
+        function updateWolves(deltaTime) {
+            if (gameState.paused) return;
+            
+            gameState.wolves.forEach(wolf => {
+                if (wolf.health <= 0) return;
+                
+                // Simple AI - move towards player
+                const dx = gameState.player.x - wolf.x;
+                const dy = gameState.player.y - wolf.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    // Move towards player
+                    wolf.x += (dx / dist) * (wolf.speed || 3) * deltaTime / 16;
+                    wolf.y += (dy / dist) * (wolf.speed || 3) * deltaTime / 16;
+                    
+                    // Attack if close
+                    if (dist < 30) {
+                        const now = Date.now();
+                        if (!wolf.lastAttack || now - wolf.lastAttack > 1000) {
+                            wolf.lastAttack = now;
+                            gameState.player.health = Math.max(0, gameState.player.health - (wolf.damage || 10));
+                            
+                            // Visual feedback
+                            if (gameState.vfx) {
+                                gameState.vfx.createImpactEffect(gameState.player.x, gameState.player.y, '#ff0000');
+                            }
+                        }
+                    }
+                }
+                
+                // Update wolf AI if available
+                if (wolf.update && typeof wolf.update === 'function') {
+                    wolf.update(deltaTime, gameState.wolves, [gameState.player], []);
+                }
+            });
+        }
+        
+        function updateParticles(deltaTime) {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i];
+                p.x += p.vx * deltaTime / 16;
+                p.y += p.vy * deltaTime / 16;
+                p.life -= p.decay * deltaTime / 16;
+                
+                if (p.life <= 0) {
+                    gameState.particles.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateUI() {
+            // Update UI elements
+            document.getElementById('playerHealth').textContent = Math.round(gameState.player.health);
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('energy').textContent = Math.round(gameState.player.energy);
+            
+            // Update wave info
+            const waveInfo = waveManager.getWaveInfo();
+            document.getElementById('waveNumber').textContent = waveInfo.currentWave;
+            document.getElementById('wolvesSpawned').textContent = waveInfo.wolvesSpawned;
+            document.getElementById('wolvesRequired').textContent = waveInfo.wolvesRequired;
+            document.getElementById('wolvesRemaining').textContent = waveInfo.wolvesRemaining;
+            document.getElementById('nextWaveCount').textContent = waveInfo.nextWaveWolves;
+        }
+        
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = 'rgba(15, 15, 30, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw particles
+            gameState.particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+            });
+            ctx.globalAlpha = 1;
+            
+            // Draw wolves
+            gameState.wolves.forEach(wolf => {
+                if (wolf.health <= 0) return;
+                
+                // Draw wolf
+                ctx.save();
+                ctx.translate(wolf.x, wolf.y);
+                
+                // Body
+                ctx.fillStyle = wolf.color || '#8B4513';
+                ctx.beginPath();
+                ctx.arc(0, 0, wolf.radius || 18, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eyes
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(-5, -3, 2, 0, Math.PI * 2);
+                ctx.arc(5, -3, 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Health bar
+                if (wolf.health < wolf.maxHealth) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(-20, -30, 40, 4);
+                    
+                    const healthPercent = wolf.health / wolf.maxHealth;
+                    ctx.fillStyle = healthPercent > 0.3 ? '#00ff00' : '#ff0000';
+                    ctx.fillRect(-20, -30, 40 * healthPercent, 4);
+                }
+                
+                // Wave number badge
+                ctx.fillStyle = '#ffcc00';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`W${wolf.waveNumber || 1}`, 0, -35);
+                
+                ctx.restore();
+            });
+            
+            // Draw player
+            ctx.save();
+            ctx.translate(gameState.player.x, gameState.player.y);
+            
+            // Player body
+            ctx.fillStyle = gameState.player.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, gameState.player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Player direction indicator
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(gameState.player.radius, 0);
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            // Draw visual effects
+            if (gameState.vfx) {
+                gameState.vfx.render(ctx);
+            }
+        }
+        
+        // Game loop
+        let lastTime = performance.now();
+        
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Update
+            updatePlayer(deltaTime);
+            updateWolves(deltaTime);
+            updateParticles(deltaTime);
+            waveManager.update(deltaTime);
+            
+            if (gameState.vfx) {
+                gameState.vfx.update(deltaTime);
+            }
+            
+            // Render
+            render();
+            
+            // Update UI
+            updateUI();
+            
+            // Continue loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Start game loop
+        gameLoop(performance.now());
+        
+        // Window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        console.log('🎮 Wolf Wave Demo Ready!');
+        console.log('Use WASD or Arrow keys to move');
+        console.log('Click "Start Wave 1" to begin!');
+    </script>
+</body>
+</html>
