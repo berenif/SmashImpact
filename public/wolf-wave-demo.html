@@ -208,6 +208,14 @@
         // Initialize Wolf Wave Manager
         const waveManager = new WolfWaveManager(gameState);
         
+        // Set wave complete callback
+        waveManager.waveCompleteCallback = function(waveNumber) {
+            console.log(`Wave ${waveNumber} completed! Ready for next wave.`);
+            // Enable the start wave button for the next wave
+            document.getElementById('startWaveBtn').disabled = false;
+            document.getElementById('startWaveBtn').textContent = `Start Wave ${waveNumber + 1}`;
+        };
+        
         // Input handling
         window.addEventListener('keydown', (e) => {
             gameState.keys[e.key] = true;
@@ -220,13 +228,9 @@
         // Game functions
         function startNextWave() {
             const waveInfo = waveManager.startNextWave();
-            document.getElementById('startWaveBtn').textContent = `Start Wave ${waveManager.currentWave + 1}`;
+            // Disable button while wave is active
             document.getElementById('startWaveBtn').disabled = true;
-            
-            // Re-enable button when wave is complete
-            setTimeout(() => {
-                document.getElementById('startWaveBtn').disabled = false;
-            }, 10000);
+            document.getElementById('startWaveBtn').textContent = `Wave ${waveManager.currentWave} Active`;
         }
         
         function killAllWolves() {

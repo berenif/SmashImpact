@@ -356,11 +356,19 @@
         }
         
         update(deltaTime) {
-            // Check if all wolves from current wave are defeated
-            if (!this.allWolvesDefeated && this.currentWave > 0) {
+            // Only check for wave completion if:
+            // 1. Wave has started (currentWave > 0)
+            // 2. All wolves have been spawned
+            // 3. Wave is not already marked as complete
+            if (!this.allWolvesDefeated && 
+                this.currentWave > 0 && 
+                this.wolvesSpawnedThisWave >= this.wolvesRequiredThisWave &&
+                this.wolvesRequiredThisWave > 0) {
+                
                 const remainingWolves = this.getRemainingWolves();
                 
-                if (remainingWolves === 0) {
+                // Only mark complete if we actually spawned wolves and they're all defeated
+                if (remainingWolves === 0 && this.wolvesSpawnedThisWave > 0) {
                     this.allWolvesDefeated = true;
                     this.onWaveComplete();
                 }
@@ -368,8 +376,15 @@
         }
         
         getRemainingWolves() {
-            if (!this.gameState.wolves) return 0;
+            if (!this.gameState.wolves || this.gameState.wolves.length === 0) {
+                // If no wolves exist but we haven't spawned any yet, don't count as 0
+                if (this.wolvesSpawnedThisWave === 0) {
+                    return -1; // Indicate waiting state
+                }
+                return 0;
+            }
             
+            // Count wolves from current wave that are still alive
             return this.gameState.wolves.filter(wolf => 
                 wolf.waveNumber === this.currentWave && 
                 wolf.health > 0 &&
@@ -383,10 +398,11 @@
             // Show completion message
             this.showWaveCompleteMessage();
             
-            // Auto-start next wave after delay
-            setTimeout(() => {
-                this.startNextWave();
-            }, 5000);
+            // Don't auto-start next wave - let the game or player decide
+            // The game can call startNextWave() when ready
+            if (this.waveCompleteCallback) {
+                this.waveCompleteCallback(this.currentWave);
+            }
         }
         
         showWaveCompleteMessage() {
