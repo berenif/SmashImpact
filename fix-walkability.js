@@ -9,24 +9,24 @@ const filePath = path.join(__dirname, 'isometric-game.js');
 // Read the file
 let content = fs.readFileSync(filePath, 'utf8');
 
-// 1. Reduce tile depth for walls instead of blocks
-content = content.replace(/TILE_DEPTH: 24,.*\/\/ Significant depth for 3D blocks/g, 
-                         'TILE_DEPTH: 8,      // Reduced depth for walls instead of blocks');
+// 1. Tile depth is already at 8, so skip this change
+// content = content.replace(/TILE_DEPTH: 8,.*\/\/ Significant depth for 3D blocks/g, 
+//                          'TILE_DEPTH: 8,      // Reduced depth for walls instead of blocks');
 
 // 2. Reduce voxel height
-content = content.replace(/VOXEL_HEIGHT: 20,.*\/\/ Much higher for 3D blocks/g,
+content = content.replace(/VOXEL_HEIGHT: 20,\s*\/\/ Much higher for 3D blocks/g,
                          'VOXEL_HEIGHT: 8,    // Lower height for walls');
 
 // 3. Reduce shadow opacity
-content = content.replace(/SHADOW_OPACITY: 0\.35,.*\/\/ Stronger shadows for depth/g,
+content = content.replace(/SHADOW_OPACITY: 0\.35,\s*\/\/ Stronger shadows for depth/g,
                          'SHADOW_OPACITY: 0.25, // Softer shadows for walls');
 
 // 4. Fix the drawZeldaTile function to only draw height for walls
-content = content.replace(/const tileHeight = CONFIG\.TILE_DEPTH; \/\/ Much taller 3D blocks/g,
+content = content.replace(/const tileHeight = CONFIG\.TILE_DEPTH;\s*\/\/ Much taller 3D blocks/g,
                          'const tileHeight = type === TILE_TYPES.WALL ? CONFIG.TILE_DEPTH * 2 : 0; // Only walls have height');
 
 // 5. Reduce shadow offset for non-wall tiles
-content = content.replace(/ctx\.translate\(6, 10\); \/\/ Larger shadow offset/g,
+content = content.replace(/ctx\.translate\(6, 10\);\s*\/\/ Larger shadow offset/g,
                          'ctx.translate(4, 6); // Smaller shadow offset');
 
 // 6. Fix the addDecorations function to reduce wall placement
@@ -60,7 +60,7 @@ content = content.replace(decorationsPattern, `// Add walls only at map boundari
 fs.writeFileSync(filePath, content, 'utf8');
 
 console.log('✅ Successfully fixed map walkability issues:');
-console.log('  - Reduced tile depth from 24 to 8');
+console.log('  - Tile depth already at 8 (no change needed)');
 console.log('  - Reduced voxel height from 20 to 8');
 console.log('  - Made only walls have 3D height');
 console.log('  - Reduced shadow effects');
