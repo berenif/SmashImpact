@@ -1046,18 +1046,38 @@
       this.wolves = [];
     }
     
-    nextWave() {
-      this.waveNumber++;
-      this.enemies = [];
-      this.wolves = [];
-      this.generateObstacles();
-      this.timers.waveTransition = CONFIG.WAVE_TRANSITION_TIME;
-      
-      // Visual effect
-      if (this.vfx) {
-        this.vfx.shakeScreen(15, 500);
+      nextWave() {
+    this.waveNumber++;
+    this.enemies = [];
+    this.wolves = [];
+    this.generateObstacles();
+    this.timers.waveTransition = CONFIG.WAVE_TRANSITION_TIME;
+    
+    // Spawn initial enemies for the wave
+    const baseEnemyCount = 3;
+    const enemiesPerWave = 2;
+    const totalEnemies = Math.min(baseEnemyCount + (this.waveNumber - 1) * enemiesPerWave, CONFIG.MAX_ENEMIES);
+    
+    // Spawn enemies after transition
+    setTimeout(() => {
+      for (let i = 0; i < totalEnemies; i++) {
+        this.spawnEnemy();
       }
+      
+      // Spawn wolves starting from wave 3
+      if (this.waveNumber >= 3) {
+        const wolfCount = Math.min(Math.floor((this.waveNumber - 2) / 2), CONFIG.MAX_WOLVES);
+        for (let i = 0; i < wolfCount; i++) {
+          this.spawnWolf();
+        }
+      }
+    }, CONFIG.WAVE_TRANSITION_TIME);
+    
+    // Visual effect
+    if (this.vfx) {
+      this.vfx.shakeScreen(15, 500);
     }
+  }
     
     giveShield() {
       if (this.player) {
