@@ -365,12 +365,69 @@ class MobileControls {
             autoHide: true
         });
         
-        // Create boost button
-        this.boostButton = new TouchButton(this.canvas, {
+        // Create attack button (main action button)
+        this.attackButton = new TouchButton(this.canvas, {
             x: this.canvas.width - 100,
             y: this.canvas.height - 100,
+            radius: 45,
+            label: 'ATTACK',
+            color: 'rgba(255, 50, 50, 0.4)',
+            activeColor: 'rgba(255, 100, 100, 0.9)',
+            onPress: () => {
+                if (this.game) {
+                    this.game.handleAttack();
+                }
+            },
+            onRelease: () => {
+                if (this.game) {
+                    this.game.handleAttackRelease();
+                }
+            }
+        });
+        
+        // Create block button (defensive action)
+        this.blockButton = new TouchButton(this.canvas, {
+            x: this.canvas.width - 200,
+            y: this.canvas.height - 100,
             radius: 40,
+            label: 'BLOCK',
+            color: 'rgba(50, 150, 255, 0.4)',
+            activeColor: 'rgba(100, 200, 255, 0.9)',
+            onPress: () => {
+                if (this.game) {
+                    this.game.handleBlock();
+                }
+            },
+            onRelease: () => {
+                if (this.game) {
+                    this.game.handleBlockRelease();
+                }
+            }
+        });
+        
+        // Create roll button (evasive action)
+        this.rollButton = new TouchButton(this.canvas, {
+            x: this.canvas.width - 150,
+            y: this.canvas.height - 180,
+            radius: 40,
+            label: 'ROLL',
+            color: 'rgba(50, 255, 50, 0.4)',
+            activeColor: 'rgba(100, 255, 100, 0.9)',
+            onPress: () => {
+                if (this.game) {
+                    this.game.handleRoll();
+                }
+            }
+        });
+        
+        // Create boost button (optional, for movement speed)
+        this.boostButton = new TouchButton(this.canvas, {
+            x: this.canvas.width - 250,
+            y: this.canvas.height - 180,
+            radius: 35,
             label: 'BOOST',
+            color: 'rgba(255, 255, 50, 0.4)',
+            activeColor: 'rgba(255, 255, 100, 0.9)',
             onPress: () => {
                 if (this.game) {
                     this.game.handleBoost();
@@ -378,12 +435,14 @@ class MobileControls {
             }
         });
         
-        // Create shoot button
+        // Create shoot button (ranged attack if needed)
         this.shootButton = new TouchButton(this.canvas, {
             x: this.canvas.width - 100,
             y: this.canvas.height - 200,
-            radius: 40,
+            radius: 35,
             label: 'FIRE',
+            color: 'rgba(255, 150, 50, 0.4)',
+            activeColor: 'rgba(255, 200, 100, 0.9)',
             onPress: () => {
                 if (this.game) {
                     this.game.handleShoot();
@@ -394,6 +453,9 @@ class MobileControls {
         // Register controls with game
         if (this.game) {
             this.game.setJoystick(this.joystick);
+            this.game.setButton('attack', this.attackButton);
+            this.game.setButton('block', this.blockButton);
+            this.game.setButton('roll', this.rollButton);
             this.game.setButton('boost', this.boostButton);
             this.game.setButton('shoot', this.shootButton);
         }
@@ -401,13 +463,22 @@ class MobileControls {
         // Handle resize
         window.addEventListener('resize', () => this.handleResize());
         
-        this.controls = [this.joystick, this.boostButton, this.shootButton];
+        this.controls = [this.joystick, this.attackButton, this.blockButton, this.rollButton, this.boostButton, this.shootButton];
     }
     
     handleResize() {
         // Update button positions
+        if (this.attackButton) {
+            this.attackButton.updatePosition(this.canvas.width - 100, this.canvas.height - 100);
+        }
+        if (this.blockButton) {
+            this.blockButton.updatePosition(this.canvas.width - 200, this.canvas.height - 100);
+        }
+        if (this.rollButton) {
+            this.rollButton.updatePosition(this.canvas.width - 150, this.canvas.height - 180);
+        }
         if (this.boostButton) {
-            this.boostButton.updatePosition(this.canvas.width - 100, this.canvas.height - 100);
+            this.boostButton.updatePosition(this.canvas.width - 250, this.canvas.height - 180);
         }
         if (this.shootButton) {
             this.shootButton.updatePosition(this.canvas.width - 100, this.canvas.height - 200);
