@@ -326,6 +326,24 @@ export class WolfBehaviors {
     }
 
     /**
+     * Get the current lunge progress without modifying state
+     * Used for rendering animations without side effects
+     * @returns {number} Progress value between 0 and 1, or 0 if not lunging
+     */
+    getLungeProgress() {
+        // Return 0 if not currently lunging
+        if (!this.wolf.lungeStartTime) {
+            return 0;
+        }
+        
+        // Calculate progress based on time elapsed
+        const lungeProgress = (Date.now() - this.wolf.lungeStartTime) / WOLF_CONFIG.timings.LUNGE_DURATION;
+        
+        // Clamp between 0 and 1
+        return Math.min(Math.max(lungeProgress, 0), 1);
+    }
+
+    /**
      * Regroup behavior - move towards pack center
      * @param {Array} packMembers - Array of pack members
      * @returns {Object} Movement vector
