@@ -21,14 +21,30 @@ namespace Config {
     constexpr float PROJECTILE_RADIUS = 5.0f;
     constexpr int MAX_ENTITIES = 1000;
     
-    // Block system configuration
-    constexpr float BLOCK_DURATION = 500.0f;
-    constexpr float BLOCK_COOLDOWN = 300.0f;
-    constexpr float PERFECT_PARRY_WINDOW = 100.0f; // 100ms window for perfect parry
-    constexpr float BLOCK_DAMAGE_REDUCTION = 0.5f; // Normal block reduces damage by 50%
+    // Shield/Block system configuration
+    constexpr float SHIELD_DURATION = 2000.0f;
+    constexpr float SHIELD_COOLDOWN = 500.0f;
+    constexpr float PERFECT_PARRY_WINDOW = 150.0f; // 150ms window for perfect parry
+    constexpr float SHIELD_DAMAGE_REDUCTION = 0.7f; // Normal block reduces damage by 70%
     constexpr float PERFECT_PARRY_DAMAGE_REDUCTION = 1.0f; // Perfect parry negates all damage
-    constexpr float PERFECT_PARRY_STUN_DURATION = 1000.0f; // Stun enemy for 1 second
-    constexpr float PERFECT_PARRY_ENERGY_RESTORE = 20.0f;
+    constexpr float PERFECT_PARRY_STUN_DURATION = 1500.0f; // Stun enemy for 1.5 seconds
+    constexpr float PERFECT_PARRY_ENERGY_RESTORE = 30.0f;
+    
+    // Sword attack configuration
+    constexpr float SWORD_RANGE = 60.0f;
+    constexpr float SWORD_ARC = 1.047f; // 60 degrees in radians (PI/3)
+    constexpr float SWORD_DAMAGE = 30.0f;
+    constexpr float SWORD_KNOCKBACK = 15.0f;
+    constexpr float SWORD_COOLDOWN = 400.0f;
+    constexpr float SWORD_ANIMATION_TIME = 200.0f;
+    constexpr float SWORD_ENERGY_COST = 10.0f;
+    
+    // Roll/Dodge configuration
+    constexpr float ROLL_DISTANCE = 150.0f;
+    constexpr float ROLL_DURATION = 300.0f;
+    constexpr float ROLL_COOLDOWN = 800.0f;
+    constexpr float ROLL_SPEED_MULTIPLIER = 2.5f;
+    constexpr float ROLL_ENERGY_COST = 15.0f;
 }
 
 // Vector2 class for 2D math operations
@@ -136,20 +152,42 @@ public:
     float boostCooldown;
     bool boosting;
     
-    // Block system properties
-    bool blocking;
-    float blockStartTime;
-    float blockCooldown;
+    // Shield system properties
+    bool shielding;
+    float shieldStartTime;
+    float shieldCooldown;
     bool perfectParryWindow;
     float lastPerfectParry;
-    float blockHeldTime;
+    float shieldHeldTime;
+    float shieldAngle;
+    
+    // Sword attack properties
+    bool swordActive;
+    float swordAngle;
+    float swordCooldown;
+    float swordAnimationTime;
+    float lastAttackTime;
+    
+    // Roll properties
+    bool rolling;
+    Vector2 rollDirection;
+    float rollCooldown;
+    float rollStartTime;
+    float rollEndTime;
+    
+    // Player facing direction
+    float facing;
     
     Player(int id, float x, float y)
         : Entity(id, EntityType::PLAYER, x, y, Config::PLAYER_RADIUS),
           energy(100), maxEnergy(100), invulnerable(false),
           boostCooldown(0), boosting(false),
-          blocking(false), blockStartTime(0), blockCooldown(0),
-          perfectParryWindow(false), lastPerfectParry(0), blockHeldTime(0) {}
+          shielding(false), shieldStartTime(0), shieldCooldown(0),
+          perfectParryWindow(false), lastPerfectParry(0), shieldHeldTime(0), shieldAngle(0),
+          swordActive(false), swordAngle(0), swordCooldown(0), 
+          swordAnimationTime(0), lastAttackTime(0),
+          rolling(false), rollDirection(0, 0), rollCooldown(0),
+          rollStartTime(0), rollEndTime(0), facing(0) {}
     
     void applyInput(float dx, float dy, float deltaTime) {
         Vector2 input(dx, dy);
@@ -172,51 +210,133 @@ public:
     }
     
     void update(float deltaTime) override {
-        Entity::update(deltaTime);
+        // Handle rolling movement
+        if (rolling) {
+            float currentTime = emscripten_get_now();
+            if (currentTime < rollEndTime) {
+                // Apply roll movement
+                velocity = rollDirection * (Config::PLAYER_MAX_SPEED * Config::ROLL_SPEED_MULTIPLIER);
+                invulnerable = true;
+            } else {
+                // End roll
+                rolling = false;
+                invulnerable = false;
+                velocity *= 0.5f; // Reduce speed after roll
+            }
+        } else if (!shielding) {
+            // Normal movement update (not while shielding or rolling)
+            Entity::update(deltaTime);
+        } else {
+            // Reduced movement while shielding
+            velocity *= 0.7f;
+            Entity::update(deltaTime);
+        }
         
         // Update cooldowns
         if (boostCooldown > 0) {
             boostCooldown -= deltaTime;
         }
         
-        if (blockCooldown > 0) {
-            blockCooldown -= deltaTime;
+        if (shieldCooldown > 0) {
+            shieldCooldown -= deltaTime;
         }
         
-        // Update block state
-        if (blocking) {
-            blockHeldTime += deltaTime;
+        if (swordCooldown > 0) {
+            swordCooldown -= deltaTime;
+        }
+        
+        if (rollCooldown > 0) {
+            rollCooldown -= deltaTime;
+        }
+        
+        if (swordAnimationTime > 0) {
+            swordAnimationTime -= deltaTime;
+            if (swordAnimationTime <= 0) {
+                swordActive = false;
+            }
+        }
+        
+        // Update shield state
+        if (shielding) {
+            shieldHeldTime += deltaTime;
             
             // Check if perfect parry window has expired
-            if (perfectParryWindow && blockHeldTime > Config::PERFECT_PARRY_WINDOW) {
+            if (perfectParryWindow && shieldHeldTime > Config::PERFECT_PARRY_WINDOW) {
                 perfectParryWindow = false;
             }
-            
-            // Reduce movement speed while blocking
-            velocity *= 0.5f;
         }
         
-        // Energy regeneration
-        if (energy < maxEnergy) {
-            energy = std::min(maxEnergy, energy + 0.1f * deltaTime);
+        // Energy regeneration (not while rolling or shielding)
+        if (!rolling && !shielding && energy < maxEnergy) {
+            energy = std::min(maxEnergy, energy + 0.2f * deltaTime / 16.0f);
         }
     }
     
-    void startBlock() {
-        if (blockCooldown > 0 || blocking) return;
+    void startShield() {
+        if (shieldCooldown > 0 || shielding || rolling || swordActive) return;
         
-        blocking = true;
-        blockStartTime = 0; // Will be set by game engine with current time
+        shielding = true;
+        shieldStartTime = emscripten_get_now();
         perfectParryWindow = true;
-        blockHeldTime = 0;
+        shieldHeldTime = 0;
+        shieldAngle = facing;
     }
     
-    void endBlock() {
-        if (!blocking) return;
+    void endShield() {
+        if (!shielding) return;
         
-        blocking = false;
+        shielding = false;
         perfectParryWindow = false;
-        blockCooldown = Config::BLOCK_COOLDOWN;
+        shieldCooldown = Config::SHIELD_COOLDOWN;
+    }
+    
+    bool performSwordAttack() {
+        if (swordCooldown > 0 || energy < Config::SWORD_ENERGY_COST || rolling || shielding) {
+            return false;
+        }
+        
+        swordActive = true;
+        swordAngle = facing;
+        swordCooldown = Config::SWORD_COOLDOWN;
+        swordAnimationTime = Config::SWORD_ANIMATION_TIME;
+        lastAttackTime = emscripten_get_now();
+        energy -= Config::SWORD_ENERGY_COST;
+        
+        return true;
+    }
+    
+    bool performRoll(float dirX, float dirY) {
+        if (rollCooldown > 0 || energy < Config::ROLL_ENERGY_COST || shielding || rolling) {
+            return false;
+        }
+        
+        // If no direction provided, use facing direction
+        if (dirX == 0 && dirY == 0) {
+            dirX = std::cos(facing);
+            dirY = std::sin(facing);
+        }
+        
+        // Normalize direction
+        Vector2 dir(dirX, dirY);
+        if (dir.magnitude() > 0) {
+            dir = dir.normalized();
+        }
+        
+        rolling = true;
+        rollDirection = dir;
+        rollCooldown = Config::ROLL_COOLDOWN;
+        rollStartTime = emscripten_get_now();
+        rollEndTime = rollStartTime + Config::ROLL_DURATION;
+        energy -= Config::ROLL_ENERGY_COST;
+        invulnerable = true;
+        
+        return true;
+    }
+    
+    void updateFacing(float mouseX, float mouseY) {
+        float dx = mouseX - position.x;
+        float dy = mouseY - position.y;
+        facing = std::atan2(dy, dx);
     }
 };
 
