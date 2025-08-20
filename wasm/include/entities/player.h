@@ -72,7 +72,7 @@ public:
             boostDuration -= deltaTime;
             if (boostDuration <= 0) {
                 boosting = false;
-                boostCooldown = Config::PLAYER_BOOST_COOLDOWN;
+                boostCooldown = Config::PLAYER_BOOST_COOLDOWN / 1000.0f;  // Convert ms to seconds
             }
         } else if (boostCooldown > 0) {
             boostCooldown -= deltaTime;
@@ -95,7 +95,7 @@ public:
             attackCooldown -= deltaTime;
             if (attackCooldown <= 0) {
                 attacking = false;
-                attackCooldown = Config::SWORD_COOLDOWN;
+                attackCooldown = Config::SWORD_COOLDOWN / 1000.0f;  // Convert ms to seconds
             }
         } else if (attackCooldown > 0) {
             attackCooldown -= deltaTime;
@@ -107,7 +107,7 @@ public:
             if (rollDuration <= 0) {
                 rolling = false;
                 invulnerable = false;
-                rollCooldown = Config::ROLL_COOLDOWN;
+                rollCooldown = Config::ROLL_COOLDOWN / 1000.0f;  // Convert ms to seconds
             } else {
                 // Move in roll direction
                 position += rollDirection * Config::ROLL_SPEED_MULTIPLIER * (deltaTime / 16.0f);
@@ -147,7 +147,7 @@ public:
     void startBoost() {
         if (!boosting && boostCooldown <= 0 && energy >= 20) {
             boosting = true;
-            boostDuration = Config::PLAYER_BOOST_DURATION;
+            boostDuration = Config::PLAYER_BOOST_DURATION / 1000.0f;  // Convert ms to seconds
             energy -= 20;
         }
     }
@@ -155,7 +155,7 @@ public:
     void startBlock() {
         if (!blocking && blockCooldown <= 0 && !rolling) {
             blocking = true;
-            blockDuration = Config::SHIELD_DURATION;
+            blockDuration = Config::SHIELD_DURATION / 1000.0f;  // Convert ms to seconds
             blockStartTime = emscripten_get_now();
             perfectParryWindow = true;
         }
@@ -164,14 +164,14 @@ public:
     void endBlock() {
         blocking = false;
         perfectParryWindow = false;
-        blockCooldown = Config::SHIELD_COOLDOWN;
+        blockCooldown = Config::SHIELD_COOLDOWN / 1000.0f;  // Convert ms to seconds
     }
     
     void startAttack(float angle) {
         if (!attacking && attackCooldown <= 0 && energy >= Config::SWORD_ENERGY_COST) {
             attacking = true;
             attackAngle = angle;
-            attackCooldown = Config::SWORD_ANIMATION_TIME;
+            attackCooldown = Config::SWORD_ANIMATION_TIME / 1000.0f;  // Convert ms to seconds
             energy -= Config::SWORD_ENERGY_COST;
         }
     }
@@ -180,7 +180,7 @@ public:
         if (!rolling && rollCooldown <= 0 && energy >= Config::ROLL_ENERGY_COST) {
             rolling = true;
             rollDirection = direction.normalized();
-            rollDuration = Config::ROLL_DURATION;
+            rollDuration = Config::ROLL_DURATION / 1000.0f;  // Convert ms to seconds
             invulnerable = true;
             energy -= Config::ROLL_ENERGY_COST;
         }
@@ -196,7 +196,7 @@ public:
                 break;
             case PowerUpType::SHIELD:
                 hasShield = true;
-                shieldDuration = Config::POWERUP_DURATION;
+                shieldDuration = Config::POWERUP_DURATION / 1000.0f;  // Convert ms to seconds
                 break;
             case PowerUpType::SPEED:
                 speedMultiplier = 1.5f;
@@ -206,11 +206,11 @@ public:
                 break;
             case PowerUpType::RAPID_FIRE:
                 rapidFire = true;
-                rapidFireDuration = Config::POWERUP_DURATION;
+                rapidFireDuration = Config::POWERUP_DURATION / 1000.0f;  // Convert ms to seconds
                 break;
             case PowerUpType::MULTI_SHOT:
                 multiShot = true;
-                multiShotDuration = Config::POWERUP_DURATION;
+                multiShotDuration = Config::POWERUP_DURATION / 1000.0f;  // Convert ms to seconds
                 break;
         }
     }

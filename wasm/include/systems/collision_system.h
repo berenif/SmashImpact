@@ -108,7 +108,7 @@ private:
             if (perfectParry) {
                 // Perfect parry - no damage, stun enemy
                 damage = 0;
-                enemy->stun(Config::PERFECT_PARRY_STUN_DURATION);
+                enemy->stun(Config::PERFECT_PARRY_STUN_DURATION / 1000.0f);  // Convert ms to seconds
                 player->energy = std::min(player->energy + Config::PERFECT_PARRY_ENERGY_RESTORE, 
                                         player->maxEnergy);
                 
@@ -129,7 +129,7 @@ private:
         if (damage > 0) {
             player->takeDamage(damage);
             player->invulnerable = true;
-            player->invulnerabilityTimer = Config::INVULNERABILITY_DURATION;
+            player->invulnerabilityTimer = Config::INVULNERABILITY_DURATION / 1000.0f;  // Convert ms to seconds
             
             // Knockback
             Vector2 knockback = (player->position - enemy->position).normalized() * 10;
