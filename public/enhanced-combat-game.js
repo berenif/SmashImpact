@@ -35,10 +35,10 @@
     PERFECT_PARRY_ENERGY_RESTORE: 30,
     
     // Roll settings
-    ROLL_DISTANCE: 150,
+    ROLL_DISTANCE: 75,  // Reduced by half from 150
     ROLL_DURATION: 300,
     ROLL_COOLDOWN: 800,
-    ROLL_INVULNERABILITY: true,
+    ROLL_INVULNERABILITY: true,  // Invincibility during roll
     ROLL_SPEED_MULTIPLIER: 2.5,
     
     // Enemy settings
@@ -96,6 +96,10 @@
         mouse: { x: 0, y: 0 },
         mouseAngle: 0
       };
+      
+      // Enemy targeting system
+      this.targetedEnemy = null;
+      this.targetLockEnabled = true;
       
       // Timers
       this.timers = {
@@ -168,7 +172,12 @@
         // Status
         invulnerable: false,
         stunned: false,
-        color: '#4a90e2'
+        color: '#4a90e2',
+        
+        // Facing direction tracking
+        movementDirection: 0,  // Direction based on movement
+        lastMovementX: 0,
+        lastMovementY: 0
       };
     }
     
@@ -222,6 +231,12 @@
             this.restart();
           }
           break;
+          
+        case 'shift':
+          // Switch to next enemy target
+          e.preventDefault();
+          this.switchTarget();
+          break;
       }
     }
     
@@ -239,8 +254,8 @@
       this.input.mouse.x = e.clientX - rect.left;
       this.input.mouse.y = e.clientY - rect.top;
       
-      // Calculate angle from player to mouse
-      if (this.player) {
+      // Calculate angle from player to mouse (only when not using movement-based facing)
+      if (this.player && !this.targetLockEnabled) {
         const dx = this.input.mouse.x - this.player.x;
         const dy = this.input.mouse.y - this.player.y;
         this.input.mouseAngle = Math.atan2(dy, dx);
@@ -248,11 +263,51 @@
       }
     }
     
+    // Find closest enemy to player
+    findClosestEnemy() {
+      if (!this.player || this.enemies.length === 0) return null;
+      
+      let closestEnemy = null;
+      let closestDistance = Infinity;
+      
+      for (const enemy of this.enemies) {
+        const dx = enemy.x - this.player.x;
+        const dy = enemy.y - this.player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestEnemy = enemy;
+        }
+      }
+      
+      return closestEnemy;
+    }
+    
+    // Switch to next enemy target
+    switchTarget() {
+      if (this.enemies.length === 0) {
+        this.targetedEnemy = null;
+        return;
+      }
+      
+      // If no current target, get closest
+      if (!this.targetedEnemy || !this.enemies.includes(this.targetedEnemy)) {
+        this.targetedEnemy = this.findClosestEnemy();
+        return;
+      }
+      
+      // Find next enemy in the list
+      const currentIndex = this.enemies.indexOf(this.targetedEnemy);
+      const nextIndex = (currentIndex + 1) % this.enemies.length;
+      this.targetedEnemy = this.enemies[nextIndex];
+    }
+    
     performSwordAttack() {
       if (this.player.energy < 10) return;
       
       this.player.swordActive = true;
-      this.player.swordAngle = this.player.facing;
+      this.player.swordAngle = this.player.facing;  // Attack in facing direction
       this.player.swordCooldown = CONFIG.SWORD_COOLDOWN;
       this.player.swordAnimationTime = CONFIG.SWORD_ANIMATION_TIME;
       this.player.lastAttackTime = performance.now();
@@ -316,7 +371,7 @@
       this.player.shielding = true;
       this.player.shieldStartTime = performance.now();
       this.player.perfectParryWindow = true;
-      this.player.shieldAngle = this.player.facing;
+      this.player.shieldAngle = this.player.facing;  // Shield in facing direction
       
       // Visual feedback
       this.createShieldEffect();
@@ -342,26 +397,9 @@
     }
     
     performRoll() {
-      // Determine roll direction based on movement input or mouse direction
-      let dx = 0, dy = 0;
-      
-      if (this.input.keys['w'] || this.input.keys['arrowup']) dy -= 1;
-      if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
-      if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
-      if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
-      
-      // If no movement input, roll towards mouse
-      if (dx === 0 && dy === 0) {
-        dx = Math.cos(this.player.facing);
-        dy = Math.sin(this.player.facing);
-      }
-      
-      // Normalize direction
-      const mag = Math.sqrt(dx * dx + dy * dy);
-      if (mag > 0) {
-        dx /= mag;
-        dy /= mag;
-      }
+      // Roll in the direction the player is facing
+      let dx = Math.cos(this.player.facing);
+      let dy = Math.sin(this.player.facing);
       
       this.player.rolling = true;
       this.player.rollDirection = { x: dx, y: dy };
@@ -370,10 +408,8 @@
       this.player.rollEndTime = this.player.rollStartTime + CONFIG.ROLL_DURATION;
       this.player.energy -= 15;
       
-      // Set invulnerability during roll
-      if (CONFIG.ROLL_INVULNERABILITY) {
-        this.player.invulnerable = true;
-      }
+      // Set invulnerability during roll (always on)
+      this.player.invulnerable = true;
       
       // Create roll effect
       this.createRollEffect();
@@ -515,14 +551,34 @@
     updatePlayer(deltaTime) {
       if (!this.player) return;
       
+      // Update enemy targeting
+      if (this.targetLockEnabled) {
+        // Auto-target closest enemy if none selected or current target is dead
+        if (!this.targetedEnemy || !this.enemies.includes(this.targetedEnemy)) {
+          this.targetedEnemy = this.findClosestEnemy();
+        }
+        
+        // Update facing to look at targeted enemy
+        if (this.targetedEnemy) {
+          const dx = this.targetedEnemy.x - this.player.x;
+          const dy = this.targetedEnemy.y - this.player.y;
+          this.player.facing = Math.atan2(dy, dx);
+        }
+      }
+      
       // Handle rolling
       if (this.player.rolling) {
         const now = performance.now();
-        if (now < this.player.rollEndTime) {
-          // Apply roll movement
-          const rollSpeed = CONFIG.PLAYER_MAX_SPEED * CONFIG.ROLL_SPEED_MULTIPLIER;
+        const rollProgress = (now - this.player.rollStartTime) / CONFIG.ROLL_DURATION;
+        
+        if (rollProgress < 1) {
+          // Apply roll movement with proper distance calculation
+          const rollSpeed = (CONFIG.ROLL_DISTANCE / CONFIG.ROLL_DURATION) * 1000;
           this.player.vx = this.player.rollDirection.x * rollSpeed;
           this.player.vy = this.player.rollDirection.y * rollSpeed;
+          
+          // Ensure invulnerability during roll
+          this.player.invulnerable = true;
           
           // Create trail effect
           if (this.frameCount % 2 === 0) {
@@ -544,6 +600,18 @@
         if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
         if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
         if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+        
+        // Track movement direction for facing
+        if (dx !== 0 || dy !== 0) {
+          this.player.lastMovementX = dx;
+          this.player.lastMovementY = dy;
+          
+          // Update facing based on movement if not targeting an enemy
+          if (!this.targetLockEnabled || !this.targetedEnemy) {
+            this.player.movementDirection = Math.atan2(dy, dx);
+            this.player.facing = this.player.movementDirection;
+          }
+        }
         
         // Normalize diagonal movement
         if (dx !== 0 && dy !== 0) {
@@ -1123,16 +1191,29 @@
       ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
       ctx.fill();
       
-      // Player direction indicator
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
+      // Player direction indicator (enhanced)
+      ctx.save();
+      ctx.translate(this.player.x, this.player.y);
+      ctx.rotate(this.player.facing);
+      
+      // Direction arrow
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.beginPath();
-      ctx.moveTo(this.player.x, this.player.y);
-      ctx.lineTo(
-        this.player.x + Math.cos(this.player.facing) * this.player.radius * 0.8,
-        this.player.y + Math.sin(this.player.facing) * this.player.radius * 0.8
-      );
+      ctx.moveTo(this.player.radius * 0.5, 0);
+      ctx.lineTo(this.player.radius * 0.9, -5);
+      ctx.lineTo(this.player.radius * 0.9, 5);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Direction line
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(this.player.radius * 0.6, 0);
       ctx.stroke();
+      
+      ctx.restore();
       
       ctx.restore();
     }
@@ -1140,6 +1221,50 @@
     renderEnemies() {
       for (const enemy of this.enemies) {
         const ctx = this.ctx;
+        
+        // Draw targeting circle for targeted enemy
+        if (enemy === this.targetedEnemy) {
+          ctx.save();
+          
+          // Outer targeting circle
+          ctx.strokeStyle = '#ff0000';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, enemy.radius + 15, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Inner targeting circle (animated)
+          const pulseScale = 1 + Math.sin(performance.now() * 0.005) * 0.1;
+          ctx.strokeStyle = '#ffaa00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, (enemy.radius + 10) * pulseScale, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          // Target indicator arrows
+          ctx.fillStyle = '#ff0000';
+          const arrowDist = enemy.radius + 25;
+          for (let i = 0; i < 4; i++) {
+            const angle = (Math.PI / 2) * i + performance.now() * 0.001;
+            const x = enemy.x + Math.cos(angle) * arrowDist;
+            const y = enemy.y + Math.sin(angle) * arrowDist;
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle + Math.PI);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-5, -3);
+            ctx.lineTo(-5, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+          
+          ctx.restore();
+        }
         
         // Enemy shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
