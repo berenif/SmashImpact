@@ -18,7 +18,10 @@ The following methods are now fully implemented in the WASM game engine and expo
 
 ### Player Controls
 - `updatePlayerInput(dx, dy, aimX, aimY)` - Updates player movement and aim direction
+- `setJoystickInput(x, y)` - Sets player movement from joystick input (mobile)
 - `playerShoot(aimX, aimY)` - Player shoots a projectile towards aim position
+- `playerAttack()` - Performs melee sword attack
+- `playerRoll(dirX, dirY)` - Performs evasive roll/dodge (optional direction)
 - `playerBoost()` - Activates player boost ability
 - `playerSpecialAbility()` - Triggers player's special ability (area attack)
 - `activateBoost(playerId)` - Activates boost for specific player
@@ -42,6 +45,8 @@ The following methods are now fully implemented in the WASM game engine and expo
 ### State Queries
 - `isBlocking(playerId)` - Check if player is currently blocking
 - `isPerfectParryWindow(playerId)` - Check if player is in perfect parry window
+- `isAttacking()` - Check if player is currently performing an attack
+- `isRolling()` - Check if player is currently rolling/dodging
 
 ## Usage in JavaScript
 
