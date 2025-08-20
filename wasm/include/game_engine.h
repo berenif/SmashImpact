@@ -70,6 +70,8 @@ public:
     // Player controls
     void updatePlayerInput(float dx, float dy, float aimX, float aimY);
     void playerShoot(float aimX, float aimY);
+    void playerBoost();
+    void playerSpecialAbility();
     void activateBoost(int playerId);
     void deactivateBoost(int playerId);
     void startBlock(int playerId);
@@ -98,6 +100,7 @@ public:
     
     // JavaScript interface
     emscripten::val getEntityPositions();
+    emscripten::val getAllEntities();
     emscripten::val getPlayerState();
     emscripten::val getGameState();
     emscripten::val getPerformanceMetrics();
