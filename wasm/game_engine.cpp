@@ -20,6 +20,15 @@ namespace Config {
     constexpr float POWERUP_RADIUS = 15.0f;
     constexpr float PROJECTILE_RADIUS = 5.0f;
     constexpr int MAX_ENTITIES = 1000;
+    
+    // Block system configuration
+    constexpr float BLOCK_DURATION = 500.0f;
+    constexpr float BLOCK_COOLDOWN = 300.0f;
+    constexpr float PERFECT_PARRY_WINDOW = 100.0f; // 100ms window for perfect parry
+    constexpr float BLOCK_DAMAGE_REDUCTION = 0.5f; // Normal block reduces damage by 50%
+    constexpr float PERFECT_PARRY_DAMAGE_REDUCTION = 1.0f; // Perfect parry negates all damage
+    constexpr float PERFECT_PARRY_STUN_DURATION = 1000.0f; // Stun enemy for 1 second
+    constexpr float PERFECT_PARRY_ENERGY_RESTORE = 20.0f;
 }
 
 // Vector2 class for 2D math operations
@@ -127,10 +136,20 @@ public:
     float boostCooldown;
     bool boosting;
     
+    // Block system properties
+    bool blocking;
+    float blockStartTime;
+    float blockCooldown;
+    bool perfectParryWindow;
+    float lastPerfectParry;
+    float blockHeldTime;
+    
     Player(int id, float x, float y)
         : Entity(id, EntityType::PLAYER, x, y, Config::PLAYER_RADIUS),
           energy(100), maxEnergy(100), invulnerable(false),
-          boostCooldown(0), boosting(false) {}
+          boostCooldown(0), boosting(false),
+          blocking(false), blockStartTime(0), blockCooldown(0),
+          perfectParryWindow(false), lastPerfectParry(0), blockHeldTime(0) {}
     
     void applyInput(float dx, float dy, float deltaTime) {
         Vector2 input(dx, dy);
@@ -160,10 +179,44 @@ public:
             boostCooldown -= deltaTime;
         }
         
+        if (blockCooldown > 0) {
+            blockCooldown -= deltaTime;
+        }
+        
+        // Update block state
+        if (blocking) {
+            blockHeldTime += deltaTime;
+            
+            // Check if perfect parry window has expired
+            if (perfectParryWindow && blockHeldTime > Config::PERFECT_PARRY_WINDOW) {
+                perfectParryWindow = false;
+            }
+            
+            // Reduce movement speed while blocking
+            velocity *= 0.5f;
+        }
+        
         // Energy regeneration
         if (energy < maxEnergy) {
             energy = std::min(maxEnergy, energy + 0.1f * deltaTime);
         }
+    }
+    
+    void startBlock() {
+        if (blockCooldown > 0 || blocking) return;
+        
+        blocking = true;
+        blockStartTime = 0; // Will be set by game engine with current time
+        perfectParryWindow = true;
+        blockHeldTime = 0;
+    }
+    
+    void endBlock() {
+        if (!blocking) return;
+        
+        blocking = false;
+        perfectParryWindow = false;
+        blockCooldown = Config::BLOCK_COOLDOWN;
     }
 };
 
@@ -173,13 +226,24 @@ public:
     float speed;
     float damage;
     Entity* target;
+    bool stunned;
+    float stunnedUntil;
     
     Enemy(int id, float x, float y, float speed = 2.0f)
         : Entity(id, EntityType::ENEMY, x, y, Config::ENEMY_RADIUS),
-          speed(speed), damage(10), target(nullptr) {}
+          speed(speed), damage(10), target(nullptr), stunned(false), stunnedUntil(0) {}
     
     void update(float deltaTime) override {
-        if (target && target->active) {
+        // Check if enemy is stunned
+        if (stunned && stunnedUntil > 0) {
+            stunnedUntil -= deltaTime;
+            if (stunnedUntil <= 0) {
+                stunned = false;
+            } else {
+                // Reduce velocity while stunned
+                velocity *= 0.9f;
+            }
+        } else if (target && target->active && !stunned) {
             // Simple AI: move towards target
             Vector2 direction = (target->position - position).normalized();
             velocity = direction * speed;
@@ -463,6 +527,29 @@ public:
         );
     }
     
+    void handlePerfectParry(Player* player, Enemy* enemy) {
+        // Perfect parry successful!
+        player->lastPerfectParry = emscripten_get_now();
+        
+        // Restore energy
+        player->energy = std::min(player->maxEnergy, 
+                                 player->energy + Config::PERFECT_PARRY_ENERGY_RESTORE);
+        
+        // Stun the enemy
+        enemy->stunned = true;
+        enemy->stunnedUntil = Config::PERFECT_PARRY_STUN_DURATION;
+        
+        // Knockback the enemy
+        Vector2 knockback = (enemy->position - player->position).normalized() * 10;
+        enemy->velocity = knockback;
+        
+        // Deal damage to enemy
+        enemy->health -= 50; // Perfect parry deals damage to enemy
+        if (enemy->health <= 0) {
+            enemy->active = false;
+        }
+    }
+    
     void handleCollision(Entity& a, Entity& b) {
         // Player-Enemy collision
         if (a.type == EntityType::PLAYER && b.type == EntityType::ENEMY) {
@@ -470,12 +557,35 @@ public:
             Enemy* e = static_cast<Enemy*>(&b);
             
             if (!p->invulnerable) {
-                p->health -= e->damage;
-                p->invulnerable = true;
+                float damage = e->damage;
+                bool blocked = false;
                 
-                // Knockback
-                Vector2 knockback = (p->position - e->position).normalized() * 5;
-                p->velocity += knockback;
+                // Check if player is blocking
+                if (p->blocking) {
+                    blocked = true;
+                    
+                    // Check for perfect parry
+                    if (p->perfectParryWindow) {
+                        // Perfect parry!
+                        handlePerfectParry(p, e);
+                        damage = 0; // No damage on perfect parry
+                        return; // Exit early
+                    } else {
+                        // Normal block - reduce damage
+                        damage *= (1.0f - Config::BLOCK_DAMAGE_REDUCTION);
+                    }
+                }
+                
+                // Apply damage (if any)
+                if (damage > 0) {
+                    p->health -= damage;
+                    p->invulnerable = true;
+                    
+                    // Reduced knockback if blocking
+                    float knockbackMultiplier = blocked ? 0.3f : 1.0f;
+                    Vector2 knockback = (p->position - e->position).normalized() * 5 * knockbackMultiplier;
+                    p->velocity += knockback;
+                }
             }
         }
         
@@ -543,6 +653,9 @@ public:
         state.set("invulnerable", player->invulnerable);
         state.set("boosting", player->boosting);
         state.set("boostCooldown", player->boostCooldown);
+        state.set("blocking", player->blocking);
+        state.set("blockCooldown", player->blockCooldown);
+        state.set("perfectParryWindow", player->perfectParryWindow);
         
         return state;
     }
@@ -579,6 +692,33 @@ public:
             player->boosting = false;
         }
     }
+    
+    void startBlock(int playerId) {
+        if (player && player->id == playerId) {
+            player->startBlock();
+            player->blockStartTime = emscripten_get_now();
+        }
+    }
+    
+    void endBlock(int playerId) {
+        if (player && player->id == playerId) {
+            player->endBlock();
+        }
+    }
+    
+    bool isBlocking(int playerId) {
+        if (player && player->id == playerId) {
+            return player->blocking;
+        }
+        return false;
+    }
+    
+    bool isPerfectParryWindow(int playerId) {
+        if (player && player->id == playerId) {
+            return player->perfectParryWindow;
+        }
+        return false;
+    }
 };
 
 // Bindings for JavaScript
@@ -597,5 +737,9 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("getPerformanceMetrics", &GameEngine::getPerformanceMetrics)
         .function("setWorldBounds", &GameEngine::setWorldBounds)
         .function("activateBoost", &GameEngine::activateBoost)
-        .function("deactivateBoost", &GameEngine::deactivateBoost);
+        .function("deactivateBoost", &GameEngine::deactivateBoost)
+        .function("startBlock", &GameEngine::startBlock)
+        .function("endBlock", &GameEngine::endBlock)
+        .function("isBlocking", &GameEngine::isBlocking)
+        .function("isPerfectParryWindow", &GameEngine::isPerfectParryWindow);
 }

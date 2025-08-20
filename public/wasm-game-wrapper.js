@@ -136,6 +136,54 @@ export class WasmGameEngine {
     }
     
     /**
+     * Start blocking
+     */
+    startBlock() {
+        if (!this.initialized) throw new Error('Engine not initialized');
+        const playerId = this.entityIdMap.get('player');
+        if (playerId && this.engine.startBlock) {
+            this.engine.startBlock(playerId);
+        }
+    }
+    
+    /**
+     * End blocking
+     */
+    endBlock() {
+        if (!this.initialized) throw new Error('Engine not initialized');
+        const playerId = this.entityIdMap.get('player');
+        if (playerId && this.engine.endBlock) {
+            this.engine.endBlock(playerId);
+        }
+    }
+    
+    /**
+     * Check if player is blocking
+     * @returns {boolean}
+     */
+    isBlocking() {
+        if (!this.initialized) return false;
+        const playerId = this.entityIdMap.get('player');
+        if (playerId && this.engine.isBlocking) {
+            return this.engine.isBlocking(playerId);
+        }
+        return false;
+    }
+    
+    /**
+     * Check if in perfect parry window
+     * @returns {boolean}
+     */
+    isPerfectParryWindow() {
+        if (!this.initialized) return false;
+        const playerId = this.entityIdMap.get('player');
+        if (playerId && this.engine.isPerfectParryWindow) {
+            return this.engine.isPerfectParryWindow(playerId);
+        }
+        return false;
+    }
+    
+    /**
      * Update the game engine
      * @param {number} deltaTime - Time since last update in milliseconds
      */
