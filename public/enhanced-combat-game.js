@@ -201,21 +201,21 @@
       
       // Handle special keys
       switch(e.key.toLowerCase()) {
-        case 'control':
+        case 'k':
           e.preventDefault();
           if (!this.player.swordActive && this.player.swordCooldown <= 0 && !this.player.rolling) {
             this.performSwordAttack();
           }
           break;
           
-        case 'alt':
+        case 'l':
           e.preventDefault();
           if (!this.player.shielding && this.player.shieldCooldown <= 0 && !this.player.rolling && !this.player.swordActive) {
             this.startShield();
           }
           break;
           
-        case ' ':
+        case 'm':
           e.preventDefault();
           if (!this.player.rolling && this.player.rollCooldown <= 0 && !this.player.shielding) {
             this.performRoll();
@@ -244,7 +244,7 @@
       this.input.keys[e.key.toLowerCase()] = false;
       
       // Handle shield release
-      if (e.key.toLowerCase() === 'alt' && this.player.shielding) {
+      if (e.key.toLowerCase() === 'l' && this.player.shielding) {
         this.endShield();
       }
     }
@@ -595,11 +595,11 @@
         // Normal movement (not while shielding or rolling)
         let dx = 0, dy = 0;
         
-        // Keyboard input
-        if (this.input.keys['w'] || this.input.keys['arrowup']) dy -= 1;
-        if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
-        if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
-        if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+              // Keyboard input - ZQSD controls
+      if (this.input.keys['z'] || this.input.keys['arrowup']) dy -= 1;
+      if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
+      if (this.input.keys['q'] || this.input.keys['arrowleft']) dx -= 1;
+      if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
         
         // Track movement direction for facing
         if (dx !== 0 || dy !== 0) {

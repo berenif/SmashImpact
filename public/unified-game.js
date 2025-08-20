@@ -296,10 +296,19 @@
             this.nextWave();
           }
           break;
-        case 'shift':
-        case ' ': // Space bar as alternative block key
+        case 'l': // Shield/block key
           if (this.state === 'playing' && !this.player.blocking && this.player.blockCooldown <= 0) {
             this.startBlock();
+          }
+          break;
+        case 'k': // Attack key
+          if (this.state === 'playing' && !this.player.attacking) {
+            this.performAttack();
+          }
+          break;
+        case 'm': // Roll key
+          if (this.state === 'playing' && !this.player.rolling && this.player.rollCooldown <= 0) {
+            this.performRoll();
           }
           break;
         case '4':
@@ -540,10 +549,10 @@
       // Handle input
       let dx = 0, dy = 0;
       
-      // Keyboard input
-      if (this.input.keys['w'] || this.input.keys['arrowup']) dy -= 1;
+      // Keyboard input - ZQSD controls
+      if (this.input.keys['z'] || this.input.keys['arrowup']) dy -= 1;
       if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
-      if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
+      if (this.input.keys['q'] || this.input.keys['arrowleft']) dx -= 1;
       if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
       
       // Joystick input
