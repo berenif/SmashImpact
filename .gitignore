@@ -1,0 +1,24 @@
+# Emscripten SDK - downloaded during build
+emsdk/
+emsdk-install/
+
+# Node modules
+node_modules/
+
+# Build outputs
+*.wasm
+*.wasm.map
+*.js.map
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
