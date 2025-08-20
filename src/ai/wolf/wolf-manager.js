@@ -363,7 +363,7 @@ export class WolfManager {
             waveNumber: options.waveNumber || 1
         });
         
-        if (wolves.length > 0) {
+        if (wolves && wolves.length > 0) {
             const packId = this.packCoordinator.createPack(wolves);
             
             // Set pack target if provided
@@ -396,14 +396,14 @@ export class WolfManager {
     triggerCoordinatedHowl() {
         const packs = this.packCoordinator.getAllPacks();
         
-        if (packs.length > 0) {
+        if (packs && packs.length > 0) {
             // Random pack starts howling
             const pack = packs[Math.floor(Math.random() * packs.length)];
             this.packCoordinator.triggerHowl(pack);
         } else {
             // Individual wolves howl
             const wolves = this.getLivingWolves();
-            if (wolves.length > 0) {
+            if (wolves && wolves.length > 0) {
                 const wolf = wolves[Math.floor(Math.random() * wolves.length)];
                 wolf.performHowl();
             }
@@ -436,7 +436,7 @@ export class WolfManager {
         ctx.lineWidth = 1;
         
         for (const wolf of this.wolves.values()) {
-            if (wolf.currentPath && wolf.currentPath.length > 0) {
+            if (wolf.currentPath && wolf.currentPath && currentPath.length > 0) {
                 ctx.beginPath();
                 ctx.moveTo(wolf.x, wolf.y);
                 

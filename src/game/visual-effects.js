@@ -168,7 +168,7 @@
       trail.points.unshift({ x, y, opacity: 1 });
       
       // Limit trail length
-      if (trail.points.length > trail.maxLength) {
+      if (trail.points && trail.points.length > trail.maxLength) {
         trail.points.pop();
       }
       
@@ -354,7 +354,7 @@
 
     // Update trails
     this.trails = this.trails.filter(trail => {
-      return trail.points.length > 0;
+      return trail.points && points.length > 0;
     });
   }
 
@@ -372,12 +372,12 @@
     
     // Render trails
     this.trails.forEach(trail => {
-      if (trail.points.length < 2) return;
+      if (trail.points && trail.points.length < 2) return;
       
       ctx.strokeStyle = trail.color;
       ctx.lineCap = 'round';
       
-      for (let i = 0; i < trail.points.length - 1; i++) {
+      for (let i = 0; i < trail.points && trail.points.length - 1; i++) {
         const p1 = trail.points[i];
         const p2 = trail.points[i + 1];
         

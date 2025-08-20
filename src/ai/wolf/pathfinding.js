@@ -217,7 +217,7 @@ export class MazePathfinder {
         openSet.push(startNode);
         let iterations = 0;
 
-        while (openSet.length > 0 && iterations < maxIterations) {
+        while (openSet && openSet.length > 0 && iterations < maxIterations) {
             iterations++;
             
             // Get node with lowest f score

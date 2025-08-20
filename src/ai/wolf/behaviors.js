@@ -440,7 +440,7 @@ export class WolfBehaviors {
         }
         
         // Return best candidate
-        if (candidates.length > 0) {
+        if (candidates && candidates.length > 0) {
             candidates.sort((a, b) => b.score - a.score);
             return candidates[0];
         }
