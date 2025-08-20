@@ -460,27 +460,6 @@
                 
                 // Create game engine instance
                 Game.engine = new Game.wasmModule.GameEngine(1920, 1080);
-                
-                // Workaround: Add clearEntities function if it doesn't exist
-                if (typeof Game.engine.clearEntities !== 'function') {
-                    console.warn('clearEntities not found in WASM module, adding workaround...');
-                    Game.engine.clearEntities = function() {
-                        // Get all current entities
-                        const entities = this.getEntityPositions();
-                        // Remove each entity
-                        for (let i = 0; i < entities.size(); i++) {
-                            const entity = entities.get(i);
-                            if (entity && entity.id !== undefined) {
-                                try {
-                                    this.removeEntity(entity.id);
-                                } catch (e) {
-                                    // Entity might already be removed, continue
-                                }
-                            }
-                        }
-                    };
-                }
-                
                 updateLoading(70, 'Setting up renderer...');
                 
                 // Initialize canvas

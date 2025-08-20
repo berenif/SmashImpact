@@ -2,6 +2,7 @@
 #define ENTITY_H
 
 #include "../math/vector2.h"
+#include <algorithm>
 
 // Entity types in the game
 enum class EntityType {
@@ -67,7 +68,7 @@ public:
         return position.distanceTo(other.position);
     }
     
-    void takeDamage(float damage) {
+    virtual void takeDamage(float damage) {
         if (!invulnerable && active) {
             health -= damage;
             if (health <= 0) {

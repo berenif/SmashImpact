@@ -1,4 +1,6 @@
 #include "../include/game_engine.h"
+#include <emscripten/bind.h>
+#include <emscripten/val.h>
 #include <cstdlib>
 #include <ctime>
 
@@ -551,8 +553,10 @@ bool GameEngine::isPerfectParryWindow(int playerId) {
 }
 
 // Bindings for JavaScript
+using namespace emscripten;
+
 EMSCRIPTEN_BINDINGS(game_engine) {
-    emscripten::class_<GameEngine>("GameEngine")
+    class_<GameEngine>("GameEngine")
         .constructor<float, float>()
         .function("createPlayer", &GameEngine::createPlayer)
         .function("createEnemy", &GameEngine::createEnemy)
