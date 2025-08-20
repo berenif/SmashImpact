@@ -454,7 +454,7 @@ export class DebugPanel {
         `;
         
         // Time travel
-        if (this.stateHistory && stateHistory.length > 0) {
+        if (this.stateHistory && stateHistory && stateHistory && stateHistory.length > 0) {
             html += '<h4>⏰ Time Travel</h4>';
             html += `
                 <input type="range" id="time-travel-slider" 
@@ -566,7 +566,7 @@ export class DebugPanel {
         html += '</div>';
         
         // Recommendations
-        if (report.recommendations && report.recommendations && recommendations.length > 0) {
+        if (report.recommendations && report.recommendations && recommendations && recommendations && recommendations.length > 0) {
             html += '<h4>💡 Balance Recommendations</h4>';
             html += '<div style="border: 1px solid #ff0; padding: 10px; background: rgba(255, 255, 0, 0.1);">';
             
@@ -1021,7 +1021,7 @@ export class DebugPanel {
     }
     
     loadState() {
-        if (this.stateHistory && stateHistory.length > 0 && typeof GameState !== 'undefined' && GameState.instance) {
+        if (this.stateHistory && stateHistory && stateHistory && stateHistory.length > 0 && typeof GameState !== 'undefined' && GameState.instance) {
             const snapshot = this.stateHistory[this.stateHistory.length - 1];
             GameState.instance.restoreSnapshot(snapshot);
             console.log('State snapshot loaded');

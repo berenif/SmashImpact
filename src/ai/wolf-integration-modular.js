@@ -187,7 +187,7 @@ export class WolfAIIntegration {
      */
     getSpawnPosition() {
         // Try to spawn away from players
-        if (this.gameState.players && this.gameState.players && players.length > 0) {
+        if (this.gameState.players && this.gameState.players && players && players && players.length > 0) {
             const player = this.gameState.players[0];
             const angle = Math.random() * Math.PI * 2;
             const distance = 15 + Math.random() * 10;

@@ -111,7 +111,7 @@
       
       // Set up data channel handlers
       if (this.dataChannel) {
-        console.log('Data channel state:', this.dataChannel && this.dataChannel.readyState);
+        console.log('Data channel state:', this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState);
         
         this.dataChannel.onmessage = (msgEvent) => {
           try {
@@ -135,7 +135,7 @@
           this.cleanup();
         };
         
-        this.isConnected = this.dataChannel && this.dataChannel.readyState === 'open';
+        this.isConnected = this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open';
         console.log('Connection established, isConnected:', this.isConnected);
       }
       
@@ -156,7 +156,7 @@
       } else {
         // Wait for connection to be ready
         this.connectionCheckInterval = setInterval(() => {
-          if (this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open') {
+          if (this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open') {
             this.isConnected = true;
             this.startSyncLoop();
             this.startPingLoop();
@@ -214,7 +214,7 @@
             this.cleanup();
           };
           
-          this.isConnected = this.dataChannel && this.dataChannel.readyState === 'open';
+          this.isConnected = this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open';
         }
         
         // Initialize player positions
@@ -254,11 +254,11 @@
   
   // Send message through data channel
   sendMessage(message) {
-    if (this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open') {
+    if (this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open') {
       this.dataChannel.send(JSON.stringify(message));
     } else {
       console.warn('Cannot send message, data channel not open. State:', 
-        this.dataChannel ? this.dataChannel && this.dataChannel.readyState : 'no channel');
+        this.dataChannel ? this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState : 'no channel');
     }
   }
   
@@ -317,7 +317,7 @@
     const FULL_SYNC_INTERVAL = 1000; // Full sync every second
     
     this.syncInterval = setInterval(() => {
-      if (!this.dataChannel || this.dataChannel && this.dataChannel.readyState !== 'open') {
+      if (!this.dataChannel || this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState !== 'open') {
         return; // Skip if connection not ready
       }
       
@@ -368,7 +368,7 @@
     }
     
     this.pingInterval = setInterval(() => {
-      if (this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open') {
+      if (this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel && this.dataChannel.readyState === 'open') {
         this.sendMessage({ 
           type: 'ping', 
           timestamp: Date.now() 
