@@ -453,7 +453,9 @@
                 const module = await import('./public/game_engine.js');
                 updateLoading(30, 'Initializing WASM...');
                 
-                Game.wasmModule = await module.default();
+                // Initialize the WASM module properly
+                const GameEngineModule = module.default;
+                Game.wasmModule = await GameEngineModule();
                 updateLoading(50, 'Creating game engine...');
                 
                 // Create game engine instance
