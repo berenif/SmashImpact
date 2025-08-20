@@ -647,6 +647,30 @@ public:
         );
     }
     
+    void checkCollisions() {
+        // Rebuild spatial grid
+        spatialGrid.clear();
+        for (auto& entity : entities) {
+            if (entity->active) {
+                spatialGrid.insert(entity.get());
+            }
+        }
+        
+        // Check collisions using spatial hashing
+        collisionChecks = 0;
+        for (auto& entity : entities) {
+            if (!entity->active) continue;
+            
+            auto nearby = spatialGrid.getNearby(entity.get());
+            for (Entity* other : nearby) {
+                collisionChecks++;
+                if (entity->isColliding(*other)) {
+                    handleCollision(*entity, *other);
+                }
+            }
+        }
+    }
+    
     void handlePerfectParry(Player* player, Enemy* enemy) {
         // Perfect parry successful!
         player->lastPerfectParry = emscripten_get_now();
@@ -852,6 +876,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("removeEntity", &GameEngine::removeEntity)
         .function("updatePlayerInput", &GameEngine::updatePlayerInput)
         .function("update", &GameEngine::update)
+        .function("checkCollisions", &GameEngine::checkCollisions)
         .function("getEntityPositions", &GameEngine::getEntityPositions)
         .function("getPlayerState", &GameEngine::getPlayerState)
         .function("getPerformanceMetrics", &GameEngine::getPerformanceMetrics)

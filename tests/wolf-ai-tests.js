@@ -549,7 +549,7 @@ class WolfAITestSuite {
 }
 
 // Run tests if this is the main module
-if (typeof process !== 'undefined' && process.argv[1] === import.meta.url) {
+if (typeof process !== 'undefined' && typeof require !== 'undefined' && require.main === module) {
     const suite = new WolfAITestSuite();
     suite.runAll().catch(console.error);
 }

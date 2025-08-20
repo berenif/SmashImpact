@@ -306,7 +306,7 @@ async function main() {
 }
 
 // Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (typeof process !== 'undefined' && typeof require !== 'undefined' && require.main === module) {
     main().catch(error => {
         console.error('Fatal error:', error);
         process.exit(1);

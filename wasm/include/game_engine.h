@@ -81,6 +81,7 @@ public:
     void update(float deltaTime);
     void updatePhysics(float deltaTime);
     void updateAI(float deltaTime);
+    void checkCollisions();
     void checkBounds();
     
     // Game state
