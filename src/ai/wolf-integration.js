@@ -74,7 +74,7 @@
         }
         
         // Create pack
-        if (pack && pack.length > 0) {
+        if (pack && pack && pack && pack.length > 0) {
             wolfPackCoordinator.createPack(pack);
         }
         
@@ -213,7 +213,7 @@
                 wolfPackCoordinator.updatePack(packId);
                 
                 // Coordinate attacks on nearby players
-                if (pack.members && members.length > 0 && !pack.target) {
+                if (pack.members && members && members && members.length > 0 && !pack.target) {
                     const alpha = pack.alpha;
                     if (alpha && alpha.target) {
                         wolfPackCoordinator.coordinateAttack(pack, alpha.target);

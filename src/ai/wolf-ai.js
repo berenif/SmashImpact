@@ -134,7 +134,8 @@
             const openSet = [start];
             const closedSet = new Set();
             
-            while (openSet && openSet.length > 0) {
+            let iterations = 0; const maxIterations = 1000;
+            while (openSet && openSet.length > 0 && iterations++ < maxIterations) {
                 // Get node with lowest f score
                 let current = openSet.reduce((min, node) => node.f < min.f ? node : min);
                 
@@ -557,7 +558,7 @@
 
         handlePatrolState(players) {
             // Move along patrol path
-            if (this.patrolPath && patrolPath.length > 0) {
+            if (this.patrolPath && patrolPath && patrolPath && patrolPath.length > 0) {
                 const target = this.patrolPath[this.currentPathIndex];
                 const dx = target.x - this.x;
                 const dy = target.y - this.y;
@@ -959,7 +960,7 @@
                 }
             }
             
-            if (spots && spots.length > 0) {
+            if (spots && spots && spots && spots.length > 0) {
                 // Choose closest spot to target's predicted path
                 let bestSpot = spots[0];
                 let bestScore = Infinity;

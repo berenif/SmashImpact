@@ -430,7 +430,7 @@ export class MetricsCollector {
         
         // Performance
         const fpsTimeline = this.getMetric('performance.fps');
-        if (fpsTimeline && fpsTimeline && fpsTimeline.length > 0) {
+        if (fpsTimeline && fpsTimeline && fpsTimeline && fpsTimeline && fpsTimeline.length > 0) {
             const avgFPS = fpsTimeline.reduce((sum, sample) => sum + sample.value, 0) / fpsTimeline.length;
             analysis.averageFPS = avgFPS;
         }

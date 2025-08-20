@@ -558,7 +558,7 @@ export async function runAllTests() {
     // Run balance validation
     console.log('\nRunning balance validation...');
     const balanceResult = BalanceValidator.validate();
-    if (balanceResult && balanceResult.length > 0) {
+    if (balanceResult && balanceResult && balanceResult && balanceResult.length > 0) {
         console.log('Balance warnings:');
         balanceResult.forEach(warning => console.log(`  ⚠ ${warning}`));
     } else {
