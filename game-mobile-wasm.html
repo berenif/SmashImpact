@@ -198,30 +198,19 @@
         // Load WASM module
         async function loadWASM() {
             try {
-                // Load the WASM module
-                const response = await fetch('public/game_engine.wasm');
-                const wasmBuffer = await response.arrayBuffer();
-                
-                // Load the JavaScript bindings
+                // Load the JavaScript module that includes WASM
                 const script = document.createElement('script');
                 script.src = 'public/game_engine.js';
                 
                 return new Promise((resolve, reject) => {
                     script.onload = async () => {
-                        // Initialize the module
-                        const Module = {
-                            wasmBinary: wasmBuffer,
-                            onRuntimeInitialized: () => {
-                                console.log('WASM module loaded successfully');
-                                resolve(Module);
-                            }
-                        };
-                        
-                        // The game_engine.js should define the Module
-                        if (typeof window.Module !== 'undefined') {
-                            Object.assign(window.Module, Module);
+                        // The module is exported as GameEngineModule
+                        if (typeof GameEngineModule !== 'undefined') {
+                            const Module = await GameEngineModule();
+                            console.log('WASM module loaded successfully');
+                            resolve(Module);
                         } else {
-                            window.Module = Module;
+                            reject(new Error('GameEngineModule not found'));
                         }
                     };
                     
