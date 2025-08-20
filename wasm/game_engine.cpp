@@ -590,9 +590,12 @@ public:
         }
     }
     
-    void updatePlayerInput(float dx, float dy, float deltaTime) {
+    void updatePlayerInput(float dx, float dy, float aimX = 0, float aimY = 0) {
         if (player && player->active) {
-            player->applyInput(dx, dy, deltaTime);
+            player->applyInput(dx, dy, 16.0f); // Assume 60 FPS (16ms per frame)
+            if (aimX != 0 || aimY != 0) {
+                player->updateFacing(aimX, aimY);
+            }
         }
     }
     
@@ -647,6 +650,30 @@ public:
         );
     }
     
+    void checkCollisions() {
+        // Rebuild spatial grid
+        spatialGrid.clear();
+        for (auto& entity : entities) {
+            if (entity->active) {
+                spatialGrid.insert(entity.get());
+            }
+        }
+        
+        // Check collisions using spatial hashing
+        collisionChecks = 0;
+        for (auto& entity : entities) {
+            if (!entity->active) continue;
+            
+            auto nearby = spatialGrid.getNearby(entity.get());
+            for (Entity* other : nearby) {
+                collisionChecks++;
+                if (entity->isColliding(*other)) {
+                    handleCollision(*entity, *other);
+                }
+            }
+        }
+    }
+    
     void handlePerfectParry(Player* player, Enemy* enemy) {
         // Perfect parry successful!
         player->lastPerfectParry = emscripten_get_now();
@@ -681,7 +708,7 @@ public:
                 bool blocked = false;
                 
                 // Check if player is blocking
-                if (p->blocking) {
+                if (p->shielding) {
                     blocked = true;
                     
                     // Check for perfect parry
@@ -773,8 +800,8 @@ public:
         state.set("invulnerable", player->invulnerable);
         state.set("boosting", player->boosting);
         state.set("boostCooldown", player->boostCooldown);
-        state.set("blocking", player->blocking);
-        state.set("blockCooldown", player->blockCooldown);
+        state.set("blocking", player->shielding);
+        state.set("blockCooldown", player->shieldCooldown);
         state.set("perfectParryWindow", player->perfectParryWindow);
         
         return state;
@@ -815,20 +842,19 @@ public:
     
     void startBlock(int playerId) {
         if (player && player->id == playerId) {
-            player->startBlock();
-            player->blockStartTime = emscripten_get_now();
+            player->startShield();
         }
     }
     
     void endBlock(int playerId) {
         if (player && player->id == playerId) {
-            player->endBlock();
+            player->endShield();
         }
     }
     
     bool isBlocking(int playerId) {
         if (player && player->id == playerId) {
-            return player->blocking;
+            return player->shielding;
         }
         return false;
     }
@@ -838,6 +864,100 @@ public:
             return player->perfectParryWindow;
         }
         return false;
+    }
+    
+    // Get all active entities
+    emscripten::val getAllEntities() {
+        return getEntityPositions(); // Reuse existing method
+    }
+    
+    // Player boost (same as activateBoost)
+    void playerBoost() {
+        if (player && player->active) {
+            activateBoost(player->id);
+        }
+    }
+    
+    // Player special ability (can be customized)
+    void playerSpecialAbility() {
+        if (player && player->active) {
+            // Trigger a special ability - for now, a powerful area attack
+            if (player->energy >= 50) {
+                player->energy -= 50;
+                
+                // Create explosion effect around player
+                for (auto& entity : entities) {
+                    if (entity->active && entity->type == EntityType::ENEMY) {
+                        float dist = player->distanceTo(*entity);
+                        if (dist < 150) { // Area of effect radius
+                            entity->health -= 75; // Heavy damage
+                            if (entity->health <= 0) {
+                                entity->active = false;
+                            }
+                            // Knockback
+                            Vector2 knockback = (entity->position - player->position).normalized() * 20;
+                            entity->velocity = knockback;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Clear all entities except player
+    void clearEntities() {
+        entities.erase(
+            std::remove_if(entities.begin(), entities.end(),
+                [this](const std::unique_ptr<Entity>& e) { 
+                    if (e.get() != player) {
+                        entityMap.erase(e->id);
+                        return true;
+                    }
+                    return false;
+                }),
+            entities.end()
+        );
+    }
+    
+    // Create power-up
+    int createPowerUp(float x, float y, int type) {
+        // PowerUp is a simple entity for now
+        auto powerup = std::make_unique<Entity>(nextEntityId++, EntityType::POWERUP, x, y, Config::POWERUP_RADIUS);
+        int id = powerup->id;
+        entityMap[id] = powerup.get();
+        entities.push_back(std::move(powerup));
+        return id;
+    }
+    
+    // Create obstacle
+    int createObstacle(float x, float y, float radius, bool destructible) {
+        auto obstacle = std::make_unique<Entity>(nextEntityId++, EntityType::OBSTACLE, x, y, radius);
+        obstacle->health = destructible ? 50 : 999999; // High health for indestructible
+        int id = obstacle->id;
+        entityMap[id] = obstacle.get();
+        entities.push_back(std::move(obstacle));
+        return id;
+    }
+    
+    // Player shoot projectile
+    void playerShoot(float aimX, float aimY) {
+        if (!player || !player->active) return;
+        
+        // Calculate projectile direction
+        Vector2 direction(aimX - player->position.x, aimY - player->position.y);
+        direction = direction.normalized();
+        
+        // Create projectile slightly in front of player
+        float spawnDist = player->radius + Config::PROJECTILE_RADIUS + 5;
+        float px = player->position.x + direction.x * spawnDist;
+        float py = player->position.y + direction.y * spawnDist;
+        
+        // Projectile velocity
+        float projectileSpeed = 500;
+        float vx = direction.x * projectileSpeed;
+        float vy = direction.y * projectileSpeed;
+        
+        createProjectile(px, py, vx, vy, 25, player->id);
     }
 };
 
@@ -849,15 +969,23 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("createEnemy", &GameEngine::createEnemy)
         .function("createWolf", &GameEngine::createWolf)
         .function("createProjectile", &GameEngine::createProjectile)
+        .function("createPowerUp", &GameEngine::createPowerUp)
+        .function("createObstacle", &GameEngine::createObstacle)
         .function("removeEntity", &GameEngine::removeEntity)
         .function("updatePlayerInput", &GameEngine::updatePlayerInput)
         .function("update", &GameEngine::update)
+        .function("checkCollisions", &GameEngine::checkCollisions)
         .function("getEntityPositions", &GameEngine::getEntityPositions)
+        .function("getAllEntities", &GameEngine::getAllEntities)
         .function("getPlayerState", &GameEngine::getPlayerState)
         .function("getPerformanceMetrics", &GameEngine::getPerformanceMetrics)
         .function("setWorldBounds", &GameEngine::setWorldBounds)
         .function("activateBoost", &GameEngine::activateBoost)
         .function("deactivateBoost", &GameEngine::deactivateBoost)
+        .function("playerBoost", &GameEngine::playerBoost)
+        .function("playerShoot", &GameEngine::playerShoot)
+        .function("playerSpecialAbility", &GameEngine::playerSpecialAbility)
+        .function("clearEntities", &GameEngine::clearEntities)
         .function("startBlock", &GameEngine::startBlock)
         .function("endBlock", &GameEngine::endBlock)
         .function("isBlocking", &GameEngine::isBlocking)
