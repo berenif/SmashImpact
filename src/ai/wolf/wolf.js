@@ -960,6 +960,7 @@ export class Wolf {
             scale = 1.1 + Math.sin(Date.now() * 0.01) * 0.05;
         } else if (this.stateMachine.isInState(WolfState.LUNGING)) {
             // Stretch effect during lunge
+            const lungeProgress = this.behaviors.getLungeProgress();
             const lungeResult = this.behaviors.lunge(this.target);
             const lungeProgress = lungeResult && lungeResult.progress ? lungeResult.progress : 0;
             scale = 1 + lungeProgress * 0.3;
