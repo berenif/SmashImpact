@@ -69,6 +69,8 @@ export class WolfStateMachine {
             () => !this.context?.target);
 
         // From CHASING
+        this.addTransition(WolfState.CHASING, WolfState.LUNGING,
+            () => this.context?.shouldLunge());
         this.addTransition(WolfState.CHASING, WolfState.ATTACKING,
             () => this.context?.inAttackRange());
         this.addTransition(WolfState.CHASING, WolfState.FLANKING,
@@ -79,12 +81,42 @@ export class WolfStateMachine {
             () => this.context?.lostTarget());
 
         // From ATTACKING
+        this.addTransition(WolfState.ATTACKING, WolfState.STUNNED,
+            () => this.context?.isStunned);
         this.addTransition(WolfState.ATTACKING, WolfState.RETREATING,
             () => this.context?.shouldRetreat());
         this.addTransition(WolfState.ATTACKING, WolfState.CHASING,
             () => !this.context?.inAttackRange() && this.context?.target);
         this.addTransition(WolfState.ATTACKING, WolfState.IDLE,
             () => !this.context?.target);
+
+        // From LUNGING
+        this.addTransition(WolfState.LUNGING, WolfState.STUNNED,
+            () => this.context?.isStunned);
+        this.addTransition(WolfState.LUNGING, WolfState.ATTACKING,
+            () => this.context?.lungeComplete && this.context?.inAttackRange());
+        this.addTransition(WolfState.LUNGING, WolfState.CHASING,
+            () => this.context?.lungeComplete && !this.context?.inAttackRange());
+        this.addTransition(WolfState.LUNGING, WolfState.HURT,
+            () => this.context?.wasHurt);
+
+        // From HURT
+        this.addTransition(WolfState.HURT, WolfState.RETREATING,
+            () => this.getStateTime() > 300 && this.context?.shouldRetreat());
+        this.addTransition(WolfState.HURT, WolfState.CHASING,
+            () => this.getStateTime() > 300 && this.context?.target && !this.context?.shouldRetreat());
+        this.addTransition(WolfState.HURT, WolfState.IDLE,
+            () => this.getStateTime() > 300 && !this.context?.target);
+
+        // From STUNNED
+        this.addTransition(WolfState.STUNNED, WolfState.HURT,
+            () => this.getStateTime() > 1000 && this.context?.wasHurt);
+        this.addTransition(WolfState.STUNNED, WolfState.RETREATING,
+            () => this.getStateTime() > 1000 && this.context?.shouldRetreat());
+        this.addTransition(WolfState.STUNNED, WolfState.CHASING,
+            () => this.getStateTime() > 1000 && this.context?.target);
+        this.addTransition(WolfState.STUNNED, WolfState.IDLE,
+            () => this.getStateTime() > 1000);
 
         // From RETREATING
         this.addTransition(WolfState.RETREATING, WolfState.REGROUPING,
@@ -122,12 +154,23 @@ export class WolfStateMachine {
         this.addTransition(WolfState.REGROUPING, WolfState.IDLE,
             () => !this.context?.packMembers?.length);
 
-        // To DEAD (from any state)
+        // From DYING
+        this.addTransition(WolfState.DYING, WolfState.DEAD,
+            () => this.getStateTime() > 800);
+
+        // To DYING (from any state except DEAD)
         for (const state of Object.values(WolfState)) {
-            if (state !== WolfState.DEAD) {
-                this.addTransition(state, WolfState.DEAD,
+            if (state !== WolfState.DEAD && state !== WolfState.DYING) {
+                this.addTransition(state, WolfState.DYING,
                     () => this.context?.health <= 0);
             }
+        }
+
+        // To HURT (from combat states)
+        const combatStates = [WolfState.CHASING, WolfState.ATTACKING, WolfState.FLANKING, WolfState.STALKING];
+        for (const state of combatStates) {
+            this.addTransition(state, WolfState.HURT,
+                () => this.context?.wasHurt && !this.context?.isStunned);
         }
     }
 
@@ -177,6 +220,40 @@ export class WolfStateMachine {
             onExit: () => {
                 this.context?.resetAttack?.();
             }
+        });
+
+        this.setStateHandler(WolfState.LUNGING, {
+            onEnter: () => {
+                this.context?.startLunge?.();
+            },
+            onExit: () => {
+                this.context?.endLunge?.();
+            }
+        });
+
+        this.setStateHandler(WolfState.HURT, {
+            onEnter: () => {
+                this.context?.playHurtAnimation?.();
+            },
+            onExit: () => {
+                this.context?.wasHurt = false;
+            }
+        });
+
+        this.setStateHandler(WolfState.STUNNED, {
+            onEnter: () => {
+                this.context?.playStunnedAnimation?.();
+            },
+            onExit: () => {
+                this.context?.isStunned = false;
+            }
+        });
+
+        this.setStateHandler(WolfState.DYING, {
+            onEnter: () => {
+                this.context?.playDeathAnimation?.();
+            },
+            onExit: () => {}
         });
 
         this.setStateHandler(WolfState.RETREATING, {
@@ -262,6 +339,18 @@ export class WolfStateMachine {
     update(deltaTime) {
         // Don't update if dead
         if (this.currentState === WolfState.DEAD) {
+            return;
+        }
+        
+        // Allow dying animation to complete
+        if (this.currentState === WolfState.DYING) {
+            const possibleTransitions = this.transitions.get(this.currentState) || [];
+            for (const transition of possibleTransitions) {
+                if (transition.condition()) {
+                    this.transitionTo(transition.to, transition.onTransition);
+                    break;
+                }
+            }
             return;
         }
 

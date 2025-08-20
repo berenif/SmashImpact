@@ -271,6 +271,61 @@ export class WolfBehaviors {
     }
 
     /**
+     * Lunge attack behavior - rapid forward dash attack
+     * @param {Object} target - Target to lunge at
+     * @returns {Object} Movement vector and attack info
+     */
+    lunge(target) {
+        if (!target) return { vx: 0, vy: 0 };
+        
+        const dx = target.x - this.wolf.x;
+        const dy = target.y - this.wolf.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if in lunge range
+        if (distance > WOLF_CONFIG.movement.LUNGE_DISTANCE) {
+            // Too far, move closer first
+            return this.chase(target);
+        }
+        
+        // Calculate lunge velocity
+        const speed = WOLF_CONFIG.movement.LUNGE_SPEED;
+        const lungeVx = (dx / distance) * speed;
+        const lungeVy = (dy / distance) * speed;
+        
+        // Store lunge start position if not already lunging
+        if (!this.wolf.lungeStartPosition) {
+            this.wolf.lungeStartPosition = { x: this.wolf.x, y: this.wolf.y };
+            this.wolf.lungeTargetPosition = { 
+                x: this.wolf.x + (dx / distance) * WOLF_CONFIG.movement.LUNGE_DISTANCE,
+                y: this.wolf.y + (dy / distance) * WOLF_CONFIG.movement.LUNGE_DISTANCE
+            };
+            this.wolf.lungeStartTime = Date.now();
+        }
+        
+        // Check if lunge is complete
+        const lungeProgress = (Date.now() - this.wolf.lungeStartTime) / WOLF_CONFIG.timings.LUNGE_DURATION;
+        if (lungeProgress >= 1) {
+            // Lunge complete, reset
+            this.wolf.lungeStartPosition = null;
+            this.wolf.lungeTargetPosition = null;
+            this.wolf.lungeStartTime = null;
+            return { vx: 0, vy: 0 };
+        }
+        
+        // Apply easing for more realistic lunge motion (fast start, slow end)
+        const easing = 1 - Math.pow(1 - lungeProgress, 3);
+        const adjustedSpeed = speed * (1 - easing * 0.7);
+        
+        return {
+            vx: (dx / distance) * adjustedSpeed,
+            vy: (dy / distance) * adjustedSpeed,
+            isLunging: true,
+            progress: lungeProgress
+        };
+    }
+
+    /**
      * Regroup behavior - move towards pack center
      * @param {Array} packMembers - Array of pack members
      * @returns {Object} Movement vector

@@ -88,6 +88,20 @@ export class Wolf {
         this.stateTimer = 0;
         this.howlCooldown = 0;
         this.retreatTimer = 0;
+        this.lungeCooldown = 0;
+        
+        // Animation states
+        this.wasHurt = false;
+        this.isStunned = false;
+        this.lungeComplete = false;
+        this.deathAnimationProgress = 0;
+        this.hurtAnimationProgress = 0;
+        this.stunAnimationProgress = 0;
+        
+        // Lunge properties
+        this.lungeStartPosition = null;
+        this.lungeTargetPosition = null;
+        this.lungeStartTime = null;
     }
 
     /**
@@ -107,6 +121,10 @@ export class Wolf {
         
         if (this.retreatTimer > 0) {
             this.retreatTimer -= deltaTime;
+        }
+        
+        if (this.lungeCooldown > 0) {
+            this.lungeCooldown -= deltaTime;
         }
         
         // Update state machine
@@ -166,6 +184,38 @@ export class Wolf {
                 
             case WolfState.ATTACKING:
                 this.performAttack();
+                break;
+                
+            case WolfState.LUNGING:
+                if (this.target) {
+                    movement = this.behaviors.lunge(this.target);
+                    // Check for collision with target during lunge
+                    if (movement.isLunging && movement.progress > 0.3) {
+                        this.checkLungeHit();
+                    }
+                    if (movement.progress >= 1) {
+                        this.lungeComplete = true;
+                    }
+                }
+                break;
+                
+            case WolfState.HURT:
+                // Knockback effect
+                if (this.hurtKnockback) {
+                    movement = this.hurtKnockback;
+                    this.hurtKnockback.vx *= 0.9;
+                    this.hurtKnockback.vy *= 0.9;
+                }
+                break;
+                
+            case WolfState.STUNNED:
+                // No movement when stunned
+                movement = { vx: 0, vy: 0 };
+                break;
+                
+            case WolfState.DYING:
+                // Slow down movement during death animation
+                movement = { vx: this.vx * 0.8, vy: this.vy * 0.8 };
                 break;
                 
             case WolfState.RETREATING:
@@ -283,6 +333,19 @@ export class Wolf {
         // Update eye glow based on state
         const targetGlow = this.getTargetEyeGlow();
         this.eyeGlow += (targetGlow - this.eyeGlow) * 0.1;
+        
+        // Update animation progress
+        if (this.stateMachine.isInState(WolfState.HURT)) {
+            this.hurtAnimationProgress = Math.min(1, this.hurtAnimationProgress + deltaTime / WOLF_CONFIG.timings.HURT_DURATION);
+        }
+        
+        if (this.stateMachine.isInState(WolfState.STUNNED)) {
+            this.stunAnimationProgress = Math.min(1, this.stunAnimationProgress + deltaTime / WOLF_CONFIG.timings.STUN_DURATION);
+        }
+        
+        if (this.stateMachine.isInState(WolfState.DYING)) {
+            this.deathAnimationProgress = Math.min(1, this.deathAnimationProgress + deltaTime / WOLF_CONFIG.timings.DEATH_ANIMATION_DURATION);
+        }
     }
 
     /**
@@ -295,11 +358,14 @@ export class Wolf {
                 return 0.3;
             case WolfState.CHASING:
             case WolfState.ATTACKING:
+            case WolfState.LUNGING:
                 return 1.0;
             case WolfState.HOWLING:
                 return 0.7;
             case WolfState.AMBUSH:
                 return 0.1;
+            case WolfState.STUNNED:
+                return 0.5 + Math.sin(Date.now() * 0.01) * 0.5; // Pulsing effect
             default:
                 return 0;
         }
@@ -351,6 +417,106 @@ export class Wolf {
         }
     }
 
+    /**
+     * Check if should perform lunge attack
+     * @returns {boolean}
+     */
+    shouldLunge() {
+        if (!this.target || this.lungeCooldown > 0) return false;
+        
+        const distance = this.getDistanceTo(this.target);
+        return distance > WOLF_CONFIG.detection.ATTACK_RANGE && 
+               distance <= WOLF_CONFIG.movement.LUNGE_DISTANCE &&
+               this.aggression > 0.6 &&
+               Math.random() < 0.3; // 30% chance when conditions are met
+    }
+    
+    /**
+     * Start lunge attack
+     */
+    startLunge() {
+        this.lungeComplete = false;
+        this.lungeCooldown = WOLF_CONFIG.timings.LUNGE_COOLDOWN;
+        
+        // Play lunge sound if available
+        if (this.gameState.playSound) {
+            this.gameState.playSound('wolf_growl');
+        }
+    }
+    
+    /**
+     * End lunge attack
+     */
+    endLunge() {
+        this.lungeStartPosition = null;
+        this.lungeTargetPosition = null;
+        this.lungeStartTime = null;
+        this.lungeComplete = false;
+    }
+    
+    /**
+     * Check if lunge hits the target
+     */
+    checkLungeHit() {
+        if (!this.target || this.lastAttackTime + 200 > Date.now()) return;
+        
+        const distance = this.getDistanceTo(this.target);
+        if (distance <= WOLF_CONFIG.detection.ATTACK_RANGE * 1.5) {
+            // Check if player is blocking
+            let damage = WOLF_CONFIG.combat.LUNGE_DAMAGE;
+            let blocked = false;
+            
+            if (this.target.isBlocking && this.target.isBlocking()) {
+                // Player blocked the lunge
+                blocked = true;
+                
+                // Check for perfect parry
+                if (this.target.isPerfectParry && this.target.isPerfectParry()) {
+                    // Perfect parry - wolf gets stunned
+                    this.isStunned = true;
+                    this.stunAnimationProgress = 0;
+                    damage = 0;
+                    
+                    // Create parry effect
+                    this.createDamageEffect('parry');
+                    
+                    // Play parry sound
+                    if (this.gameState.playSound) {
+                        this.gameState.playSound('perfect_parry');
+                    }
+                } else {
+                    // Normal block - reduced damage
+                    damage *= 0.3;
+                    
+                    // Create block effect
+                    this.createDamageEffect('block');
+                }
+            }
+            
+            if (!blocked || damage > 0) {
+                // Apply damage and knockback
+                if (this.target.takeDamage) {
+                    this.target.takeDamage(damage);
+                } else {
+                    this.target.health -= damage;
+                }
+                
+                // Apply knockback
+                if (this.target.applyKnockback) {
+                    const dx = this.target.x - this.x;
+                    const dy = this.target.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    this.target.applyKnockback({
+                        vx: (dx / dist) * WOLF_CONFIG.combat.LUNGE_KNOCKBACK,
+                        vy: (dy / dist) * WOLF_CONFIG.combat.LUNGE_KNOCKBACK
+                    });
+                }
+            }
+            
+            this.lastAttackTime = Date.now();
+        }
+    }
+    
     /**
      * Perform attack
      */
@@ -444,12 +610,30 @@ export class Wolf {
     /**
      * Take damage
      * @param {number} amount - Damage amount
+     * @param {Object} options - Damage options (e.g., from blocking)
      */
-    takeDamage(amount) {
+    takeDamage(amount, options = {}) {
         this.health = Math.max(0, this.health - amount);
+        
+        // Set hurt flag for state machine
+        this.wasHurt = true;
+        this.hurtAnimationProgress = 0;
+        
+        // Apply knockback if provided
+        if (options.knockback) {
+            this.hurtKnockback = {
+                vx: options.knockback.vx || 0,
+                vy: options.knockback.vy || 0
+            };
+        }
         
         // Create damage effect
         this.createDamageEffect('hit');
+        
+        // Play hurt sound
+        if (this.gameState.playSound) {
+            this.gameState.playSound('wolf_hurt');
+        }
         
         // Check if should retreat
         if (this.health < this.maxHealth * WOLF_CONFIG.combat.CRITICAL_HEALTH_PERCENT) {
@@ -461,16 +645,47 @@ export class Wolf {
         
         // Death
         if (this.health <= 0) {
-            this.onDeath();
+            this.playDeathAnimation();
         }
     }
-
+    
     /**
-     * Handle death
+     * Play hurt animation
      */
-    onDeath() {
-        this.stateMachine.transitionTo(WolfState.DEAD);
-        
+    playHurtAnimation() {
+        this.hurtAnimationProgress = 0;
+        // Flash red
+        this.createDamageEffect('hurt');
+    }
+    
+    /**
+     * Play stunned animation
+     */
+    playStunnedAnimation() {
+        this.stunAnimationProgress = 0;
+        // Create stun stars effect
+        for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2;
+            if (this.gameState.particles) {
+                this.gameState.particles.push({
+                    x: this.x,
+                    y: this.y - 20,
+                    vx: Math.cos(angle) * 2,
+                    vy: Math.sin(angle) * 2 - 1,
+                    color: '#ffff00',
+                    life: 1000,
+                    size: 3,
+                    type: 'star'
+                });
+            }
+        }
+    }
+    
+    /**
+     * Play death animation
+     */
+    playDeathAnimation() {
+        this.deathAnimationProgress = 0;
         // Create death effect
         this.createDamageEffect('death');
         
@@ -478,7 +693,12 @@ export class Wolf {
         if (this.gameState.playSound) {
             this.gameState.playSound('wolf_death');
         }
-        
+    }
+
+    /**
+     * Handle death
+     */
+    onDeath() {
         // Remove from pack
         if (this.pack) {
             this.pack.members = this.pack.members.filter(w => w !== this);
@@ -495,7 +715,10 @@ export class Wolf {
         const colors = {
             hit: '#ff0000',
             critical: '#ff00ff',
-            death: '#800000'
+            death: '#800000',
+            hurt: '#ff6600',
+            parry: '#00ffff',
+            block: '#0088ff'
         };
         
         const color = colors[type] || '#ff0000';
@@ -716,16 +939,42 @@ export class Wolf {
     render(ctx) {
         ctx.save();
         
+        // Apply screen shake for hurt/stunned states
+        let shakeX = 0, shakeY = 0;
+        if (this.stateMachine.isInState(WolfState.HURT)) {
+            shakeX = Math.sin(Date.now() * 0.1) * 2 * (1 - this.hurtAnimationProgress);
+            shakeY = Math.cos(Date.now() * 0.1) * 2 * (1 - this.hurtAnimationProgress);
+        } else if (this.stateMachine.isInState(WolfState.STUNNED)) {
+            // Wobble effect when stunned
+            shakeX = Math.sin(Date.now() * 0.05) * 3;
+            shakeY = Math.cos(Date.now() * 0.08) * 2;
+        }
+        
         // Transform to wolf position
-        ctx.translate(this.x, this.y);
+        ctx.translate(this.x + shakeX, this.y + shakeY);
         ctx.rotate(this.rotation);
         
         // Scale based on state
         let scale = 1;
         if (this.stateMachine.isInState(WolfState.ATTACKING)) {
             scale = 1.1 + Math.sin(Date.now() * 0.01) * 0.05;
+        } else if (this.stateMachine.isInState(WolfState.LUNGING)) {
+            // Stretch effect during lunge
+            const lungeProgress = this.behaviors.lunge(this.target).progress || 0;
+            scale = 1 + lungeProgress * 0.3;
+            ctx.scale(scale * 1.2, scale * 0.8); // Stretch horizontally
+        } else if (this.stateMachine.isInState(WolfState.DYING)) {
+            // Shrink during death
+            scale = 1 - this.deathAnimationProgress * 0.5;
+            ctx.globalAlpha = 1 - this.deathAnimationProgress * 0.7;
+        } else if (this.stateMachine.isInState(WolfState.HURT)) {
+            // Flash red when hurt
+            ctx.globalAlpha = 0.8 + Math.sin(Date.now() * 0.1) * 0.2;
         }
-        ctx.scale(scale, scale);
+        
+        if (scale !== 1 && !this.stateMachine.isInState(WolfState.LUNGING)) {
+            ctx.scale(scale, scale);
+        }
         
         // Draw shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
@@ -830,6 +1079,41 @@ export class Wolf {
             ctx.fillRect(this.x - 20, this.y - 35, 40 * healthPercent, 4);
         }
         
+        // Draw stunned stars
+        if (this.stateMachine.isInState(WolfState.STUNNED)) {
+            ctx.save();
+            ctx.translate(this.x, this.y - 30);
+            const starAngle = Date.now() * 0.003;
+            for (let i = 0; i < 3; i++) {
+                const angle = starAngle + (i * Math.PI * 2 / 3);
+                const starX = Math.cos(angle) * 15;
+                const starY = Math.sin(angle) * 8;
+                
+                ctx.fillStyle = '#ffff00';
+                ctx.strokeStyle = '#ffaa00';
+                ctx.lineWidth = 1;
+                
+                // Draw star
+                ctx.save();
+                ctx.translate(starX, starY);
+                ctx.rotate(angle * 2);
+                ctx.beginPath();
+                for (let j = 0; j < 5; j++) {
+                    const starPointAngle = (j * Math.PI * 2) / 5 - Math.PI / 2;
+                    const radius = j % 2 === 0 ? 4 : 2;
+                    const px = Math.cos(starPointAngle) * radius;
+                    const py = Math.sin(starPointAngle) * radius;
+                    if (j === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+        
         // Debug info
         if (this.gameState.debug) {
             ctx.fillStyle = '#ffffff';
@@ -866,6 +1150,21 @@ export class Wolf {
         // State-based modification
         if (this.stateMachine.isInState(WolfState.ATTACKING)) {
             return '#8a4a4a'; // Reddish tint
+        } else if (this.stateMachine.isInState(WolfState.LUNGING)) {
+            return '#aa3a3a'; // Deep red for lunge
+        } else if (this.stateMachine.isInState(WolfState.HURT)) {
+            // Flash between red and base color
+            const flash = Math.sin(Date.now() * 0.02) > 0;
+            return flash ? '#ff6666' : baseColor;
+        } else if (this.stateMachine.isInState(WolfState.STUNNED)) {
+            return '#999999'; // Grayed out when stunned
+        } else if (this.stateMachine.isInState(WolfState.DYING)) {
+            // Fade to dark
+            const fade = 1 - this.deathAnimationProgress;
+            const r = parseInt(baseColor.substr(1, 2), 16);
+            const g = parseInt(baseColor.substr(3, 2), 16);
+            const b = parseInt(baseColor.substr(5, 2), 16);
+            return `rgb(${Math.floor(r * fade)}, ${Math.floor(g * fade)}, ${Math.floor(b * fade)})`;
         } else if (this.stateMachine.isInState(WolfState.STALKING)) {
             return '#4a4a6a'; // Bluish tint
         } else if (this.stateMachine.isInState(WolfState.RETREATING)) {
