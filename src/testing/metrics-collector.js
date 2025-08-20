@@ -316,7 +316,7 @@ export class MetricsCollector {
      */
     trackPerformance() {
         // FPS calculation
-        if (window.performance && window.performance.now) {
+        if (typeof window !== 'undefined' && window.performance && window.performance.now) {
             const fps = this.calculateFPS();
             this.updateMetric('performance.fps', fps);
         }
