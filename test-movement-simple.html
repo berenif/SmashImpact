@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Movement Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #222;
+            color: white;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 2px solid #fff;
+            background: #111;
+        }
+        .info {
+            text-align: center;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>Simple Movement Test</h2>
+        <p>Use WASD to move the green circle</p>
+        <p>Position: <span id="position">0, 0</span></p>
+        <p>Keys: <span id="keys">none</span></p>
+        <p>FPS: <span id="fps">0</span></p>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 20,
+            speed: 200 // pixels per second
+        };
+        
+        const keys = {};
+        let lastTime = 0;
+        let frameCount = 0;
+        let fpsTime = 0;
+        
+        // Input handlers
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            updateKeysDisplay();
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            updateKeysDisplay();
+        });
+        
+        function updateKeysDisplay() {
+            const pressed = Object.keys(keys).filter(k => keys[k]).join(', ') || 'none';
+            document.getElementById('keys').textContent = pressed;
+        }
+        
+        function update(deltaTime) {
+            // Movement
+            let dx = 0, dy = 0;
+            
+            if (keys['w']) dy -= 1;
+            if (keys['s']) dy += 1;
+            if (keys['a']) dx -= 1;
+            if (keys['d']) dx += 1;
+            
+            // Normalize diagonal movement
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.707;
+                dy *= 0.707;
+            }
+            
+            // Apply movement
+            const dt = deltaTime / 1000; // Convert to seconds
+            player.x += dx * player.speed * dt;
+            player.y += dy * player.speed * dt;
+            
+            // Keep player in bounds
+            player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+            
+            // Update position display
+            document.getElementById('position').textContent = 
+                `${Math.round(player.x)}, ${Math.round(player.y)}`;
+        }
+        
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw player
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw center marker
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(player.x - 10, player.y);
+            ctx.lineTo(player.x + 10, player.y);
+            ctx.moveTo(player.x, player.y - 10);
+            ctx.lineTo(player.x, player.y + 10);
+            ctx.stroke();
+        }
+        
+        function gameLoop(currentTime) {
+            // Calculate delta time
+            if (!lastTime) lastTime = currentTime;
+            const deltaTime = Math.min(currentTime - lastTime, 100);
+            lastTime = currentTime;
+            
+            // Calculate FPS
+            frameCount++;
+            if (currentTime - fpsTime > 1000) {
+                document.getElementById('fps').textContent = frameCount;
+                frameCount = 0;
+                fpsTime = currentTime;
+            }
+            
+            // Update and render
+            if (deltaTime > 0) {
+                update(deltaTime);
+                render();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Start game
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
