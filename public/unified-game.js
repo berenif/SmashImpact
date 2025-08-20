@@ -123,8 +123,7 @@
         invulnerability: 0
       };
       
-      // Initialize systems
-      this.init();
+      // Don't initialize automatically - wait for start() to be called
     }
     
     init() {
@@ -160,6 +159,12 @@
       // Start game loop
       this.state = 'playing';
       this.gameLoop();
+    }
+    
+    // Public method to start the game
+    start() {
+      // Call init to start the game
+      this.init();
     }
     
     initPlayer() {
