@@ -525,10 +525,6 @@
             <span>⚡</span>
             <span class="action-btn-label">Boost</span>
           </button>
-          <button class="action-btn" id="btnBlock" data-action="block">
-            <span>🛡️</span>
-            <span class="action-btn-label">Block</span>
-          </button>
           <button class="action-btn primary" id="btnAttack" data-action="attack">
             <span>💥</span>
             <span class="action-btn-label">Attack</span>
@@ -539,7 +535,7 @@
 
     <!-- Desktop controls hint -->
     <div class="desktop-controls">
-      Use WASD or Arrow Keys to move • Space to attack • Shift to boost • Q/Ctrl to block
+      Use WASD or Arrow Keys to move • Space to attack • Shift to boost
     </div>
 
     <!-- Pause menu -->
@@ -584,10 +580,6 @@
   <script src="multiplayer.js"></script>
   <!-- Visual effects system -->
   <script src="visual-effects.js"></script>
-  <!-- Wolf AI System -->
-  <script src="wolf-ai.js"></script>
-  <!-- Wolf Wave System -->
-  <script src="wolf-wave-system.js"></script>
   
   <script type="module">
     // Mobile joystick controller
@@ -874,10 +866,6 @@
           this.vfx = null; // Continue without visual effects
         }
         
-        // Initialize WASM engine (will be set up asynchronously)
-        this.wasmEngine = null;
-        this.useWasm = false;
-        
         // Check for multiplayer
         this.isMultiplayer = sessionStorage.getItem('p2pConnected') === 'true';
         this.multiplayer = null;
@@ -900,16 +888,7 @@
           score: 0,
           speed: 4, // Base speed
           boosting: false,
-          lastBoostParticle: 0,
-          // Block system
-          blocking: false,
-          blockStartTime: 0,
-          blockCooldown: 0,
-          perfectParryWindow: false,
-          lastPerfectParry: 0,
-          hasShield: false,
-          energy: 100,
-          maxEnergy: 100
+          lastBoostParticle: 0
         };
         
         this.enemy = {
@@ -1041,27 +1020,13 @@
         }
       }
 
-      async init() {
+      init() {
         // Prevent duplicate initialization
         if (this.initialized) {
           console.warn('Game is already initialized');
           return;
         }
         this.initialized = true;
-        
-        // Try to initialize WASM engine
-        try {
-          if (typeof WasmGameEngine !== 'undefined') {
-            const { WasmGameEngine } = await import('./wasm-game-wrapper.js');
-            this.wasmEngine = new WasmGameEngine();
-            await this.wasmEngine.initialize(this.canvas.width, this.canvas.height);
-            this.useWasm = true;
-            console.log('✓ WASM engine initialized');
-          }
-        } catch (error) {
-          console.warn('WASM engine not available, using JavaScript fallback:', error);
-          this.useWasm = false;
-        }
         
         // Setup canvas
         this.resizeCanvas();
@@ -1159,41 +1124,27 @@
             break;
         }
         
-        // Use advanced wolf AI if available
-        let wolf;
-        if (window.WolfAI) {
-          wolf = new window.WolfAI(x, y, {
-            waveNumber: this.waveNumber,
-            packMembers: this.wolves,
-            player: this.player,
-            obstacles: this.obstacles || []
-          });
-        } else {
-          // Fallback to basic wolf
-          wolf = {
-            id: Date.now() + Math.random(),
-            x: x,
-            y: y,
-            vx: 0,
-            vy: 0,
-            radius: 12,
-            speed: 2 + (this.waveNumber * 0.3), // Wolves get faster each wave
-            health: 2 + Math.floor(this.waveNumber / 2), // More health in later waves
-            color: '#8b4513', // Brown color for wolves
-            state: 'hunting', // hunting, stalking, attacking, fleeing
-            targetX: this.canvas.width / 2,
-            targetY: this.canvas.height / 2,
-            lastAttack: 0,
-            attackCooldown: 2000,
-            alertRadius: 150, // Detection range
-            attackRadius: 30, // Attack range
-            fleeHealth: 1,
-            animationPhase: 0,
-            growlSound: false,
-            role: 'chaser', // Default role
-            pack: null
-          };
-        }
+        const wolf = {
+          id: Date.now() + Math.random(),
+          x: x,
+          y: y,
+          vx: 0,
+          vy: 0,
+          radius: 12,
+          speed: 2 + (this.waveNumber * 0.3), // Wolves get faster each wave
+          health: 2 + Math.floor(this.waveNumber / 2), // More health in later waves
+          color: '#8b4513', // Brown color for wolves
+          state: 'hunting', // hunting, stalking, attacking, fleeing
+          targetX: this.canvas.width / 2,
+          targetY: this.canvas.height / 2,
+          lastAttack: 0,
+          attackCooldown: 2000,
+          alertRadius: 150, // Detection range
+          attackRadius: 30, // Attack range
+          fleeHealth: 1,
+          animationPhase: 0,
+          growlSound: false
+        };
         
         this.wolves.push(wolf);
         
@@ -1469,16 +1420,12 @@
         // Initialize action buttons
         const attackBtn = document.getElementById('btnAttack');
         const boostBtn = document.getElementById('btnBoost');
-        const blockBtn = document.getElementById('btnBlock');
         
         if (attackBtn) {
           this.buttons.attack = new ActionButton(attackBtn, 'attack');
         }
         if (boostBtn) {
           this.buttons.boost = new ActionButton(boostBtn, 'boost');
-        }
-        if (blockBtn) {
-          this.buttons.block = new ActionButton(blockBtn, 'block');
         }
         
         // Show mobile controls
@@ -1521,10 +1468,6 @@
             e.preventDefault();
             this.handleAction('boost', true);
           }
-          if (e.key.toLowerCase() === 'q' || e.key === 'Control') {
-            e.preventDefault();
-            this.handleAction('block', true);
-          }
         };
         
         this.keyupHandler = (e) => {
@@ -1535,9 +1478,6 @@
           }
           if (e.key === 'Shift') {
             this.handleAction('boost', false);
-          }
-          if (e.key.toLowerCase() === 'q' || e.key === 'Control') {
-            this.handleAction('block', false);
           }
         };
         
@@ -1630,114 +1570,7 @@
             }
             // In multiplayer, boost is handled in the update loop
             break;
-          case 'block':
-            if (!this.isMultiplayer) {
-              if (pressed) {
-                this.startBlock();
-              } else {
-                this.endBlock();
-              }
-            }
-            break;
         }
-      }
-      
-      startBlock() {
-        if (this.player.blockCooldown > 0 || this.player.blocking) return;
-        
-        this.player.blocking = true;
-        this.player.blockStartTime = performance.now();
-        this.player.perfectParryWindow = true;
-        
-        // Perfect parry window expires after 100ms
-        setTimeout(() => {
-          this.player.perfectParryWindow = false;
-        }, 100);
-        
-        // Visual feedback
-        if (this.vfx) {
-          this.vfx.createShieldEffect(this.player.x, this.player.y, {
-            color: '#3b82f6',
-            radius: this.player.radius + 10
-          });
-        }
-      }
-      
-      endBlock() {
-        if (!this.player.blocking) return;
-        
-        this.player.blocking = false;
-        this.player.blockCooldown = 300; // 300ms cooldown
-        
-        // Start cooldown timer
-        setTimeout(() => {
-          this.player.blockCooldown = 0;
-        }, 300);
-      }
-      
-      updateWithWasm(deltaTime) {
-        // Get input
-        let inputX = 0;
-        let inputY = 0;
-        
-        if (this.joystick) {
-          const vector = this.joystick.getVector();
-          inputX = vector.x;
-          inputY = vector.y;
-        } else if (this.keys) {
-          if (this.keys['a'] || this.keys['arrowleft']) inputX -= 1;
-          if (this.keys['d'] || this.keys['arrowright']) inputX += 1;
-          if (this.keys['w'] || this.keys['arrowup']) inputY -= 1;
-          if (this.keys['s'] || this.keys['arrowdown']) inputY += 1;
-        }
-        
-        // Update player input in WASM
-        this.wasmEngine.updatePlayerInput(inputX, inputY, deltaTime);
-        
-        // Handle boost
-        if (this.player.boosting || (this.buttons.boost && this.buttons.boost.isPressed())) {
-          this.wasmEngine.activateBoost();
-        } else {
-          this.wasmEngine.deactivateBoost();
-        }
-        
-        // Handle block
-        if (this.player.blocking || (this.buttons.block && this.buttons.block.isPressed())) {
-          this.wasmEngine.startBlock();
-        } else {
-          this.wasmEngine.endBlock();
-        }
-        
-        // Update physics in WASM
-        this.wasmEngine.update(deltaTime);
-        
-        // Get updated positions from WASM
-        const entities = this.wasmEngine.getEntityPositions();
-        const playerState = this.wasmEngine.getPlayerState();
-        
-        // Update player state from WASM
-        if (playerState) {
-          this.player.x = playerState.x;
-          this.player.y = playerState.y;
-          this.player.health = playerState.health;
-          this.player.energy = playerState.energy;
-          this.player.blocking = playerState.blocking;
-        }
-        
-        // Update wolves from WASM entities
-        for (const entity of entities) {
-          if (entity.type === 'wolf') {
-            const wolf = this.wolves.find(w => w.id === entity.id);
-            if (wolf) {
-              wolf.x = entity.x;
-              wolf.y = entity.y;
-              wolf.health = entity.health;
-            }
-          }
-        }
-        
-        // Update visual effects
-        this.vfx.update(deltaTime);
       }
 
       attack() {
@@ -1823,12 +1656,6 @@
 
       update(deltaTime) {
         if (this.paused) return;
-        
-        // Use WASM engine if available for physics
-        if (this.useWasm && this.wasmEngine) {
-          this.updateWithWasm(deltaTime);
-          return;
-        }
         
         // Get input
         let inputX = 0;
@@ -2161,14 +1988,9 @@
           return;
         }
         
-        // Save context state for performance
-        this.ctx.save();
-        
-        // Clear canvas with optimal method
-        this.ctx.globalCompositeOperation = 'copy';
+        // Clear canvas
         this.ctx.fillStyle = '#0a0e27';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.globalCompositeOperation = 'source-over';
         
         // Draw grid
         this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)';
@@ -2404,9 +2226,6 @@
           this.ctx.lineTo(arrowX, arrowY);
           this.ctx.stroke();
         }
-        
-        // Restore context state for performance
-        this.ctx.restore();
       }
 
       animate(currentTime = 0) {
