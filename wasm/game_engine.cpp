@@ -9,6 +9,10 @@
 #include <algorithm>
 #include <unordered_map>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // Constants for game configuration
 namespace Config {
     constexpr float PLAYER_RADIUS = 20.0f;
@@ -904,6 +908,87 @@ public:
         }
     }
     
+    // Player attack (sword attack)
+    void playerAttack() {
+        if (player && player->active) {
+            bool success = player->performSwordAttack();
+            if (success) {
+                // Check for enemies in sword range
+                for (auto& entity : entities) {
+                    if (entity->active && entity->type == EntityType::ENEMY) {
+                        float dist = player->distanceTo(*entity);
+                        if (dist <= Config::SWORD_RANGE) {
+                            // Check if enemy is within sword arc
+                            Vector2 toEnemy = entity->position - player->position;
+                            float angleToEnemy = std::atan2(toEnemy.y, toEnemy.x);
+                            float angleDiff = std::abs(angleToEnemy - player->swordAngle);
+                            
+                            // Normalize angle difference
+                            if (angleDiff > M_PI) angleDiff = 2 * M_PI - angleDiff;
+                            
+                            if (angleDiff <= Config::SWORD_ARC / 2) {
+                                // Hit the enemy
+                                entity->health -= Config::SWORD_DAMAGE;
+                                if (entity->health <= 0) {
+                                    entity->active = false;
+                                }
+                                // Apply knockback
+                                Vector2 knockback = toEnemy.normalized() * Config::SWORD_KNOCKBACK;
+                                entity->velocity = knockback;
+                                
+                                // Stun enemy if it's an Enemy type
+                                if (Enemy* enemy = dynamic_cast<Enemy*>(entity.get())) {
+                                    enemy->stunned = true;
+                                    enemy->stunnedUntil = emscripten_get_now() + 500; // 0.5 second stun
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Player roll/dodge
+    void playerRoll(float dirX = 0, float dirY = 0) {
+        if (player && player->active) {
+            // If no direction specified, use current velocity or facing
+            if (dirX == 0 && dirY == 0) {
+                if (player->velocity.magnitude() > 0.1f) {
+                    dirX = player->velocity.x;
+                    dirY = player->velocity.y;
+                } else {
+                    dirX = std::cos(player->facing);
+                    dirY = std::sin(player->facing);
+                }
+            }
+            player->performRoll(dirX, dirY);
+        }
+    }
+    
+    // Mobile-specific input handlers
+    void setJoystickInput(float x, float y) {
+        if (player && player->active) {
+            player->applyInput(x, y, 16.0f); // Assume 60 FPS
+        }
+    }
+    
+    // Get player attack state
+    bool isAttacking() {
+        if (player && player->active) {
+            return player->swordActive;
+        }
+        return false;
+    }
+    
+    // Get player roll state
+    bool isRolling() {
+        if (player && player->active) {
+            return player->rolling;
+        }
+        return false;
+    }
+    
     // Clear all entities except player
     void clearEntities() {
         entities.erase(
@@ -985,6 +1070,11 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("playerBoost", &GameEngine::playerBoost)
         .function("playerShoot", &GameEngine::playerShoot)
         .function("playerSpecialAbility", &GameEngine::playerSpecialAbility)
+        .function("playerAttack", &GameEngine::playerAttack)
+        .function("playerRoll", &GameEngine::playerRoll)
+        .function("setJoystickInput", &GameEngine::setJoystickInput)
+        .function("isAttacking", &GameEngine::isAttacking)
+        .function("isRolling", &GameEngine::isRolling)
         .function("clearEntities", &GameEngine::clearEntities)
         .function("startBlock", &GameEngine::startBlock)
         .function("endBlock", &GameEngine::endBlock)
