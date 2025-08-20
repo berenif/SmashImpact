@@ -620,6 +620,13 @@
       }
 
       init() {
+        // Prevent duplicate initialization
+        if (this.initialized) {
+          console.warn('JoystickController is already initialized');
+          return;
+        }
+        this.initialized = true;
+        
         // Touch events
         this.element.addEventListener('touchstart', this.boundHandleStart, { passive: false });
         this.element.addEventListener('touchmove', this.boundHandleMove, { passive: false });
@@ -774,6 +781,13 @@
       }
 
       init() {
+        // Prevent duplicate initialization
+        if (this.initialized) {
+          console.warn('ActionButton is already initialized');
+          return;
+        }
+        this.initialized = true;
+        
         // Touch events
         this.element.addEventListener('touchstart', this.boundHandlePress, { passive: false });
         this.element.addEventListener('touchend', this.boundHandleRelease, { passive: false });
@@ -842,6 +856,7 @@
         
         this.running = false;
         this.paused = false;
+        this.initialized = false;
         
         // Initialize visual effects with error handling
         try {
@@ -1006,6 +1021,13 @@
       }
 
       init() {
+        // Prevent duplicate initialization
+        if (this.initialized) {
+          console.warn('Game is already initialized');
+          return;
+        }
+        this.initialized = true;
+        
         // Setup canvas
         this.resizeCanvas();
         window.addEventListener('resize', this.resizeHandler);
@@ -1371,6 +1393,20 @@
       }
 
       initMobileControls() {
+        // Cleanup existing controls if any
+        if (this.joystick) {
+          this.joystick.destroy();
+          this.joystick = null;
+        }
+        if (this.buttons.attack) {
+          this.buttons.attack.destroy();
+          this.buttons.attack = null;
+        }
+        if (this.buttons.boost) {
+          this.buttons.boost.destroy();
+          this.buttons.boost = null;
+        }
+        
         // Initialize joystick
         const joystickEl = document.getElementById('joystick');
         const joystickKnob = document.getElementById('joystickKnob');
@@ -1406,6 +1442,16 @@
       }
 
       initDesktopControls() {
+        // Cleanup existing keyboard listeners if any
+        if (this.keydownHandler) {
+          window.removeEventListener('keydown', this.keydownHandler);
+          this.keydownHandler = null;
+        }
+        if (this.keyupHandler) {
+          window.removeEventListener('keyup', this.keyupHandler);
+          this.keyupHandler = null;
+        }
+        
         // Hide mobile controls
         document.getElementById('mobileControls').style.display = 'none';
         
@@ -1481,6 +1527,18 @@
       }
 
       start() {
+        // Prevent duplicate animation loops
+        if (this.running) {
+          console.warn('Game is already running');
+          return;
+        }
+        
+        // Cancel any existing animation frame to prevent duplicates
+        if (this.animationId) {
+          cancelAnimationFrame(this.animationId);
+          this.animationId = null;
+        }
+        
         this.running = true;
         this.animate();
       }
