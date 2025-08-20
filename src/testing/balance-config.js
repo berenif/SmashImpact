@@ -608,7 +608,7 @@ export function runBalanceTests() {
     console.log('Running balance validation...');
     
     const warnings = BalanceValidator.validate();
-    if (warnings.length > 0) {
+    if (warnings && warnings.length > 0) {
         console.warn('Balance warnings:', warnings);
     } else {
         console.log('✓ Balance validation passed');

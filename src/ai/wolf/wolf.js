@@ -190,10 +190,10 @@ export class Wolf {
                 if (this.target) {
                     movement = this.behaviors.lunge(this.target);
                     // Check for collision with target during lunge
-                    if (movement.isLunging && movement.progress > 0.3) {
+                    if (movement && movement.isLunging && movement.progress > 0.3) {
                         this.checkLungeHit();
                     }
-                    if (movement.progress >= 1) {
+                    if (movement && movement.progress >= 1) {
                         this.lungeComplete = true;
                     }
                 }
@@ -961,6 +961,8 @@ export class Wolf {
         } else if (this.stateMachine.isInState(WolfState.LUNGING)) {
             // Stretch effect during lunge
             const lungeProgress = this.behaviors.getLungeProgress();
+            const lungeResult = this.behaviors.lunge(this.target);
+            const lungeProgress = lungeResult && lungeResult.progress ? lungeResult.progress : 0;
             scale = 1 + lungeProgress * 0.3;
             ctx.scale(scale * 1.2, scale * 0.8); // Stretch horizontally
         } else if (this.stateMachine.isInState(WolfState.DYING)) {

@@ -628,10 +628,10 @@
         this.initialized = true;
         
         // Touch events
-        this.element.addEventListener('touchstart', this.boundHandleStart, { passive: false });
-        this.element.addEventListener('touchmove', this.boundHandleMove, { passive: false });
-        this.element.addEventListener('touchend', this.boundHandleEnd, { passive: false });
-        this.element.addEventListener('touchcancel', this.boundHandleEnd, { passive: false });
+        this.element.addEventListener('touchstart', this.boundHandleStart, { passive: false, capture: false });
+        this.element.addEventListener('touchmove', this.boundHandleMove, { passive: false, capture: false });
+        this.element.addEventListener('touchend', this.boundHandleEnd, { passive: false, capture: false });
+        this.element.addEventListener('touchcancel', this.boundHandleEnd, { passive: false, capture: false });
         
         // Mouse events for testing
         this.element.addEventListener('mousedown', this.boundHandleMouseStart);
@@ -789,9 +789,9 @@
         this.initialized = true;
         
         // Touch events
-        this.element.addEventListener('touchstart', this.boundHandlePress, { passive: false });
-        this.element.addEventListener('touchend', this.boundHandleRelease, { passive: false });
-        this.element.addEventListener('touchcancel', this.boundHandleRelease, { passive: false });
+        this.element.addEventListener('touchstart', this.boundHandlePress, { passive: false, capture: false });
+        this.element.addEventListener('touchend', this.boundHandleRelease, { passive: false, capture: false });
+        this.element.addEventListener('touchcancel', this.boundHandleRelease, { passive: false, capture: false });
         
         // Mouse events
         this.element.addEventListener('mousedown', this.boundHandlePress);
@@ -2392,7 +2392,7 @@
       if (e.target.closest('.mobile-controls') || e.target === document.getElementById('gameCanvas')) {
         e.preventDefault();
       }
-    }, { passive: false });
+    }, { passive: false, capture: false });
 
     // Handle visibility change
     document.addEventListener('visibilitychange', () => {
