@@ -5,9 +5,9 @@
  * Run with: node test-game.js
  */
 
-import { runAllTests } from './src/testing/test-framework.js';
-import { runBalanceTests } from './src/testing/balance-config.js';
-import { metrics } from './src/testing/metrics-collector.js';
+import { runAllTests } from '../src/testing/test-framework.js';
+import { runBalanceTests } from '../src/testing/balance-config.js';
+import { metrics } from '../src/testing/metrics-collector.js';
 import fs from 'fs';
 import path from 'path';
 
