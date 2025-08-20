@@ -719,7 +719,7 @@ public:
                         return; // Exit early
                     } else {
                         // Normal block - reduce damage
-                        damage *= (1.0f - Config::BLOCK_DAMAGE_REDUCTION);
+                        damage *= (1.0f - Config::SHIELD_DAMAGE_REDUCTION);
                     }
                 }
                 
