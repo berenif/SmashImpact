@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ultimate WASM Game Engine</title>
+    <link rel="stylesheet" href="src/game/styles.css">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loader"></div>
+        <div class="loading-text">Loading WASM Engine</div>
+        <div class="loading-progress">
+            <div class="loading-bar" id="loadingBar"></div>
+        </div>
+    </div>
+    
+    <!-- Main Menu -->
+    <div id="mainMenu">
+        <h1 class="game-title">WASM ULTIMATE</h1>
+        <div class="menu-buttons">
+            <button class="btn" onclick="Game.start('campaign')">Campaign</button>
+            <button class="btn" onclick="Game.start('survival')">Survival</button>
+            <button class="btn" onclick="Game.start('multiplayer')">Multiplayer</button>
+            <button class="btn" onclick="Game.start('sandbox')">Sandbox</button>
+            <button class="btn" onclick="Game.showSettings()">Settings</button>
+        </div>
+    </div>
+    
+    <!-- Game UI -->
+    <div id="gameUI">
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-item">
+                <div>Health</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="healthBar" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="hud-item">
+                <div>Energy</div>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energyBar" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="hud-item">
+                <div>Wave: <span id="waveNum">1</span></div>
+            </div>
+            <div class="hud-item">
+                <div>Enemies: <span id="enemyCount">0</span></div>
+            </div>
+        </div>
+        
+        <!-- Score -->
+        <div id="score">0</div>
+        
+        <!-- Minimap -->
+        <canvas id="minimap"></canvas>
+        
+        <!-- Performance Stats -->
+        <div id="performanceStats">
+            <span class="perf-stat">FPS: <span id="fps">0</span></span>
+            <span class="perf-stat">MS: <span id="ms">0</span></span>
+            <span class="perf-stat">WASM: <span id="wasmMs">0</span></span>
+            <span class="perf-stat">Entities: <span id="entities">0</span></span>
+        </div>
+    </div>
+    
+    <!-- Mobile Controls -->
+    <div id="mobileControls">
+        <div class="joystick" id="joystick">
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+        <div class="action-buttons">
+            <div class="action-btn" id="shootBtn">🔫</div>
+            <div class="action-btn" id="boostBtn">⚡</div>
+            <div class="action-btn" id="specialBtn">💥</div>
+        </div>
+    </div>
+    
+    <!-- Pause Menu -->
+    <div id="pauseMenu">
+        <h2>PAUSED</h2>
+        <button class="btn" onclick="Game.resume()">Resume</button>
+        <button class="btn" onclick="Game.restart()">Restart</button>
+        <button class="btn" onclick="Game.quit()">Quit</button>
+    </div>
+    
+    <!-- Load the modular game system -->
+    <script type="module">
+        import gameInstance from './src/game/game-core.js';
+        
+        // Game is automatically initialized when the module loads
+        console.log('Game modules loaded');
+        
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            if (gameInstance) {
+                gameInstance.cleanup();
+            }
+        });
+    </script>
+</body>
+</html>
