@@ -9,7 +9,9 @@ export const WOLF_CONFIG = {
         BASE_SPEED: 2.5,
         SPRINT_SPEED: 4.0,
         STEALTH_SPEED: 1.2,
-        PATROL_SPEED: 1.5
+        PATROL_SPEED: 1.5,
+        LUNGE_SPEED: 8.0,  // Fast burst speed for lunge attack
+        LUNGE_DISTANCE: 4.0  // Distance covered in lunge
     },
     
     detection: {
@@ -24,7 +26,12 @@ export const WOLF_CONFIG = {
         RETREAT_DURATION: 2000,
         AMBUSH_PATIENCE: 5000,
         HOWL_COOLDOWN: 10000,
-        ATTACK_COOLDOWN: 1500
+        ATTACK_COOLDOWN: 1500,
+        LUNGE_DURATION: 400,  // Duration of lunge animation
+        LUNGE_COOLDOWN: 3000,  // Cooldown between lunges
+        HURT_DURATION: 300,  // Duration of hurt animation
+        STUN_DURATION: 1000,  // Duration when blocked/stunned
+        DEATH_ANIMATION_DURATION: 800  // Duration of death animation
     },
     
     // Pack coordination
@@ -39,8 +46,11 @@ export const WOLF_CONFIG = {
     combat: {
         HEALTH: 40,
         DAMAGE: 12,
+        LUNGE_DAMAGE: 20,  // Higher damage for lunge attack
+        LUNGE_KNOCKBACK: 5.0,  // Knockback force for lunge
         CRITICAL_HEALTH_PERCENT: 0.3,
-        CRITICAL_DAMAGE_MULTIPLIER: 1.5
+        CRITICAL_DAMAGE_MULTIPLIER: 1.5,
+        BLOCK_STUN_MULTIPLIER: 1.5  // Extra stun time when blocked
     },
     
     // AI decision weights
@@ -65,9 +75,13 @@ export const WolfState = {
     CHASING: 'chasing',
     FLANKING: 'flanking',
     ATTACKING: 'attacking',
+    LUNGING: 'lunging',  // New lunge attack state
+    HURT: 'hurt',  // When wolf takes damage
+    STUNNED: 'stunned',  // When wolf is blocked/stunned
     RETREATING: 'retreating',
     HOWLING: 'howling',
     REGROUPING: 'regrouping',
+    DYING: 'dying',  // Death animation state
     DEAD: 'dead'
 };
 
