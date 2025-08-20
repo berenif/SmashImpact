@@ -208,13 +208,14 @@ export class Wolf {
         this.y += this.vy * dt;
         
         // Check collision
-        if (this.checkCollision()) {
+        const collidedObstacle = this.checkCollision();
+        if (collidedObstacle) {
             // Revert position
             this.x = oldX;
             this.y = oldY;
             
-            // Try to slide along obstacle
-            this.slideAlongObstacle();
+            // Try to slide along the specific obstacle that was hit
+            this.slideAlongObstacle(collidedObstacle);
         }
         
         // Update rotation based on movement
@@ -230,27 +231,28 @@ export class Wolf {
 
     /**
      * Check collision with obstacles
-     * @returns {boolean} True if collision detected
+     * @returns {Object|null} The obstacle that was collided with, or null if no collision
      */
     checkCollision() {
-        if (!this.gameState.obstacles) return false;
+        if (!this.gameState.obstacles) return null;
         
         for (const obstacle of this.gameState.obstacles) {
             if (this.behaviors.pointInObstacle(this.x, this.y, obstacle)) {
-                return true;
+                return obstacle;
             }
         }
         
-        return false;
+        return null;
     }
 
     /**
      * Try to slide along obstacle
+     * @param {Object} obstacle - The obstacle to slide along
      */
-    slideAlongObstacle() {
+    slideAlongObstacle(obstacle) {
         // Try horizontal movement only
         const testX = this.x + this.vx * 0.016;
-        if (!this.behaviors.pointInObstacle(testX, this.y, this.gameState.obstacles[0])) {
+        if (!this.behaviors.pointInObstacle(testX, this.y, obstacle)) {
             this.x = testX;
             this.vy = 0;
             return;
@@ -258,7 +260,7 @@ export class Wolf {
         
         // Try vertical movement only
         const testY = this.y + this.vy * 0.016;
-        if (!this.behaviors.pointInObstacle(this.x, testY, this.gameState.obstacles[0])) {
+        if (!this.behaviors.pointInObstacle(this.x, testY, obstacle)) {
             this.y = testY;
             this.vx = 0;
             return;
