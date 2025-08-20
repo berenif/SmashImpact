@@ -1,6 +1,7 @@
 {
   "name": "smash-impact",
   "version": "1.0.0",
+  "type": "module",
   "description": "Isometric dungeon crawler game",
   "scripts": {
     "update-cache": "./scripts/update-cache-version.sh",

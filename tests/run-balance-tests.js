@@ -5,7 +5,7 @@
  * Tests game balance configuration without dependencies
  */
 
-import { BalanceConfig } from './src/testing/balance-config.js';
+import { BalanceConfig } from '../src/testing/balance-config.js';
 
 // Color codes for terminal output
 const colors = {
