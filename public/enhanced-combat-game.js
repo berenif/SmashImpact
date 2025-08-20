@@ -1,0 +1,1205 @@
+// Enhanced Combat Game System with Sword & Shield Mechanics
+// Based on UnifiedGame but with new combat features
+
+(function(window) {
+  'use strict';
+
+  // Enhanced Configuration
+  const CONFIG = {
+    // Canvas settings
+    CANVAS_WIDTH: window.innerWidth,
+    CANVAS_HEIGHT: window.innerHeight,
+    
+    // Player settings
+    PLAYER_RADIUS: 25,
+    PLAYER_SPEED: 5,
+    PLAYER_MAX_SPEED: 8,
+    PLAYER_ACCELERATION: 0.5,
+    PLAYER_FRICTION: 0.9,
+    
+    // Sword Attack settings
+    SWORD_RANGE: 60,
+    SWORD_ARC: Math.PI / 3, // 60 degree arc
+    SWORD_DAMAGE: 30,
+    SWORD_KNOCKBACK: 15,
+    SWORD_COOLDOWN: 400,
+    SWORD_ANIMATION_TIME: 200,
+    
+    // Shield settings
+    SHIELD_DURATION: 2000,
+    SHIELD_COOLDOWN: 500,
+    PERFECT_PARRY_WINDOW: 150, // 150ms window for perfect parry
+    SHIELD_DAMAGE_REDUCTION: 0.7, // Normal block reduces damage by 70%
+    PERFECT_PARRY_DAMAGE_REDUCTION: 1.0, // Perfect parry negates all damage
+    PERFECT_PARRY_STUN_DURATION: 1500, // Stun enemy on perfect parry
+    PERFECT_PARRY_ENERGY_RESTORE: 30,
+    
+    // Roll settings
+    ROLL_DISTANCE: 150,
+    ROLL_DURATION: 300,
+    ROLL_COOLDOWN: 800,
+    ROLL_INVULNERABILITY: true,
+    ROLL_SPEED_MULTIPLIER: 2.5,
+    
+    // Enemy settings
+    ENEMY_RADIUS: 18,
+    ENEMY_SPEED: 2,
+    ENEMY_SPAWN_RATE: 2000,
+    MAX_ENEMIES: 15,
+    ENEMY_HEALTH: 50,
+    ENEMY_DAMAGE: 15,
+    
+    // Game settings
+    INITIAL_LIVES: 100,
+    INITIAL_ENERGY: 100,
+    ENERGY_REGEN_RATE: 0.2,
+    INVULNERABILITY_DURATION: 1000,
+    SCORE_PER_KILL: 100,
+    SCORE_PER_PERFECT_PARRY: 50,
+    
+    // Visual settings
+    PARTICLE_LIFETIME: 60,
+    MAX_PARTICLES: 500,
+    SCREEN_SHAKE_DURATION: 300
+  };
+
+  // Enhanced Combat Game Class
+  class EnhancedCombatGame {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      
+      if (!this.ctx) {
+        throw new Error('Failed to get 2D context from canvas');
+      }
+      
+      // Core game state
+      this.state = 'menu';
+      this.score = 0;
+      this.frameCount = 0;
+      this.lastTime = performance.now();
+      this.deltaTime = 0;
+      
+      // Game entities
+      this.player = null;
+      this.enemies = [];
+      this.particles = [];
+      this.projectiles = [];
+      
+      // Visual effects
+      this.vfx = null;
+      this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+      
+      // Input handling
+      this.input = {
+        keys: {},
+        mouse: { x: 0, y: 0 },
+        mouseAngle: 0
+      };
+      
+      // Timers
+      this.timers = {
+        enemySpawn: 0,
+        invulnerability: 0
+      };
+    }
+    
+    init() {
+      // Set canvas size
+      this.resizeCanvas();
+      
+      // Initialize player with sword and shield
+      this.initPlayer();
+      
+      // Initialize visual effects if available
+      if (window.VFXSystem) {
+        this.vfx = new window.VFXSystem(this.ctx);
+      } else if (window.VisualEffectsManager) {
+        this.vfx = new window.VisualEffectsManager(this.ctx, this.canvas);
+      }
+      
+      // Set up event listeners
+      this.setupEventListeners();
+      
+      // Start game
+      this.state = 'playing';
+      this.gameLoop();
+    }
+    
+    initPlayer() {
+      this.player = {
+        // Position and physics
+        x: this.canvas.width / 2,
+        y: this.canvas.height / 2,
+        vx: 0,
+        vy: 0,
+        radius: CONFIG.PLAYER_RADIUS,
+        speed: CONFIG.PLAYER_SPEED,
+        facing: 0, // Angle player is facing
+        
+        // Combat stats
+        health: CONFIG.INITIAL_LIVES,
+        maxHealth: CONFIG.INITIAL_LIVES,
+        energy: CONFIG.INITIAL_ENERGY,
+        maxEnergy: CONFIG.INITIAL_ENERGY,
+        
+        // Sword properties
+        swordActive: false,
+        swordAngle: 0,
+        swordCooldown: 0,
+        swordAnimationTime: 0,
+        lastAttackTime: 0,
+        
+        // Shield properties
+        shielding: false,
+        shieldStartTime: 0,
+        shieldCooldown: 0,
+        perfectParryWindow: false,
+        lastPerfectParry: 0,
+        shieldAngle: 0,
+        
+        // Roll properties
+        rolling: false,
+        rollDirection: { x: 0, y: 0 },
+        rollCooldown: 0,
+        rollStartTime: 0,
+        rollEndTime: 0,
+        
+        // Status
+        invulnerable: false,
+        stunned: false,
+        color: '#4a90e2'
+      };
+    }
+    
+    setupEventListeners() {
+      // Keyboard events
+      window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+      window.addEventListener('keyup', (e) => this.handleKeyUp(e));
+      
+      // Mouse events
+      this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+      
+      // Window resize
+      window.addEventListener('resize', () => this.resizeCanvas());
+      
+      // Prevent right click menu
+      this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+    
+    handleKeyDown(e) {
+      this.input.keys[e.key.toLowerCase()] = true;
+      
+      // Handle special keys
+      switch(e.key.toLowerCase()) {
+        case 'control':
+          e.preventDefault();
+          if (!this.player.swordActive && this.player.swordCooldown <= 0 && !this.player.rolling) {
+            this.performSwordAttack();
+          }
+          break;
+          
+        case 'alt':
+          e.preventDefault();
+          if (!this.player.shielding && this.player.shieldCooldown <= 0 && !this.player.rolling && !this.player.swordActive) {
+            this.startShield();
+          }
+          break;
+          
+        case ' ':
+          e.preventDefault();
+          if (!this.player.rolling && this.player.rollCooldown <= 0 && !this.player.shielding) {
+            this.performRoll();
+          }
+          break;
+          
+        case 'escape':
+          this.togglePause();
+          break;
+          
+        case 'r':
+          if (this.state === 'gameOver') {
+            this.restart();
+          }
+          break;
+      }
+    }
+    
+    handleKeyUp(e) {
+      this.input.keys[e.key.toLowerCase()] = false;
+      
+      // Handle shield release
+      if (e.key.toLowerCase() === 'alt' && this.player.shielding) {
+        this.endShield();
+      }
+    }
+    
+    handleMouseMove(e) {
+      const rect = this.canvas.getBoundingClientRect();
+      this.input.mouse.x = e.clientX - rect.left;
+      this.input.mouse.y = e.clientY - rect.top;
+      
+      // Calculate angle from player to mouse
+      if (this.player) {
+        const dx = this.input.mouse.x - this.player.x;
+        const dy = this.input.mouse.y - this.player.y;
+        this.input.mouseAngle = Math.atan2(dy, dx);
+        this.player.facing = this.input.mouseAngle;
+      }
+    }
+    
+    performSwordAttack() {
+      if (this.player.energy < 10) return;
+      
+      this.player.swordActive = true;
+      this.player.swordAngle = this.player.facing;
+      this.player.swordCooldown = CONFIG.SWORD_COOLDOWN;
+      this.player.swordAnimationTime = CONFIG.SWORD_ANIMATION_TIME;
+      this.player.lastAttackTime = performance.now();
+      this.player.energy -= 10;
+      
+      // Check for enemies in sword arc
+      const hitEnemies = [];
+      for (const enemy of this.enemies) {
+        const dx = enemy.x - this.player.x;
+        const dy = enemy.y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist <= CONFIG.SWORD_RANGE + enemy.radius) {
+          // Check if enemy is within sword arc
+          const angleToEnemy = Math.atan2(dy, dx);
+          let angleDiff = Math.abs(angleToEnemy - this.player.swordAngle);
+          if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+          
+          if (angleDiff <= CONFIG.SWORD_ARC / 2) {
+            hitEnemies.push(enemy);
+          }
+        }
+      }
+      
+      // Apply damage and knockback to hit enemies
+      for (const enemy of hitEnemies) {
+        enemy.health -= CONFIG.SWORD_DAMAGE;
+        
+        // Apply knockback
+        const dx = enemy.x - this.player.x;
+        const dy = enemy.y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0) {
+          enemy.vx = (dx / dist) * CONFIG.SWORD_KNOCKBACK;
+          enemy.vy = (dy / dist) * CONFIG.SWORD_KNOCKBACK;
+        }
+        
+        // Create hit effect
+        this.createHitEffect(enemy.x, enemy.y, '#ff6b6b');
+        
+        // Check if enemy is killed
+        if (enemy.health <= 0) {
+          this.score += CONFIG.SCORE_PER_KILL;
+          this.createDeathEffect(enemy.x, enemy.y);
+        }
+      }
+      
+      // Screen shake on hit
+      if (hitEnemies.length > 0) {
+        this.startScreenShake(5, 200);
+      }
+      
+      // Create sword slash effect
+      this.createSwordSlashEffect();
+      
+      // Update UI
+      this.updateAbilityUI();
+    }
+    
+    startShield() {
+      this.player.shielding = true;
+      this.player.shieldStartTime = performance.now();
+      this.player.perfectParryWindow = true;
+      this.player.shieldAngle = this.player.facing;
+      
+      // Visual feedback
+      this.createShieldEffect();
+      
+      // Set perfect parry window timer
+      setTimeout(() => {
+        if (this.player.shielding) {
+          this.player.perfectParryWindow = false;
+        }
+      }, CONFIG.PERFECT_PARRY_WINDOW);
+      
+      this.updateAbilityUI();
+    }
+    
+    endShield() {
+      if (!this.player.shielding) return;
+      
+      this.player.shielding = false;
+      this.player.perfectParryWindow = false;
+      this.player.shieldCooldown = CONFIG.SHIELD_COOLDOWN;
+      
+      this.updateAbilityUI();
+    }
+    
+    performRoll() {
+      // Determine roll direction based on movement input or mouse direction
+      let dx = 0, dy = 0;
+      
+      if (this.input.keys['w'] || this.input.keys['arrowup']) dy -= 1;
+      if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
+      if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
+      if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+      
+      // If no movement input, roll towards mouse
+      if (dx === 0 && dy === 0) {
+        dx = Math.cos(this.player.facing);
+        dy = Math.sin(this.player.facing);
+      }
+      
+      // Normalize direction
+      const mag = Math.sqrt(dx * dx + dy * dy);
+      if (mag > 0) {
+        dx /= mag;
+        dy /= mag;
+      }
+      
+      this.player.rolling = true;
+      this.player.rollDirection = { x: dx, y: dy };
+      this.player.rollCooldown = CONFIG.ROLL_COOLDOWN;
+      this.player.rollStartTime = performance.now();
+      this.player.rollEndTime = this.player.rollStartTime + CONFIG.ROLL_DURATION;
+      this.player.energy -= 15;
+      
+      // Set invulnerability during roll
+      if (CONFIG.ROLL_INVULNERABILITY) {
+        this.player.invulnerable = true;
+      }
+      
+      // Create roll effect
+      this.createRollEffect();
+      
+      this.updateAbilityUI();
+    }
+    
+    handlePerfectParry(enemy) {
+      // Stun the enemy
+      enemy.stunned = true;
+      enemy.stunnedUntil = performance.now() + CONFIG.PERFECT_PARRY_STUN_DURATION;
+      
+      // Restore energy
+      this.player.energy = Math.min(
+        this.player.maxEnergy,
+        this.player.energy + CONFIG.PERFECT_PARRY_ENERGY_RESTORE
+      );
+      
+      // Knockback enemy
+      const dx = enemy.x - this.player.x;
+      const dy = enemy.y - this.player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        enemy.vx = (dx / dist) * 20;
+        enemy.vy = (dy / dist) * 20;
+      }
+      
+      // Visual effects
+      this.createPerfectParryEffect();
+      this.startScreenShake(8, 300);
+      
+      // Score bonus
+      this.score += CONFIG.SCORE_PER_PERFECT_PARRY;
+      
+      this.player.lastPerfectParry = performance.now();
+    }
+    
+    resizeCanvas() {
+      this.canvas.width = window.innerWidth;
+      this.canvas.height = window.innerHeight;
+    }
+    
+    togglePause() {
+      if (this.state === 'playing') {
+        this.state = 'paused';
+        document.getElementById('pauseScreen').style.display = 'flex';
+      } else if (this.state === 'paused') {
+        this.state = 'playing';
+        document.getElementById('pauseScreen').style.display = 'none';
+      }
+    }
+    
+    restart() {
+      this.score = 0;
+      this.enemies = [];
+      this.particles = [];
+      this.projectiles = [];
+      this.initPlayer();
+      this.state = 'playing';
+    }
+    
+    update(deltaTime) {
+      if (this.state !== 'playing') return;
+      
+      this.deltaTime = deltaTime;
+      this.frameCount++;
+      
+      // Update timers
+      this.updateTimers(deltaTime);
+      
+      // Update player
+      this.updatePlayer(deltaTime);
+      
+      // Update enemies
+      this.updateEnemies(deltaTime);
+      
+      // Update particles
+      this.updateParticles(deltaTime);
+      
+      // Update visual effects
+      if (this.vfx) {
+        this.vfx.update(deltaTime);
+      }
+      
+      // Update screen shake
+      this.updateScreenShake(deltaTime);
+      
+      // Check collisions
+      this.checkCollisions();
+      
+      // Spawn enemies
+      this.spawnEnemies(deltaTime);
+      
+      // Update UI
+      this.updateUI();
+    }
+    
+    updateTimers(deltaTime) {
+      // Update all timers
+      for (const key in this.timers) {
+        if (this.timers[key] > 0) {
+          this.timers[key] -= deltaTime;
+        }
+      }
+      
+      // Player cooldowns
+      if (this.player.swordCooldown > 0) {
+        this.player.swordCooldown -= deltaTime;
+      }
+      if (this.player.shieldCooldown > 0) {
+        this.player.shieldCooldown -= deltaTime;
+      }
+      if (this.player.rollCooldown > 0) {
+        this.player.rollCooldown -= deltaTime;
+      }
+      if (this.player.swordAnimationTime > 0) {
+        this.player.swordAnimationTime -= deltaTime;
+        if (this.player.swordAnimationTime <= 0) {
+          this.player.swordActive = false;
+        }
+      }
+      
+      // Energy regeneration
+      if (this.player.energy < this.player.maxEnergy && !this.player.rolling && !this.player.shielding) {
+        this.player.energy = Math.min(
+          this.player.maxEnergy,
+          this.player.energy + CONFIG.ENERGY_REGEN_RATE * deltaTime / 16
+        );
+      }
+      
+      // Invulnerability
+      if (this.timers.invulnerability > 0) {
+        this.player.invulnerable = true;
+      } else if (!this.player.rolling) {
+        this.player.invulnerable = false;
+      }
+    }
+    
+    updatePlayer(deltaTime) {
+      if (!this.player) return;
+      
+      // Handle rolling
+      if (this.player.rolling) {
+        const now = performance.now();
+        if (now < this.player.rollEndTime) {
+          // Apply roll movement
+          const rollSpeed = CONFIG.PLAYER_MAX_SPEED * CONFIG.ROLL_SPEED_MULTIPLIER;
+          this.player.vx = this.player.rollDirection.x * rollSpeed;
+          this.player.vy = this.player.rollDirection.y * rollSpeed;
+          
+          // Create trail effect
+          if (this.frameCount % 2 === 0) {
+            this.createRollTrail();
+          }
+        } else {
+          // End roll
+          this.player.rolling = false;
+          this.player.invulnerable = false;
+          this.player.vx *= 0.5; // Reduce speed after roll
+          this.player.vy *= 0.5;
+        }
+      } else if (!this.player.shielding) {
+        // Normal movement (not while shielding or rolling)
+        let dx = 0, dy = 0;
+        
+        // Keyboard input
+        if (this.input.keys['w'] || this.input.keys['arrowup']) dy -= 1;
+        if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
+        if (this.input.keys['a'] || this.input.keys['arrowleft']) dx -= 1;
+        if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+        
+        // Normalize diagonal movement
+        if (dx !== 0 && dy !== 0) {
+          const mag = Math.sqrt(dx * dx + dy * dy);
+          dx /= mag;
+          dy /= mag;
+        }
+        
+        // Apply acceleration
+        const dt = deltaTime / 1000;
+        const acceleration = CONFIG.PLAYER_ACCELERATION * dt * 60;
+        this.player.vx += dx * acceleration;
+        this.player.vy += dy * acceleration;
+        
+        // Limit speed
+        const speed = Math.sqrt(this.player.vx * this.player.vx + this.player.vy * this.player.vy);
+        if (speed > CONFIG.PLAYER_MAX_SPEED) {
+          this.player.vx = (this.player.vx / speed) * CONFIG.PLAYER_MAX_SPEED;
+          this.player.vy = (this.player.vy / speed) * CONFIG.PLAYER_MAX_SPEED;
+        }
+      } else {
+        // Reduced movement while shielding
+        this.player.vx *= 0.7;
+        this.player.vy *= 0.7;
+      }
+      
+      // Apply friction (if not rolling)
+      if (!this.player.rolling) {
+        this.player.vx *= CONFIG.PLAYER_FRICTION;
+        this.player.vy *= CONFIG.PLAYER_FRICTION;
+      }
+      
+      // Update position
+      const dt = deltaTime / 1000;
+      this.player.x += this.player.vx * dt * 60;
+      this.player.y += this.player.vy * dt * 60;
+      
+      // Keep player in bounds
+      this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
+      this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+    }
+    
+    updateEnemies(deltaTime) {
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        const enemy = this.enemies[i];
+        
+        // Remove dead enemies
+        if (enemy.health <= 0) {
+          this.enemies.splice(i, 1);
+          continue;
+        }
+        
+        // Check if stunned
+        if (enemy.stunned && enemy.stunnedUntil) {
+          if (performance.now() < enemy.stunnedUntil) {
+            // Enemy is still stunned
+            enemy.vx *= 0.9;
+            enemy.vy *= 0.9;
+            
+            // Visual effect for stunned enemy
+            if (this.frameCount % 10 === 0) {
+              this.createStunEffect(enemy.x, enemy.y);
+            }
+          } else {
+            // Stun expired
+            enemy.stunned = false;
+            enemy.stunnedUntil = null;
+          }
+        } else {
+          // AI: Move towards player
+          if (this.player) {
+            const dx = this.player.x - enemy.x;
+            const dy = this.player.y - enemy.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 0) {
+              enemy.vx = (dx / dist) * CONFIG.ENEMY_SPEED;
+              enemy.vy = (dy / dist) * CONFIG.ENEMY_SPEED;
+            }
+          }
+        }
+        
+        // Apply knockback friction
+        if (Math.abs(enemy.vx) > CONFIG.ENEMY_SPEED || Math.abs(enemy.vy) > CONFIG.ENEMY_SPEED) {
+          enemy.vx *= 0.92;
+          enemy.vy *= 0.92;
+        }
+        
+        // Update position
+        const dt = deltaTime / 1000;
+        enemy.x += enemy.vx * dt * 60;
+        enemy.y += enemy.vy * dt * 60;
+        
+        // Keep in bounds
+        enemy.x = Math.max(enemy.radius, Math.min(this.canvas.width - enemy.radius, enemy.x));
+        enemy.y = Math.max(enemy.radius, Math.min(this.canvas.height - enemy.radius, enemy.y));
+      }
+    }
+    
+    updateParticles(deltaTime) {
+      for (let i = this.particles.length - 1; i >= 0; i--) {
+        const particle = this.particles[i];
+        
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.life -= deltaTime;
+        particle.vy += particle.gravity || 0;
+        particle.vx *= particle.friction || 0.98;
+        particle.vy *= particle.friction || 0.98;
+        
+        if (particle.life <= 0) {
+          this.particles.splice(i, 1);
+        }
+      }
+    }
+    
+    updateScreenShake(deltaTime) {
+      if (this.screenShake.duration > 0) {
+        this.screenShake.duration -= deltaTime;
+        this.screenShake.x = (Math.random() - 0.5) * this.screenShake.intensity;
+        this.screenShake.y = (Math.random() - 0.5) * this.screenShake.intensity;
+      } else {
+        this.screenShake.x = 0;
+        this.screenShake.y = 0;
+      }
+    }
+    
+    checkCollisions() {
+      // Check enemy collisions with player
+      for (const enemy of this.enemies) {
+        const dx = this.player.x - enemy.x;
+        const dy = this.player.y - enemy.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < this.player.radius + enemy.radius) {
+          // Check if player is invulnerable
+          if (this.player.invulnerable) continue;
+          
+          // Check if player is shielding
+          if (this.player.shielding) {
+            // Calculate angle to enemy
+            const angleToEnemy = Math.atan2(dy, dx);
+            let angleDiff = Math.abs(angleToEnemy - this.player.shieldAngle);
+            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+            
+            // Check if enemy is in front of shield (180 degree arc)
+            if (angleDiff <= Math.PI / 2) {
+              // Blocked!
+              if (this.player.perfectParryWindow) {
+                // Perfect parry!
+                this.handlePerfectParry(enemy);
+              } else {
+                // Normal block
+                const reducedDamage = enemy.damage * (1 - CONFIG.SHIELD_DAMAGE_REDUCTION);
+                this.player.health -= reducedDamage;
+                
+                // Small knockback
+                this.player.vx += (dx / dist) * 3;
+                this.player.vy += (dy / dist) * 3;
+                
+                // Visual effect
+                this.createBlockEffect(this.player.x, this.player.y);
+              }
+            } else {
+              // Hit from behind
+              this.takeDamage(enemy.damage);
+            }
+          } else {
+            // Take damage
+            this.takeDamage(enemy.damage);
+          }
+          
+          // Knockback enemy
+          enemy.vx = -(dx / dist) * 5;
+          enemy.vy = -(dy / dist) * 5;
+        }
+      }
+    }
+    
+    takeDamage(damage) {
+      this.player.health -= damage;
+      this.timers.invulnerability = CONFIG.INVULNERABILITY_DURATION;
+      
+      // Visual feedback
+      this.startScreenShake(10, 300);
+      this.createDamageEffect(this.player.x, this.player.y);
+      
+      // Check game over
+      if (this.player.health <= 0) {
+        this.gameOver();
+      }
+    }
+    
+    spawnEnemies(deltaTime) {
+      this.timers.enemySpawn -= deltaTime;
+      
+      if (this.timers.enemySpawn <= 0 && this.enemies.length < CONFIG.MAX_ENEMIES) {
+        // Spawn enemy at random edge
+        const side = Math.floor(Math.random() * 4);
+        let x, y;
+        
+        switch(side) {
+          case 0: // Top
+            x = Math.random() * this.canvas.width;
+            y = -CONFIG.ENEMY_RADIUS;
+            break;
+          case 1: // Right
+            x = this.canvas.width + CONFIG.ENEMY_RADIUS;
+            y = Math.random() * this.canvas.height;
+            break;
+          case 2: // Bottom
+            x = Math.random() * this.canvas.width;
+            y = this.canvas.height + CONFIG.ENEMY_RADIUS;
+            break;
+          case 3: // Left
+            x = -CONFIG.ENEMY_RADIUS;
+            y = Math.random() * this.canvas.height;
+            break;
+        }
+        
+        this.enemies.push({
+          x: x,
+          y: y,
+          vx: 0,
+          vy: 0,
+          radius: CONFIG.ENEMY_RADIUS,
+          health: CONFIG.ENEMY_HEALTH,
+          damage: CONFIG.ENEMY_DAMAGE,
+          color: '#ff4444',
+          stunned: false,
+          stunnedUntil: null
+        });
+        
+        this.timers.enemySpawn = CONFIG.ENEMY_SPAWN_RATE;
+      }
+    }
+    
+    gameOver() {
+      this.state = 'gameOver';
+      // You can add game over screen logic here
+      alert(`Game Over! Score: ${this.score}`);
+      this.restart();
+    }
+    
+    // Visual Effects
+    createHitEffect(x, y, color) {
+      for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI * 2 * i) / 10;
+        this.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * 5,
+          vy: Math.sin(angle) * 5,
+          radius: 3,
+          color: color,
+          life: 30,
+          friction: 0.95
+        });
+      }
+    }
+    
+    createDeathEffect(x, y) {
+      for (let i = 0; i < 20; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 8 + 2;
+        this.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: Math.random() * 4 + 2,
+          color: '#ff0000',
+          life: 40,
+          friction: 0.93,
+          gravity: 0.2
+        });
+      }
+    }
+    
+    createSwordSlashEffect() {
+      const startAngle = this.player.swordAngle - CONFIG.SWORD_ARC / 2;
+      const endAngle = this.player.swordAngle + CONFIG.SWORD_ARC / 2;
+      
+      for (let i = 0; i < 15; i++) {
+        const angle = startAngle + (endAngle - startAngle) * (i / 15);
+        const dist = CONFIG.SWORD_RANGE * 0.8;
+        this.particles.push({
+          x: this.player.x + Math.cos(angle) * dist,
+          y: this.player.y + Math.sin(angle) * dist,
+          vx: Math.cos(angle) * 2,
+          vy: Math.sin(angle) * 2,
+          radius: 4,
+          color: '#ffffff',
+          life: 20,
+          friction: 0.9
+        });
+      }
+    }
+    
+    createShieldEffect() {
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 * i) / 8;
+        this.particles.push({
+          x: this.player.x + Math.cos(angle) * (this.player.radius + 10),
+          y: this.player.y + Math.sin(angle) * (this.player.radius + 10),
+          vx: 0,
+          vy: 0,
+          radius: 3,
+          color: this.player.perfectParryWindow ? '#ffd700' : '#4444ff',
+          life: 30,
+          friction: 1
+        });
+      }
+    }
+    
+    createPerfectParryEffect() {
+      for (let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 * i) / 20;
+        this.particles.push({
+          x: this.player.x + Math.cos(angle) * this.player.radius,
+          y: this.player.y + Math.sin(angle) * this.player.radius,
+          vx: Math.cos(angle) * 8,
+          vy: Math.sin(angle) * 8,
+          radius: 5,
+          color: '#ffd700',
+          life: 40,
+          friction: 0.92
+        });
+      }
+    }
+    
+    createRollEffect() {
+      for (let i = 0; i < 5; i++) {
+        this.particles.push({
+          x: this.player.x + (Math.random() - 0.5) * 20,
+          y: this.player.y + (Math.random() - 0.5) * 20,
+          vx: -this.player.rollDirection.x * 3,
+          vy: -this.player.rollDirection.y * 3,
+          radius: 3,
+          color: '#88ccff',
+          life: 25,
+          friction: 0.95
+        });
+      }
+    }
+    
+    createRollTrail() {
+      this.particles.push({
+        x: this.player.x,
+        y: this.player.y,
+        vx: 0,
+        vy: 0,
+        radius: this.player.radius * 0.8,
+        color: 'rgba(136, 204, 255, 0.3)',
+        life: 15,
+        friction: 1
+      });
+    }
+    
+    createBlockEffect(x, y) {
+      for (let i = 0; i < 5; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        this.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * 3,
+          vy: Math.sin(angle) * 3,
+          radius: 2,
+          color: '#4444ff',
+          life: 20,
+          friction: 0.95
+        });
+      }
+    }
+    
+    createDamageEffect(x, y) {
+      for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        this.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * 4,
+          vy: Math.sin(angle) * 4,
+          radius: 3,
+          color: '#ff0000',
+          life: 25,
+          friction: 0.94
+        });
+      }
+    }
+    
+    createStunEffect(x, y) {
+      const angle = Math.random() * Math.PI * 2;
+      this.particles.push({
+        x: x + Math.cos(angle) * 15,
+        y: y + Math.sin(angle) * 15 - 20,
+        vx: 0,
+        vy: -0.5,
+        radius: 2,
+        color: '#ffff00',
+        life: 30,
+        friction: 1
+      });
+    }
+    
+    startScreenShake(intensity, duration) {
+      this.screenShake.intensity = intensity;
+      this.screenShake.duration = duration;
+    }
+    
+    // UI Updates
+    updateUI() {
+      // Update health bar
+      const healthBar = document.getElementById('healthBar');
+      if (healthBar) {
+        const healthPercent = Math.max(0, (this.player.health / this.player.maxHealth) * 100);
+        healthBar.style.width = healthPercent + '%';
+      }
+      
+      // Update energy bar
+      const energyBar = document.getElementById('energyBar');
+      if (energyBar) {
+        const energyPercent = Math.max(0, (this.player.energy / this.player.maxEnergy) * 100);
+        energyBar.style.width = energyPercent + '%';
+      }
+      
+      // Update score
+      const scoreDisplay = document.getElementById('scoreDisplay');
+      if (scoreDisplay) {
+        scoreDisplay.textContent = `Score: ${this.score}`;
+      }
+    }
+    
+    updateAbilityUI() {
+      // Update attack ability
+      const attackAbility = document.getElementById('attackAbility');
+      if (attackAbility) {
+        if (this.player.swordActive) {
+          attackAbility.className = 'ability active';
+        } else if (this.player.swordCooldown <= 0) {
+          attackAbility.className = 'ability ready';
+        } else {
+          attackAbility.className = 'ability';
+        }
+      }
+      
+      // Update shield ability
+      const shieldAbility = document.getElementById('shieldAbility');
+      if (shieldAbility) {
+        if (this.player.shielding) {
+          shieldAbility.className = 'ability active';
+        } else if (this.player.shieldCooldown <= 0) {
+          shieldAbility.className = 'ability ready';
+        } else {
+          shieldAbility.className = 'ability';
+        }
+      }
+      
+      // Update roll ability
+      const rollAbility = document.getElementById('rollAbility');
+      if (rollAbility) {
+        if (this.player.rolling) {
+          rollAbility.className = 'ability active';
+        } else if (this.player.rollCooldown <= 0) {
+          rollAbility.className = 'ability ready';
+        } else {
+          rollAbility.className = 'ability';
+        }
+      }
+    }
+    
+    // Rendering
+    render() {
+      // Clear canvas
+      this.ctx.fillStyle = 'rgba(20, 30, 50, 0.1)';
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      
+      // Apply screen shake
+      this.ctx.save();
+      this.ctx.translate(this.screenShake.x, this.screenShake.y);
+      
+      // Render particles (behind everything)
+      this.renderParticles();
+      
+      // Render enemies
+      this.renderEnemies();
+      
+      // Render player
+      this.renderPlayer();
+      
+      // Render visual effects
+      if (this.vfx && this.vfx.render) {
+        this.vfx.render();
+      }
+      
+      this.ctx.restore();
+    }
+    
+    renderPlayer() {
+      if (!this.player) return;
+      
+      const ctx = this.ctx;
+      
+      // Draw sword if active
+      if (this.player.swordActive) {
+        ctx.save();
+        ctx.translate(this.player.x, this.player.y);
+        ctx.rotate(this.player.swordAngle);
+        
+        // Sword blade
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillRect(this.player.radius, -5, CONFIG.SWORD_RANGE, 10);
+        
+        // Sword tip
+        ctx.beginPath();
+        ctx.moveTo(this.player.radius + CONFIG.SWORD_RANGE, -5);
+        ctx.lineTo(this.player.radius + CONFIG.SWORD_RANGE + 15, 0);
+        ctx.lineTo(this.player.radius + CONFIG.SWORD_RANGE, 5);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Sword glow
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.player.radius, -5, CONFIG.SWORD_RANGE, 10);
+        
+        ctx.restore();
+      }
+      
+      // Draw shield if active
+      if (this.player.shielding) {
+        ctx.save();
+        ctx.translate(this.player.x, this.player.y);
+        ctx.rotate(this.player.shieldAngle);
+        
+        // Shield arc
+        ctx.beginPath();
+        ctx.arc(0, 0, this.player.radius + 15, -Math.PI/2, Math.PI/2);
+        ctx.strokeStyle = this.player.perfectParryWindow ? '#ffd700' : '#4444ff';
+        ctx.lineWidth = 5;
+        ctx.shadowColor = this.player.perfectParryWindow ? '#ffd700' : '#4444ff';
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+        
+        // Shield decoration
+        if (this.player.perfectParryWindow) {
+          ctx.beginPath();
+          ctx.arc(0, 0, this.player.radius + 20, -Math.PI/3, Math.PI/3);
+          ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
+      
+      // Draw player body
+      ctx.save();
+      
+      // Player shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.beginPath();
+      ctx.ellipse(this.player.x, this.player.y + 5, this.player.radius * 0.8, this.player.radius * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Player body
+      if (this.player.invulnerable && this.frameCount % 10 < 5) {
+        ctx.globalAlpha = 0.5;
+      }
+      
+      ctx.fillStyle = this.player.rolling ? '#88ccff' : this.player.color;
+      ctx.shadowColor = this.player.rolling ? '#88ccff' : this.player.color;
+      ctx.shadowBlur = this.player.rolling ? 20 : 10;
+      ctx.beginPath();
+      ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Player direction indicator
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(this.player.x, this.player.y);
+      ctx.lineTo(
+        this.player.x + Math.cos(this.player.facing) * this.player.radius * 0.8,
+        this.player.y + Math.sin(this.player.facing) * this.player.radius * 0.8
+      );
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+    
+    renderEnemies() {
+      for (const enemy of this.enemies) {
+        const ctx = this.ctx;
+        
+        // Enemy shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(enemy.x, enemy.y + 3, enemy.radius * 0.8, enemy.radius * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Enemy body
+        ctx.fillStyle = enemy.stunned ? '#ffaa00' : enemy.color;
+        ctx.shadowColor = enemy.stunned ? '#ffaa00' : enemy.color;
+        ctx.shadowBlur = enemy.stunned ? 15 : 8;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Stun stars
+        if (enemy.stunned) {
+          ctx.fillStyle = '#ffff00';
+          ctx.font = '20px Arial';
+          ctx.fillText('💫', enemy.x - 10, enemy.y - enemy.radius - 5);
+        }
+        
+        // Health bar
+        if (enemy.health < CONFIG.ENEMY_HEALTH) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(enemy.x - 20, enemy.y - enemy.radius - 15, 40, 4);
+          
+          ctx.fillStyle = '#ff0000';
+          const healthPercent = enemy.health / CONFIG.ENEMY_HEALTH;
+          ctx.fillRect(enemy.x - 20, enemy.y - enemy.radius - 15, 40 * healthPercent, 4);
+        }
+      }
+    }
+    
+    renderParticles() {
+      for (const particle of this.particles) {
+        this.ctx.globalAlpha = particle.life / 60;
+        this.ctx.fillStyle = particle.color;
+        this.ctx.beginPath();
+        this.ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+      this.ctx.globalAlpha = 1;
+    }
+    
+    // Game Loop
+    gameLoop() {
+      const now = performance.now();
+      const deltaTime = now - this.lastTime;
+      this.lastTime = now;
+      
+      this.update(deltaTime);
+      this.render();
+      
+      requestAnimationFrame(() => this.gameLoop());
+    }
+  }
+  
+  // Export to global scope
+  window.EnhancedCombatGame = EnhancedCombatGame;
+  window.CONFIG = CONFIG;
+  
+})(window);
