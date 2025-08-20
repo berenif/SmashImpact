@@ -274,7 +274,7 @@
             particles: [],
             paused: false,
             startTime: Date.now(),
-            lastTime: Date.now(),
+            lastTime: 0, // Initialize to 0, will be set in gameLoop
             mouseX: 0,
             mouseY: 0,
             keys: {},
@@ -319,13 +319,15 @@
                     speed *= 1.5;
                 }
                 
-                // Apply movement
-                this.velocity.x = dx * speed;
-                this.velocity.y = dy * speed;
+                // Apply movement - scale speed properly for pixels per second
+                const pixelsPerSecond = speed * 60; // Convert to pixels per second
+                this.velocity.x = dx * pixelsPerSecond;
+                this.velocity.y = dy * pixelsPerSecond;
                 
-                // Update position with collision
-                const newX = this.x + this.velocity.x * (deltaTime / 1000);
-                const newY = this.y + this.velocity.y * (deltaTime / 1000);
+                // Update position with collision - deltaTime is in milliseconds
+                const dt = Math.min(deltaTime / 1000, 0.1); // Cap delta time to prevent teleporting
+                const newX = this.x + this.velocity.x * dt;
+                const newY = this.y + this.velocity.y * dt;
                 
                 if (!this.checkCollision(newX, newY)) {
                     this.x = newX;
@@ -347,6 +349,13 @@
             }
             
             checkCollision(x, y) {
+                // Check canvas boundaries
+                if (x - this.radius < 0 || x + this.radius > canvas.width ||
+                    y - this.radius < 0 || y + this.radius > canvas.height) {
+                    return true;
+                }
+                
+                // Check obstacle collisions
                 for (const obstacle of game.obstacles) {
                     if (x + this.radius > obstacle.x - obstacle.width/2 &&
                         x - this.radius < obstacle.x + obstacle.width/2 &&
@@ -587,12 +596,20 @@
         // Game loop
         function gameLoop(currentTime) {
             if (!game.paused) {
-                const deltaTime = currentTime - game.lastTime;
+                // Ensure we have a valid lastTime
+                if (!game.lastTime) {
+                    game.lastTime = currentTime;
+                }
+                
+                const deltaTime = Math.min(currentTime - game.lastTime, 100); // Cap at 100ms
                 game.lastTime = currentTime;
                 
-                update(deltaTime);
-                render();
-                updateUI();
+                // Only update if we have a reasonable deltaTime
+                if (deltaTime > 0 && deltaTime < 100) {
+                    update(deltaTime);
+                    render();
+                    updateUI();
+                }
             }
             
             requestAnimationFrame(gameLoop);
