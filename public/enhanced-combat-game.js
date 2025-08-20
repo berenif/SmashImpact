@@ -40,6 +40,11 @@
     ROLL_COOLDOWN: 800,
     ROLL_INVULNERABILITY: true,  // Invincibility during roll
     ROLL_SPEED_MULTIPLIER: 2.5,
+    ROLL_ENERGY_COST: 15,  // Energy required to perform a roll
+    
+    // Targeting settings
+    MAX_TARGET_DISTANCE: 400,  // Maximum distance for auto-targeting
+    TARGET_REVALIDATION_INTERVAL: 100,  // Re-check target validity every 100ms
     
     // Enemy settings
     ENEMY_RADIUS: 18,
@@ -94,12 +99,15 @@
       this.input = {
         keys: {},
         mouse: { x: 0, y: 0 },
-        mouseAngle: 0
+        mouseAngle: 0,
+        buffer: [],  // Input buffer for smoother combat
+        bufferTimeout: 200  // Buffer inputs for 200ms
       };
       
       // Enemy targeting system
       this.targetedEnemy = null;
       this.targetLockEnabled = true;
+      this.lastTargetRevalidation = 0;
       
       // Timers
       this.timers = {
@@ -205,6 +213,9 @@
           e.preventDefault();
           if (!this.player.swordActive && this.player.swordCooldown <= 0 && !this.player.rolling) {
             this.performSwordAttack();
+          } else {
+            // Add to input buffer if action can't be performed now
+            this.addToInputBuffer('attack');
           }
           break;
           
@@ -212,6 +223,9 @@
           e.preventDefault();
           if (!this.player.shielding && this.player.shieldCooldown <= 0 && !this.player.rolling && !this.player.swordActive) {
             this.startShield();
+          } else {
+            // Add to input buffer if action can't be performed now
+            this.addToInputBuffer('shield');
           }
           break;
           
@@ -219,6 +233,9 @@
           e.preventDefault();
           if (!this.player.rolling && this.player.rollCooldown <= 0 && !this.player.shielding) {
             this.performRoll();
+          } else {
+            // Add to input buffer if action can't be performed now
+            this.addToInputBuffer('roll');
           }
           break;
           
@@ -275,7 +292,8 @@
         const dy = enemy.y - this.player.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        if (distance < closestDistance) {
+        // Only consider enemies within maximum targeting range
+        if (distance < closestDistance && distance <= CONFIG.MAX_TARGET_DISTANCE) {
           closestDistance = distance;
           closestEnemy = enemy;
         }
@@ -297,14 +315,37 @@
         return;
       }
       
-      // Find next enemy in the list
-      const currentIndex = this.enemies.indexOf(this.targetedEnemy);
-      const nextIndex = (currentIndex + 1) % this.enemies.length;
-      this.targetedEnemy = this.enemies[nextIndex];
+      // Find enemies within range
+      const enemiesInRange = this.enemies.filter(enemy => {
+        const dx = enemy.x - this.player.x;
+        const dy = enemy.y - this.player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance <= CONFIG.MAX_TARGET_DISTANCE;
+      });
+      
+      if (enemiesInRange.length === 0) {
+        this.targetedEnemy = null;
+        return;
+      }
+      
+      // Find next enemy in the filtered list
+      const currentIndex = enemiesInRange.indexOf(this.targetedEnemy);
+      if (currentIndex === -1) {
+        // Current target is out of range, get closest
+        this.targetedEnemy = this.findClosestEnemy();
+      } else {
+        // Switch to next enemy in range
+        const nextIndex = (currentIndex + 1) % enemiesInRange.length;
+        this.targetedEnemy = enemiesInRange[nextIndex];
+      }
     }
     
     performSwordAttack() {
-      if (this.player.energy < 10) return;
+      if (this.player.energy < 10) {
+        // Add to input buffer to retry when energy is available
+        this.addToInputBuffer('attack');
+        return;
+      }
       
       this.player.swordActive = true;
       this.player.swordAngle = this.player.facing;  // Attack in facing direction
@@ -397,16 +438,52 @@
     }
     
     performRoll() {
+      // Check if player has enough energy
+      if (this.player.energy < CONFIG.ROLL_ENERGY_COST) {
+        console.log('Not enough energy to roll');
+        // Add to input buffer to retry when energy is available
+        this.addToInputBuffer('roll');
+        return;
+      }
+      
       // Roll in the direction the player is facing
       let dx = Math.cos(this.player.facing);
       let dy = Math.sin(this.player.facing);
+      
+      // Pre-calculate roll endpoint and validate it's within bounds
+      const endX = this.player.x + dx * CONFIG.ROLL_DISTANCE;
+      const endY = this.player.y + dy * CONFIG.ROLL_DISTANCE;
+      
+      // Adjust roll vector if it would go out of bounds
+      if (endX < this.player.radius || endX > this.canvas.width - this.player.radius) {
+        // Calculate maximum distance we can roll in X direction
+        const maxDistX = dx > 0 ? 
+          (this.canvas.width - this.player.radius - this.player.x) : 
+          (this.player.x - this.player.radius);
+        dx = dx * (maxDistX / CONFIG.ROLL_DISTANCE);
+      }
+      
+      if (endY < this.player.radius || endY > this.canvas.height - this.player.radius) {
+        // Calculate maximum distance we can roll in Y direction
+        const maxDistY = dy > 0 ? 
+          (this.canvas.height - this.player.radius - this.player.y) : 
+          (this.player.y - this.player.radius);
+        dy = dy * (maxDistY / CONFIG.ROLL_DISTANCE);
+      }
+      
+      // Don't roll if we can't move at all
+      const adjustedDist = Math.sqrt(dx * dx + dy * dy);
+      if (adjustedDist < 0.1) {
+        console.log('Cannot roll - too close to boundary');
+        return;
+      }
       
       this.player.rolling = true;
       this.player.rollDirection = { x: dx, y: dy };
       this.player.rollCooldown = CONFIG.ROLL_COOLDOWN;
       this.player.rollStartTime = performance.now();
       this.player.rollEndTime = this.player.rollStartTime + CONFIG.ROLL_DURATION;
-      this.player.energy -= 15;
+      this.player.energy -= CONFIG.ROLL_ENERGY_COST;
       
       // Set invulnerability during roll (always on)
       this.player.invulnerable = true;
@@ -415,6 +492,64 @@
       this.createRollEffect();
       
       this.updateAbilityUI();
+    }
+    
+    addToInputBuffer(action) {
+      const now = performance.now();
+      // Add action to buffer with timestamp
+      this.input.buffer.push({
+        action: action,
+        timestamp: now
+      });
+      
+      // Keep buffer size reasonable
+      if (this.input.buffer.length > 5) {
+        this.input.buffer.shift();
+      }
+    }
+    
+    processInputBuffer() {
+      if (this.input.buffer.length === 0) return;
+      
+      const now = performance.now();
+      const validBuffer = [];
+      
+      for (const bufferedInput of this.input.buffer) {
+        // Remove old buffered inputs
+        if (now - bufferedInput.timestamp > this.input.bufferTimeout) {
+          continue;
+        }
+        
+        // Try to execute buffered action
+        let executed = false;
+        switch(bufferedInput.action) {
+          case 'attack':
+            if (!this.player.swordActive && this.player.swordCooldown <= 0 && !this.player.rolling) {
+              this.performSwordAttack();
+              executed = true;
+            }
+            break;
+          case 'shield':
+            if (!this.player.shielding && this.player.shieldCooldown <= 0 && !this.player.rolling && !this.player.swordActive) {
+              this.startShield();
+              executed = true;
+            }
+            break;
+          case 'roll':
+            if (!this.player.rolling && this.player.rollCooldown <= 0 && !this.player.shielding && this.player.energy >= CONFIG.ROLL_ENERGY_COST) {
+              this.performRoll();
+              executed = true;
+            }
+            break;
+        }
+        
+        // Keep unexecuted actions in buffer
+        if (!executed) {
+          validBuffer.push(bufferedInput);
+        }
+      }
+      
+      this.input.buffer = validBuffer;
     }
     
     handlePerfectParry(enemy) {
@@ -551,11 +686,32 @@
     updatePlayer(deltaTime) {
       if (!this.player) return;
       
+      // Process buffered inputs
+      this.processInputBuffer();
+      
       // Update enemy targeting
       if (this.targetLockEnabled) {
+        const now = performance.now();
+        
         // Auto-target closest enemy if none selected or current target is dead
         if (!this.targetedEnemy || !this.enemies.includes(this.targetedEnemy)) {
           this.targetedEnemy = this.findClosestEnemy();
+          this.lastTargetRevalidation = now;
+        }
+        
+        // Periodically re-validate target distance
+        if (now - this.lastTargetRevalidation > CONFIG.TARGET_REVALIDATION_INTERVAL) {
+          if (this.targetedEnemy) {
+            const dx = this.targetedEnemy.x - this.player.x;
+            const dy = this.targetedEnemy.y - this.player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Drop target if it's too far away
+            if (distance > CONFIG.MAX_TARGET_DISTANCE) {
+              this.targetedEnemy = this.findClosestEnemy();
+            }
+          }
+          this.lastTargetRevalidation = now;
         }
         
         // Update facing to look at targeted enemy
