@@ -32,6 +32,7 @@ namespace Config {
     constexpr float WOLF_ATTACK_COOLDOWN = 1000.0f;
     constexpr float WOLF_LUNGE_SPEED = 8.0f;
     constexpr float WOLF_LUNGE_DISTANCE = 100.0f;
+    constexpr float WOLF_WAVE_SPAWN_DELAY = 2000.0f;
     constexpr int MAX_WOLVES = 20;
     
     // Projectile settings

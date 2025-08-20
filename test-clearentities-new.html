@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test clearEntities Function - New Build</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+        }
+        #status {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        #output {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Testing clearEntities Function - New Build</h1>
+    <div id="status">Loading...</div>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import GameEngineModule from './public/game_engine.js';
+        
+        const statusEl = document.getElementById('status');
+        const outputEl = document.getElementById('output');
+        
+        async function test() {
+            try {
+                statusEl.textContent = 'Initializing WASM module...';
+                outputEl.textContent = 'Starting test...\n';
+                
+                // Initialize the WASM module
+                const Module = await GameEngineModule();
+                outputEl.textContent += '✓ WASM module loaded\n';
+                
+                statusEl.textContent = 'Creating GameEngine instance...';
+                
+                // Create game engine instance
+                const engine = new Module.GameEngine(1920, 1080);
+                outputEl.textContent += '✓ GameEngine instance created\n\n';
+                
+                // List all available methods
+                outputEl.textContent += 'Checking available methods:\n';
+                const methods = [];
+                for (let key in engine) {
+                    if (typeof engine[key] === 'function') {
+                        methods.push(key);
+                    }
+                }
+                outputEl.textContent += `Found ${methods.length} methods\n`;
+                
+                // Check specifically for clearEntities
+                outputEl.textContent += '\nChecking for clearEntities:\n';
+                if (typeof engine.clearEntities === 'function') {
+                    statusEl.textContent = '✅ Success! clearEntities is available';
+                    statusEl.className = 'success';
+                    outputEl.textContent += '✅ clearEntities is a function\n';
+                    
+                    // Try calling it
+                    outputEl.textContent += '\nTesting clearEntities():\n';
+                    try {
+                        // First add some entities
+                        const enemy1 = engine.createEnemy(100, 100, 0);
+                        const enemy2 = engine.createEnemy(200, 200, 1);
+                        outputEl.textContent += '  - Created 2 enemies\n';
+                        
+                        // Get entity count before clearing
+                        const entitiesBefore = engine.getEntityPositions();
+                        outputEl.textContent += `  - Entities before clear: ${entitiesBefore.size()}\n`;
+                        
+                        // Clear entities
+                        engine.clearEntities();
+                        outputEl.textContent += '  - Called clearEntities()\n';
+                        
+                        // Get entity count after clearing
+                        const entitiesAfter = engine.getEntityPositions();
+                        outputEl.textContent += `  - Entities after clear: ${entitiesAfter.size()}\n`;
+                        
+                        if (entitiesAfter.size() === 0) {
+                            outputEl.textContent += '\n✅ clearEntities() works correctly!';
+                        } else {
+                            outputEl.textContent += '\n⚠️ clearEntities() called but entities remain';
+                        }
+                    } catch (callError) {
+                        outputEl.textContent += '❌ Error calling clearEntities(): ' + callError.message;
+                    }
+                } else {
+                    statusEl.textContent = '❌ Error: clearEntities is not a function';
+                    statusEl.className = 'error';
+                    outputEl.textContent += `❌ clearEntities type: ${typeof engine.clearEntities}\n`;
+                    
+                    // List first 10 available methods for debugging
+                    outputEl.textContent += '\nAvailable methods (first 10):\n';
+                    methods.slice(0, 10).forEach(method => {
+                        outputEl.textContent += `  - ${method}\n`;
+                    });
+                }
+                
+            } catch (error) {
+                statusEl.textContent = '❌ Error: ' + error.message;
+                statusEl.className = 'error';
+                outputEl.textContent += '\n❌ Error:\n' + error.stack;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>
