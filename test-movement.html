@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movement Test - SmashImpact</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            background: #16213e;
+        }
+        #debug {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        button {
+            margin: 5px;
+            padding: 5px 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="debug">
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Position: <span id="position">0, 0</span></div>
+        <div>Velocity: <span id="velocity">0, 0</span></div>
+        <div>Speed: <span id="speed">0</span></div>
+        <div>DeltaTime: <span id="deltaTime">0</span>ms</div>
+        <div>Input: <span id="input">None</span></div>
+    </div>
+    <div id="controls">
+        <h3>Movement Test Controls</h3>
+        <p>WASD/Arrows: Move</p>
+        <p>Space: Boost</p>
+        <p>Mouse: Aim</p>
+        <p>Click: Shoot</p>
+        <button onclick="testDiagonal()">Test Diagonal</button>
+        <button onclick="testFriction()">Test Friction</button>
+        <button onclick="testCollision()">Test Collision</button>
+        <button onclick="spawnObstacles()">Spawn Obstacles</button>
+        <button onclick="clearObstacles()">Clear Obstacles</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Test player object
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            vx: 0,
+            vy: 0,
+            radius: 20,
+            speed: 5,
+            maxSpeed: 10,
+            acceleration: 0.5,
+            friction: 0.9,
+            color: '#4CAF50'
+        };
+        
+        const obstacles = [];
+        const input = {
+            keys: {},
+            mouse: { x: 0, y: 0 }
+        };
+        
+        let lastTime = performance.now();
+        let deltaTime = 0;
+        let fps = 0;
+        let frameCount = 0;
+        let fpsTime = 0;
+        
+        // Input handlers
+        window.addEventListener('keydown', (e) => {
+            input.keys[e.key.toLowerCase()] = true;
+            updateInputDisplay();
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            input.keys[e.key.toLowerCase()] = false;
+            updateInputDisplay();
+        });
+        
+        window.addEventListener('mousemove', (e) => {
+            input.mouse.x = e.clientX;
+            input.mouse.y = e.clientY;
+        });
+        
+        function updateInputDisplay() {
+            const activeKeys = Object.keys(input.keys).filter(k => input.keys[k]);
+            document.getElementById('input').textContent = activeKeys.join(', ') || 'None';
+        }
+        
+        function updatePlayer(dt) {
+            // Get input
+            let dx = 0, dy = 0;
+            if (input.keys['w'] || input.keys['arrowup']) dy -= 1;
+            if (input.keys['s'] || input.keys['arrowdown']) dy += 1;
+            if (input.keys['a'] || input.keys['arrowleft']) dx -= 1;
+            if (input.keys['d'] || input.keys['arrowright']) dx += 1;
+            
+            // Normalize diagonal movement
+            if (dx !== 0 && dy !== 0) {
+                const mag = Math.sqrt(dx * dx + dy * dy);
+                dx /= mag;
+                dy /= mag;
+            }
+            
+            // Apply acceleration
+            const dtSeconds = dt / 1000;
+            player.vx += dx * player.acceleration * dtSeconds * 60;
+            player.vy += dy * player.acceleration * dtSeconds * 60;
+            
+            // Limit speed
+            const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+            if (speed > player.maxSpeed) {
+                player.vx = (player.vx / speed) * player.maxSpeed;
+                player.vy = (player.vy / speed) * player.maxSpeed;
+            }
+            
+            // Apply friction
+            const frictionFactor = Math.pow(player.friction, dt / 16.67);
+            player.vx *= frictionFactor;
+            player.vy *= frictionFactor;
+            
+            // Update position
+            player.x += player.vx * dtSeconds * 60;
+            player.y += player.vy * dtSeconds * 60;
+            
+            // Collision with obstacles
+            for (const obstacle of obstacles) {
+                const dx = player.x - obstacle.x;
+                const dy = player.y - obstacle.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < player.radius + obstacle.radius && dist > 0) {
+                    const overlap = player.radius + obstacle.radius - dist;
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    
+                    player.x += nx * overlap;
+                    player.y += ny * overlap;
+                    
+                    const dotProduct = player.vx * nx + player.vy * ny;
+                    player.vx -= 2 * dotProduct * nx;
+                    player.vy -= 2 * dotProduct * ny;
+                    
+                    player.vx *= 0.8;
+                    player.vy *= 0.8;
+                }
+            }
+            
+            // Keep in bounds
+            player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+        }
+        
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw obstacles
+            ctx.fillStyle = '#666';
+            for (const obstacle of obstacles) {
+                ctx.beginPath();
+                ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw velocity vector
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(player.x + player.vx * 10, player.y + player.vy * 10);
+            ctx.stroke();
+            
+            // Draw direction to mouse
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            const angle = Math.atan2(input.mouse.y - player.y, input.mouse.x - player.x);
+            ctx.lineTo(player.x + Math.cos(angle) * 50, player.y + Math.sin(angle) * 50);
+            ctx.stroke();
+        }
+        
+        function updateDebug() {
+            document.getElementById('fps').textContent = fps.toFixed(0);
+            document.getElementById('position').textContent = `${player.x.toFixed(0)}, ${player.y.toFixed(0)}`;
+            document.getElementById('velocity').textContent = `${player.vx.toFixed(2)}, ${player.vy.toFixed(2)}`;
+            const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+            document.getElementById('speed').textContent = speed.toFixed(2);
+            document.getElementById('deltaTime').textContent = deltaTime.toFixed(1);
+        }
+        
+        function gameLoop(currentTime) {
+            deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Calculate FPS
+            frameCount++;
+            fpsTime += deltaTime;
+            if (fpsTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                fpsTime = 0;
+            }
+            
+            updatePlayer(deltaTime);
+            render();
+            updateDebug();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Test functions
+        function testDiagonal() {
+            player.vx = 7.07;
+            player.vy = 7.07;
+            console.log('Testing diagonal movement - velocity should be normalized');
+        }
+        
+        function testFriction() {
+            player.vx = 10;
+            player.vy = 0;
+            console.log('Testing friction - player should gradually slow down');
+        }
+        
+        function testCollision() {
+            obstacles.push({
+                x: player.x + 100,
+                y: player.y,
+                radius: 30
+            });
+            player.vx = 5;
+            console.log('Testing collision - player should bounce off obstacle');
+        }
+        
+        function spawnObstacles() {
+            for (let i = 0; i < 5; i++) {
+                obstacles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: 20 + Math.random() * 30
+                });
+            }
+        }
+        
+        function clearObstacles() {
+            obstacles.length = 0;
+        }
+        
+        // Start game loop
+        requestAnimationFrame(gameLoop);
+        
+        // Resize handler
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

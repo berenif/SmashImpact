@@ -164,10 +164,12 @@
     
     initPlayer() {
       this.player = {
-        x: this.canvas.width / 2,
-        y: this.canvas.height / 2,
-        vx: 0,
-        vy: 0,
+              x: this.canvas.width / 2,
+      y: this.canvas.height / 2,
+      vx: 0,
+      vy: 0,
+      ax: 0, // Add acceleration components
+      ay: 0,
         radius: CONFIG.PLAYER_RADIUS,
         speed: CONFIG.PLAYER_SPEED,
         color: '#00ff00',
@@ -553,30 +555,66 @@
         dy /= mag;
       }
       
-      // Apply acceleration
-      if (!this.player.boosting) {
-        this.player.vx += dx * CONFIG.PLAYER_ACCELERATION;
-        this.player.vy += dy * CONFIG.PLAYER_ACCELERATION;
-        
-        // Limit speed
-        const speed = Math.sqrt(this.player.vx * this.player.vx + this.player.vy * this.player.vy);
-        if (speed > CONFIG.PLAYER_MAX_SPEED) {
-          this.player.vx = (this.player.vx / speed) * CONFIG.PLAYER_MAX_SPEED;
-          this.player.vy = (this.player.vy / speed) * CONFIG.PLAYER_MAX_SPEED;
-        }
+          // Apply acceleration with deltaTime compensation
+    if (!this.player.boosting) {
+      const dt = deltaTime / 1000; // Convert to seconds
+      const acceleration = CONFIG.PLAYER_ACCELERATION * dt * 60; // 60 FPS baseline
+      this.player.vx += dx * acceleration;
+      this.player.vy += dy * acceleration;
+      
+      // Limit speed
+      const speed = Math.sqrt(this.player.vx * this.player.vx + this.player.vy * this.player.vy);
+      if (speed > CONFIG.PLAYER_MAX_SPEED) {
+        this.player.vx = (this.player.vx / speed) * CONFIG.PLAYER_MAX_SPEED;
+        this.player.vy = (this.player.vy / speed) * CONFIG.PLAYER_MAX_SPEED;
       }
+    }
       
       // Apply friction
       this.player.vx *= CONFIG.PLAYER_FRICTION;
       this.player.vy *= CONFIG.PLAYER_FRICTION;
       
-      // Update position
-      this.player.x += this.player.vx * deltaTime / 16;
-      this.player.y += this.player.vy * deltaTime / 16;
+          // Update position with consistent deltaTime handling
+    const dt = deltaTime / 1000; // Convert to seconds
+    this.player.x += this.player.vx * dt * 60; // 60 FPS baseline
+    this.player.y += this.player.vy * dt * 60;
       
-      // Keep player in bounds
-      this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
-      this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+      // Keep player in bounds with collision detection
+    const prevX = this.player.x;
+    const prevY = this.player.y;
+    
+    // Check obstacle collision
+    for (const obstacle of this.obstacles) {
+      const dx = this.player.x - obstacle.x;
+      const dy = this.player.y - obstacle.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < this.player.radius + obstacle.radius && dist > 0) {
+        // Calculate overlap
+        const overlap = this.player.radius + obstacle.radius - dist;
+        
+        // Normalize collision vector
+        const nx = dx / dist;
+        const ny = dy / dist;
+        
+        // Separate player from obstacle
+        this.player.x += nx * overlap;
+        this.player.y += ny * overlap;
+        
+        // Reflect velocity for bounce effect
+        const dotProduct = this.player.vx * nx + this.player.vy * ny;
+        this.player.vx -= 2 * dotProduct * nx;
+        this.player.vy -= 2 * dotProduct * ny;
+        
+        // Apply damping
+        this.player.vx *= 0.8;
+        this.player.vy *= 0.8;
+      }
+    }
+    
+    // Keep player in bounds
+    this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
+    this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
       
       // Update trail
       if (this.player.boosting) {
@@ -762,9 +800,10 @@
           }
         }
         
-        // Update position
-        enemy.x += enemy.vx * deltaTime / 16;
-        enemy.y += enemy.vy * deltaTime / 16;
+            // Update position with consistent deltaTime handling
+    const dt = deltaTime / 1000; // Convert to seconds
+    enemy.x += enemy.vx * dt * 60; // 60 FPS baseline
+    enemy.y += enemy.vy * dt * 60;
         
         // Check obstacle collision
         for (const obstacle of this.obstacles) {
@@ -926,9 +965,10 @@
           break;
       }
       
-      // Update position
-      wolf.x += wolf.vx * deltaTime / 16;
-      wolf.y += wolf.vy * deltaTime / 16;
+      // Update position with consistent deltaTime handling
+      const dt = deltaTime / 1000; // Convert to seconds
+      wolf.x += wolf.vx * dt * 60; // 60 FPS baseline
+      wolf.y += wolf.vy * dt * 60;
     }
     
     wolfAttack(wolf) {

@@ -443,8 +443,9 @@
     const timeDiff = Math.max(0, Date.now() - data.timestamp + latencyCompensation);
     
     // Predict position based on velocity and time difference
-    const predictedX = data.x + (data.vx * timeDiff / 1000);
-    const predictedY = data.y + (data.vy * timeDiff / 1000);
+    const dt = timeDiff / 1000; // Convert to seconds
+    const predictedX = data.x + (data.vx * dt);
+    const predictedY = data.y + (data.vy * dt);
     
     // Smooth large position jumps with interpolation
     const distance = Math.sqrt(Math.pow(predictedX - prevX, 2) + Math.pow(predictedY - prevY, 2));
@@ -482,9 +483,17 @@
         this.gameState.players.player;
       
       // Apply input to remote player for smooth prediction
+      // Normalize diagonal movement
+      let dx = data.input.x;
+      let dy = data.input.y;
+      if (dx !== 0 && dy !== 0) {
+        const mag = Math.sqrt(dx * dx + dy * dy);
+        dx /= mag;
+        dy /= mag;
+      }
       const speed = data.input.boost ? 10 : 5;
-      player.vx = data.input.x * speed;
-      player.vy = data.input.y * speed;
+      player.vx = dx * speed;
+      player.vy = dy * speed;
     }
   }
   
