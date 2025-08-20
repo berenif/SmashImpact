@@ -48,7 +48,7 @@ public:
             if (enemySpawnTimer <= 0 && enemiesSpawnedThisWave < enemiesRequiredThisWave) {
                 spawnEnemy(entities, worldWidth, worldHeight);
                 enemiesSpawnedThisWave++;
-                enemySpawnTimer = Config::ENEMY_SPAWN_RATE;
+                enemySpawnTimer = Config::ENEMY_SPAWN_RATE / 1000.0f;  // Convert ms to seconds
             }
             
             // Spawn wolves (after wave 3)
@@ -56,13 +56,13 @@ public:
                 wolvesSpawnedThisWave < wolvesRequiredThisWave) {
                 spawnWolf(entities, worldWidth, worldHeight);
                 wolvesSpawnedThisWave++;
-                wolfSpawnTimer = Config::WOLF_WAVE_SPAWN_DELAY;
+                wolfSpawnTimer = Config::WOLF_WAVE_SPAWN_DELAY / 1000.0f;  // Convert ms to seconds
             }
             
             // Spawn power-ups
             if (powerUpSpawnTimer <= 0) {
                 spawnPowerUp(entities, worldWidth, worldHeight);
-                powerUpSpawnTimer = Config::POWERUP_SPAWN_RATE;
+                powerUpSpawnTimer = Config::POWERUP_SPAWN_RATE / 1000.0f;  // Convert ms to seconds
             }
             
             // Check if wave is complete
@@ -94,7 +94,7 @@ public:
     void startNextWave() {
         currentWave++;
         waveActive = false;
-        waveTransitionTimer = Config::WAVE_TRANSITION_TIME;
+        waveTransitionTimer = Config::WAVE_TRANSITION_TIME / 1000.0f;  // Convert ms to seconds
         
         // Calculate enemies for next wave
         enemiesRequiredThisWave = 5 + currentWave * 2;

@@ -48,7 +48,7 @@ public:
         if (screenShakeDuration > 0) {
             screenShakeDuration -= deltaTime;
             
-            float shakeAmount = screenShakeIntensity * (screenShakeDuration / Config::SCREEN_SHAKE_DURATION);
+            float shakeAmount = screenShakeIntensity * (screenShakeDuration / (Config::SCREEN_SHAKE_DURATION / 1000.0f));
             screenShakeOffset.x = (rand() % 200 - 100) / 100.0f * shakeAmount;
             screenShakeOffset.y = (rand() % 200 - 100) / 100.0f * shakeAmount;
             
@@ -185,7 +185,7 @@ public:
     
     void addScreenShake(float intensity) {
         screenShakeIntensity = std::max(screenShakeIntensity, intensity);
-        screenShakeDuration = Config::SCREEN_SHAKE_DURATION;
+        screenShakeDuration = Config::SCREEN_SHAKE_DURATION / 1000.0f;  // Convert ms to seconds
     }
     
     Vector2 getScreenShakeOffset() const {

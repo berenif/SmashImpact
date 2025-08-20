@@ -92,7 +92,7 @@ public:
                     aiState = AIState::CHASING;
                 } else if (attackCooldown <= 0) {
                     // Attack logic handled in collision system
-                    attackCooldown = Config::WOLF_ATTACK_COOLDOWN;
+                    attackCooldown = Config::WOLF_ATTACK_COOLDOWN / 1000.0f;  // Convert ms to seconds
                 }
                 break;
                 

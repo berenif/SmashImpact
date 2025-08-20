@@ -16,7 +16,7 @@ public:
         : Entity(EntityType::PROJECTILE, pos, Config::PROJECTILE_RADIUS),
           damage(dmg),
           speed(Config::PROJECTILE_SPEED),
-          lifetime(Config::PROJECTILE_LIFETIME),
+          lifetime(Config::PROJECTILE_LIFETIME / 1000.0f),  // Convert ms to seconds
           ownerId(owner),
           direction(dir.normalized()) {
         velocity = direction * speed;
