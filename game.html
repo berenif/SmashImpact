@@ -630,11 +630,61 @@
             console.error('Failed to load WASM:', error);
             updateLoading(100, 'Failed to load game engine!');
             
-            // Show error message
+            // Hide loading bar since we're showing an error
+            document.getElementById('loadingBar').style.display = 'none';
+            
+            // Show detailed error message
             const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: red; text-align: center;';
-            errorDiv.innerHTML = '<h2>Failed to load game engine</h2><p>Please refresh the page to try again.</p>';
+            errorDiv.style.cssText = `
+                position: absolute; 
+                top: 50%; 
+                left: 50%; 
+                transform: translate(-50%, -50%); 
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid #ff0000;
+                border-radius: 10px;
+                padding: 30px;
+                color: #ffffff;
+                text-align: center;
+                max-width: 600px;
+                font-family: Arial, sans-serif;
+            `;
+            
+            errorDiv.innerHTML = `
+                <h2 style="color: #ff0000; margin-bottom: 20px;">⚠ Game Engine Failed to Load</h2>
+                <p style="margin-bottom: 15px;">The WebAssembly game engine could not be initialized.</p>
+                <p style="margin-bottom: 20px; font-size: 14px; color: #aaa;">
+                    Error: ${error.message || 'Unknown error occurred'}
+                </p>
+                <div style="margin-top: 20px;">
+                    <h3 style="color: #ffaa00; margin-bottom: 10px;">Possible Solutions:</h3>
+                    <ul style="text-align: left; margin: 0 auto; display: inline-block;">
+                        <li>Refresh the page (F5 or Ctrl+R)</li>
+                        <li>Clear your browser cache</li>
+                        <li>Try a different browser (Chrome, Firefox, Edge recommended)</li>
+                        <li>Check if WebAssembly is enabled in your browser</li>
+                        <li>Disable browser extensions that might block WebAssembly</li>
+                    </ul>
+                </div>
+                <button onclick="location.reload()" style="
+                    margin-top: 20px;
+                    padding: 10px 30px;
+                    background: #00ff00;
+                    color: #000;
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    cursor: pointer;
+                    font-weight: bold;
+                ">
+                    🔄 Retry Loading
+                </button>
+            `;
+            
             document.getElementById('loadingScreen').appendChild(errorDiv);
+            
+            // Prevent game from starting
+            Game.initialized = false;
         }
         
         // Load script helper
@@ -1295,6 +1345,9 @@
         
         // Update game
         function update(dt) {
+            // Don't update if game failed to initialize
+            if (!Game.initialized) return;
+            
             // Handle input
             handleInput();
             
@@ -1321,8 +1374,9 @@
                     document.getElementById('enemyCount').textContent = enemies.length;
                 }
             } else {
-                // JavaScript fallback update
-                updateJS(dt / 1000);
+                // No fallback - WASM is required
+                console.error('Game engine not available');
+                return;
             }
             
             // Update HUD
