@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Entity Count Method</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .log {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #00ff00;
+            padding-left: 10px;
+        }
+        .error {
+            color: #ff0000;
+            border-left-color: #ff0000;
+        }
+        .success {
+            color: #00ff00;
+            border-left-color: #00ff00;
+        }
+        .info {
+            color: #ffff00;
+            border-left-color: #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>Testing getEntityCount Method</h1>
+    <div id="log" class="log"></div>
+    
+    <script type="module">
+        const logElement = document.getElementById('log');
+        
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toISOString().split('T')[1].replace('Z', '');
+            entry.textContent = `[${timestamp}] ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+        
+        async function testEntityCount() {
+            try {
+                log('Loading WASM module...', 'info');
+                
+                // Import the WASM module
+                const GameEngineModule = (await import('./public/game_engine.js')).default;
+                log('Module imported successfully', 'success');
+                
+                // Initialize the module
+                const wasmModule = await GameEngineModule();
+                log('WASM module initialized', 'success');
+                
+                // Create GameEngine instance
+                const engine = new wasmModule.GameEngine(1920, 1080);
+                log('GameEngine instance created', 'success');
+                
+                // Test getEntityCount method
+                log('Testing getEntityCount method...', 'info');
+                
+                // Initial count (should be 0)
+                let count = engine.getEntityCount();
+                log(`Initial entity count: ${count}`, count === 0 ? 'success' : 'error');
+                
+                // Create a player
+                const playerId = engine.createPlayer(100, 100);
+                log(`Created player with ID: ${playerId}`, 'success');
+                
+                // Check count after player creation
+                count = engine.getEntityCount();
+                log(`Entity count after player creation: ${count}`, count === 1 ? 'success' : 'error');
+                
+                // Create some enemies
+                const enemy1 = engine.createEnemy(200, 200, 0);
+                log(`Created enemy with ID: ${enemy1}`, 'success');
+                
+                const enemy2 = engine.createEnemy(300, 300, 1);
+                log(`Created enemy with ID: ${enemy2}`, 'success');
+                
+                // Check count after enemy creation
+                count = engine.getEntityCount();
+                log(`Entity count after creating 2 enemies: ${count}`, count === 3 ? 'success' : 'error');
+                
+                // Create a wolf
+                const wolfId = engine.createWolf(400, 400);
+                log(`Created wolf with ID: ${wolfId}`, 'success');
+                
+                // Final count check
+                count = engine.getEntityCount();
+                log(`Final entity count: ${count}`, count === 4 ? 'success' : 'error');
+                
+                // Test clearing entities
+                log('Testing clearEntities...', 'info');
+                engine.clearEntities();
+                count = engine.getEntityCount();
+                log(`Entity count after clearEntities: ${count} (player should remain)`, count === 1 ? 'success' : 'error');
+                
+                // Clean up
+                engine.delete();
+                log('✅ All tests passed successfully!', 'success');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                if (error.stack) {
+                    log(`Stack trace:\n${error.stack}`, 'error');
+                }
+            }
+        }
+        
+        // Run the test
+        testEntityCount();
+    </script>
+</body>
+</html>

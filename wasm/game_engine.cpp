@@ -1045,6 +1045,11 @@ public:
         return false;
     }
     
+    // Get total entity count
+    int getEntityCount() {
+        return static_cast<int>(entities.size());
+    }
+    
     // Clear all entities except player
     void clearEntities() {
         entities.erase(
@@ -1395,6 +1400,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("setJoystickInput", &GameEngine::setJoystickInput)
         .function("isAttacking", &GameEngine::isAttacking)
         .function("isRolling", &GameEngine::isRolling)
+        .function("getEntityCount", &GameEngine::getEntityCount)
         .function("clearEntities", &GameEngine::clearEntities)
         .function("startBlock", &GameEngine::startBlock)
         .function("endBlock", &GameEngine::endBlock)
