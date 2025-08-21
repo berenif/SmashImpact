@@ -1,0 +1,59 @@
+name: Update Cache Version
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'isometric-game.js'
+      - 'multiplayer.js'
+      - 'visual-effects.js'
+      - '*.html'
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Update cache version
+      run: |
+        # Generate version based on timestamp
+        VERSION=$(date +%s)
+        
+        # Update game-iso.html with new version numbers if it exists
+        if [ -f game-iso.html ]; then
+          sed -i "s/\?v=[0-9.]*/?v=$VERSION/g" game-iso.html
+          echo "✅ Updated game-iso.html cache version to: $VERSION"
+        else
+          echo "⚠️ Warning: game-iso.html not found, skipping version update"
+        fi
+        
+        # Update game.html if it exists and has versioned scripts
+        if [ -f game.html ]; then
+          if grep -q "\.js?v=" game.html; then
+            sed -i "s/\?v=[0-9.]*/?v=$VERSION/g" game.html
+            echo "✅ Updated game.html cache version to: $VERSION"
+          fi
+        fi
+        
+        # Update other HTML files with versioned scripts
+        for file in *.html; do
+          if [[ "$file" != "game-iso.html" && "$file" != "game.html" ]]; then
+            if grep -q "\.js?v=" "$file" 2>/dev/null; then
+              sed -i "s/\?v=[0-9.]*/?v=$VERSION/g" "$file"
+              echo "✅ Updated $file cache version to: $VERSION"
+            fi
+          fi
+        done
+        
+        echo "📦 Cache version update complete! Version: $VERSION"
+    
+    - name: Commit and push if changed
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@github.com'
+        git add -A
+        git diff --staged --quiet || (git commit -m "Auto-update cache version to $(date +%s)" && git push)
