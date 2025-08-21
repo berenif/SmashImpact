@@ -204,13 +204,13 @@
                 
                 return new Promise((resolve, reject) => {
                     script.onload = async () => {
-                        // The module is exported as GameEngineModule
-                        if (typeof GameEngineModule !== 'undefined') {
-                            const Module = await GameEngineModule();
+                        // The module is exported as createGameEngine
+                        if (typeof createGameEngine !== 'undefined') {
+                            const Module = await createGameEngine();
                             console.log('WASM module loaded successfully');
                             resolve(Module);
                         } else {
-                            reject(new Error('GameEngineModule not found'));
+                            reject(new Error('createGameEngine not found'));
                         }
                     };
                     

@@ -28,7 +28,7 @@
             
             try {
                 // Load WASM module
-                const Module = await GameEngineModule();
+                const Module = await createGameEngine();
                 
                 // Create game engine
                 engine = new Module.GameEngine(canvas.width, canvas.height);

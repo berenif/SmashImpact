@@ -142,11 +142,11 @@ class WasmGameEngineModern {
         }
         
         // Load the module
-        if (typeof GameEngineModule === 'undefined') {
-            throw new Error('GameEngineModule not found. Make sure game_engine.js is loaded.');
+        if (typeof createGameEngine === 'undefined') {
+            throw new Error('createGameEngine not found. Make sure game_engine.js is loaded.');
         }
         
-        this.module = await GameEngineModule(moduleConfig);
+        this.module = await createGameEngine(moduleConfig);
         
         if (!this.module) {
             throw new Error('Failed to load WebAssembly module');

@@ -153,8 +153,8 @@
                 let entities = gameEngine.getEntityPositions();
                 
                 // Draw entities
-                for (let i = 0; i < entities.size(); i++) {
-                    let entity = entities.get(i);
+                for (let i = 0; i < entities.length; i++) {
+                    let entity = entities[i];
                     
                     // Draw based on type
                     if (entity.type === 0) { // Player

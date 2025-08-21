@@ -311,9 +311,9 @@
                     // Check features
                     updateFeatureBadges(engine.features);
                     
-                } else if (typeof GameEngineModule !== 'undefined') {
+                } else if (typeof createGameEngine !== 'undefined') {
                     log('Using direct WASM module', 'info');
-                    const module = await GameEngineModule();
+                    const module = await createGameEngine();
                     engine = new module.GameEngine(canvas.width, canvas.height);
                 } else {
                     throw new Error('No WASM module found');
@@ -624,7 +624,7 @@
         
         // Auto-initialize if module is already loaded
         window.addEventListener('load', () => {
-            if (typeof GameEngineModule !== 'undefined' || typeof WasmGameEngineModern !== 'undefined') {
+            if (typeof createGameEngine !== 'undefined' || typeof WasmGameEngineModern !== 'undefined') {
                 log('WASM module detected, auto-initializing...', 'info');
                 // Give it a moment for everything to load
                 setTimeout(initializeEngine, 100);

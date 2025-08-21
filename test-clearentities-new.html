@@ -33,7 +33,7 @@
     <pre id="output"></pre>
 
     <script type="module">
-        import GameEngineModule from './public/game_engine.js';
+        import createGameEngine from './public/game_engine.js';
         
         const statusEl = document.getElementById('status');
         const outputEl = document.getElementById('output');
@@ -44,7 +44,7 @@
                 outputEl.textContent = 'Starting test...\n';
                 
                 // Initialize the WASM module
-                const Module = await GameEngineModule();
+                const Module = await createGameEngine();
                 outputEl.textContent += '✓ WASM module loaded\n';
                 
                 statusEl.textContent = 'Creating GameEngine instance...';
@@ -80,7 +80,7 @@
                         
                         // Get entity count before clearing
                         const entitiesBefore = engine.getEntityPositions();
-                        outputEl.textContent += `  - Entities before clear: ${entitiesBefore.size()}\n`;
+                        outputEl.textContent += `  - Entities before clear: ${entitiesBefore.length}\n`;
                         
                         // Clear entities
                         engine.clearEntities();
@@ -88,7 +88,7 @@
                         
                         // Get entity count after clearing
                         const entitiesAfter = engine.getEntityPositions();
-                        outputEl.textContent += `  - Entities after clear: ${entitiesAfter.size()}\n`;
+                        outputEl.textContent += `  - Entities after clear: ${entitiesAfter.length}\n`;
                         
                         if (entitiesAfter.size() === 0) {
                             outputEl.textContent += '\n✅ clearEntities() works correctly!';
