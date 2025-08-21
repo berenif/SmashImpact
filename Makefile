@@ -9,8 +9,23 @@ EMSDK_DIR = emsdk
 # Emscripten compiler
 EMCC = emcc
 
-# Source files
-WASM_SOURCES = $(WASM_DIR)/game_engine.cpp
+# Source files - support both monolithic and refactored versions
+WASM_SOURCES_MONOLITHIC = $(WASM_DIR)/game_engine.cpp
+WASM_SOURCES_REFACTORED = \
+	$(WASM_DIR)/src/game_engine.cpp \
+	$(WASM_DIR)/src/entities/entity.cpp \
+	$(WASM_DIR)/src/entities/player.cpp \
+	$(WASM_DIR)/src/entities/enemy.cpp \
+	$(WASM_DIR)/src/entities/wolf.cpp \
+	$(WASM_DIR)/src/entities/projectile.cpp \
+	$(WASM_DIR)/src/entities/powerup.cpp \
+	$(WASM_DIR)/src/entities/obstacle.cpp \
+	$(WASM_DIR)/src/effects/visual_effects.cpp \
+	$(WASM_DIR)/src/effects/particle.cpp \
+	$(WASM_DIR)/src/systems/collision_system.cpp \
+	$(WASM_DIR)/src/systems/wave_system.cpp \
+	$(WASM_DIR)/src/systems/spatial_hash_grid.cpp \
+	$(WASM_DIR)/src/bindings.cpp
 
 # Include directories
 INCLUDES = -I$(WASM_DIR)/include
@@ -36,12 +51,19 @@ WASM_OUTPUT = $(PUBLIC_DIR)/game_engine
 .PHONY: all
 all: build
 
-# Build WASM module
+# Build WASM module (monolithic version - default)
 .PHONY: build
 build: check-emscripten $(PUBLIC_DIR)
-	@echo "Building WASM module..."
-	$(EMCC) $(WASM_SOURCES) $(INCLUDES) $(WASM_FLAGS) -o $(WASM_OUTPUT).js
+	@echo "Building WASM module (monolithic)..."
+	$(EMCC) $(WASM_SOURCES_MONOLITHIC) $(INCLUDES) $(WASM_FLAGS) -o $(WASM_OUTPUT).js
 	@echo "Build complete!"
+
+# Build refactored WASM module
+.PHONY: build-refactored
+build-refactored: check-emscripten $(PUBLIC_DIR)
+	@echo "Building WASM module (refactored)..."
+	$(EMCC) $(WASM_SOURCES_REFACTORED) $(INCLUDES) $(WASM_FLAGS) -o $(WASM_OUTPUT).js
+	@echo "Refactored build complete!"
 
 # Quick build (JavaScript only)
 .PHONY: quick
@@ -121,7 +143,8 @@ help:
 	@echo "WASM Game Engine Build System"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make              - Build WASM module (default)"
+	@echo "  make              - Build WASM module (monolithic, default)"
+	@echo "  make build-refactored - Build refactored WASM module"
 	@echo "  make quick        - Quick build (JavaScript only)"
 	@echo "  make production   - Create production build"
 	@echo "  make setup        - Setup development environment"
