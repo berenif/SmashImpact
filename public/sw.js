@@ -17,7 +17,11 @@ const urlsToCache = [
   './unified-game.js',
   './vendor/qrcode.js',
   './vendor/jsqr.js',
-  './manifest.json'
+  './manifest.json',
+  './game_engine.js',
+  './game_engine.wasm',
+  './wasm-game-wrapper.js',
+  './game-engine-loader.js'
 ];
 
 // Install event - cache resources
@@ -62,9 +66,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For JS and HTML files, always try network first
+  // For JS, HTML, and WASM files, always try network first
   const isImportantFile = event.request.url.endsWith('.js') || 
                           event.request.url.endsWith('.html') ||
+                          event.request.url.endsWith('.wasm') ||
+                          event.request.url.includes('wasm') ||
                           event.request.url.endsWith('/');
 
   if (isImportantFile) {

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Loading Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 20px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.1);
+        }
+        .error {
+            color: #f00;
+            border-color: #f00;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        .success {
+            color: #0f0;
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.2);
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>WASM Module Loading Test</h1>
+    <div id="output"></div>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'status') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `<pre>${new Date().toISOString()}: ${message}</pre>`;
+            output.appendChild(div);
+            console.log(message);
+        }
+        
+        async function testWASMLoading() {
+            log('Starting WASM loading test...');
+            
+            try {
+                // Test 1: Check if game_engine.js exists
+                log('Test 1: Checking if game_engine.js exists...');
+                const response = await fetch('./public/game_engine.js');
+                if (response.ok) {
+                    log('✅ game_engine.js found', 'success');
+                } else {
+                    log(`❌ game_engine.js not found: ${response.status}`, 'error');
+                    return;
+                }
+                
+                // Test 2: Check if game_engine.wasm exists
+                log('Test 2: Checking if game_engine.wasm exists...');
+                const wasmResponse = await fetch('./public/game_engine.wasm');
+                if (wasmResponse.ok) {
+                    log('✅ game_engine.wasm found', 'success');
+                } else {
+                    log(`❌ game_engine.wasm not found: ${wasmResponse.status}`, 'error');
+                    return;
+                }
+                
+                // Test 3: Try to load the module with custom configuration
+                log('Test 3: Loading WASM module with custom configuration...');
+                
+                // Create a proper module configuration
+                const moduleConfig = {
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            const wasmPath = './public/game_engine.wasm';
+                            log(`Locating WASM file: ${path} -> ${wasmPath}`);
+                            return wasmPath;
+                        }
+                        return path;
+                    },
+                    
+                    print: (text) => {
+                        log(`[MODULE]: ${text}`);
+                    },
+                    
+                    printErr: (text) => {
+                        log(`[MODULE ERROR]: ${text}`, 'error');
+                    },
+                    
+                    onAbort: (what) => {
+                        log(`[MODULE ABORT]: ${what}`, 'error');
+                    },
+                    
+                    // Pre-initialize WebAssembly memory
+                    wasmMemory: new WebAssembly.Memory({
+                        initial: 256,
+                        maximum: 2048
+                    })
+                };
+                
+                // Import the fixed module wrapper
+                log('Loading fixed WASM module wrapper...');
+                const scriptResponse = await fetch('./public/wasm-module-fix.js');
+                const scriptText = await scriptResponse.text();
+                eval(scriptText);
+                
+                log('Creating WASM module instance with fix...');
+                const wasmModule = await window.createFixedGameEngine();
+                
+                log('✅ WASM module loaded successfully!', 'success');
+                
+                // Test 4: Try to create a GameEngine instance
+                log('Test 4: Creating GameEngine instance...');
+                if (wasmModule.GameEngine) {
+                    const engine = new wasmModule.GameEngine(1920, 1080);
+                    log('✅ GameEngine instance created successfully!', 'success');
+                    
+                    // Test some basic operations
+                    log('Testing basic operations...');
+                    
+                    // Test entity creation
+                    const playerId = engine.createPlayer(100, 100);
+                    log(`Created player with ID: ${playerId}`, 'success');
+                    
+                    // Test entity count
+                    const entityCount = engine.getEntityCount();
+                    log(`Entity count: ${entityCount}`, 'success');
+                    
+                    // Clean up
+                    engine.delete();
+                    log('✅ All tests passed!', 'success');
+                } else {
+                    log('❌ GameEngine class not found in module', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}\n${error.stack}`, 'error');
+            }
+        }
+        
+        // Run the test
+        testWASMLoading();
+    </script>
+</body>
+</html>

@@ -543,13 +543,21 @@
             try {
                 updateLoading(10, 'Loading WASM module...');
                 
-                // Try to load the WASM module
-                const module = await import('./public/game_engine.js');
+                // Load the fixed WASM module wrapper
+                const script = document.createElement('script');
+                script.src = './public/wasm-module-fix.js';
+                document.head.appendChild(script);
+                
+                // Wait for the script to load
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                });
+                
                 updateLoading(30, 'Initializing WASM...');
                 
-                // Initialize the WASM module properly
-                const createGameEngine = module.default;
-                Game.wasmModule = await createGameEngine();
+                // Use the fixed module creator
+                Game.wasmModule = await window.createFixedGameEngine();
                 updateLoading(50, 'Creating game engine...');
                 
                 // Create game engine instance
@@ -591,6 +599,12 @@
                 
             } catch (error) {
                 console.error('Failed to initialize WASM:', error);
+                console.log('Attempting fallback to JavaScript implementation...');
+                
+                // Clear any partial WASM initialization
+                Game.wasmModule = null;
+                Game.engine = null;
+                
                 // Fallback to JavaScript implementation
                 loadFallback();
                 return false;
