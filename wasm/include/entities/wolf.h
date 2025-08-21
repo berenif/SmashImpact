@@ -4,6 +4,7 @@
 #include "enemy.h"
 #include "../config/game_config.h"
 #include <cstdlib>
+#include <vector>
 
 class Wolf : public Enemy {
 public:
