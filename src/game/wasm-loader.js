@@ -36,8 +36,8 @@ export class WASMLoader {
             this.updateLoading(30, 'Initializing WASM...');
             
             // Initialize the WASM module properly
-            const GameEngineModule = module.default;
-            this.module = await GameEngineModule();
+            const createGameEngine = module.default;
+            this.module = await createGameEngine();
             this.updateLoading(50, 'Creating game engine...');
             
             // Create game engine instance

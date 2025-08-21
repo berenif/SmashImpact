@@ -268,7 +268,7 @@
     </div>
     
     <script type="module">
-        import GameEngineModule from './game_engine.js';
+        import createGameEngine from './game_engine.js';
         
         let wasmEngine = null;
         let jsEngine = null;
@@ -283,7 +283,7 @@
         
         // Initialize WebAssembly engine
         async function initWasmEngine() {
-            const Module = await GameEngineModule();
+            const Module = await createGameEngine();
             wasmEngine = new Module.GameEngine(800, 600);
             console.log('WebAssembly engine initialized');
         }

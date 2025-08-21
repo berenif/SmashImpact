@@ -11,7 +11,7 @@
     <pre id="output"></pre>
 
     <script type="module">
-        import GameEngineModule from './public/game_engine.js';
+        import createGameEngine from './public/game_engine.js';
         
         const statusEl = document.getElementById('status');
         const outputEl = document.getElementById('output');
@@ -21,7 +21,7 @@
                 statusEl.textContent = 'Initializing WASM module...';
                 
                 // Initialize the WASM module
-                const Module = await GameEngineModule();
+                const Module = await createGameEngine();
                 
                 statusEl.textContent = 'Creating GameEngine instance...';
                 

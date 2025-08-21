@@ -4,7 +4,7 @@
  * and integrates it with the existing game code for maximum performance.
  */
 
-import GameEngineModule from './game_engine.js';
+import createGameEngine from './game_engine.js';
 
 export class WasmGameEngine {
     constructor() {
@@ -31,7 +31,7 @@ export class WasmGameEngine {
     async initialize(width, height) {
         try {
             console.log('Initializing WebAssembly game engine...');
-            this.module = await GameEngineModule();
+            this.module = await createGameEngine();
             this.engine = new this.module.GameEngine(width, height);
             this.initialized = true;
             console.log('✓ WebAssembly engine initialized successfully');

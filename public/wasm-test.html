@@ -52,7 +52,7 @@
     <div id="output"></div>
 
     <script type="module">
-        import GameEngineModule from './game_engine.js';
+        import createGameEngine from './game_engine.js';
         
         let engine = null;
         let testInterval = null;
@@ -60,7 +60,7 @@
         let frameCount = 0;
         
         // Initialize the WebAssembly module
-        GameEngineModule().then(Module => {
+        createGameEngine().then(Module => {
             window.Module = Module;
             console.log('WebAssembly module loaded successfully!');
             

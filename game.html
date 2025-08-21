@@ -548,8 +548,8 @@
                 updateLoading(30, 'Initializing WASM...');
                 
                 // Initialize the WASM module properly
-                const GameEngineModule = module.default;
-                Game.wasmModule = await GameEngineModule();
+                const createGameEngine = module.default;
+                Game.wasmModule = await createGameEngine();
                 updateLoading(50, 'Creating game engine...');
                 
                 // Create game engine instance
