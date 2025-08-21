@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="49" failures="1" errors="0" time="0.367">
+  <testsuite name="tests/wolf-ai-tests.js" errors="0" failures="1" skipped="0" timestamp="2025-08-21T16:22:56" time="0.232" tests="27">
+    <testcase classname="Wolf AI Behavior Tests › Basic Wolf Properties" name="should initialize with correct properties" time="0.003">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Basic Wolf Properties" name="should calculate distance correctly" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › State Management" name="should transition to hunting when player is in alert radius" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › State Management" name="should transition to attacking when player is close" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › State Management" name="should flee when health is low" time="0">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › State Management" name="should remain idle when player is far" time="0">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Movement Behaviors" name="should move towards player when hunting" time="0.006">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Movement Behaviors" name="should move away from player when fleeing" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Movement Behaviors" name="should stop moving when attacking in range" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Movement Behaviors" name="should patrol randomly when idle" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pack Behavior" name="should find nearby wolves" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pack Behavior" name="should initiate pack hunting with enough wolves nearby" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pack Behavior" name="should calculate flanking angles for pack hunting" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pack Behavior" name="should communicate with pack members" time="0.002">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pack Behavior" name="should respond to pack messages" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pathfinding" name="should find path to target" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pathfinding" name="should follow path" time="0.001">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: false
+    at Object.toBe (/workspace/tests/wolf-ai-tests.js:467:33)
+    at Promise.finally.completed (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)
+    at _callCircusTest (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at _runTest (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:949:3)
+    at _runTestsForDescribeBlock (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:839:13)
+    at _runTestsForDescribeBlock (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:829:11)
+    at _runTestsForDescribeBlock (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:829:11)
+    at run (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:757:3)
+    at runAndTransformResultsToJestFormat (/workspace/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)
+    at jestAdapter (/workspace/node_modules/jest-circus/build/runner.js:101:19)
+    at runTestInternal (/workspace/node_modules/jest-runner/build/index.js:275:16)
+    at runTest (/workspace/node_modules/jest-runner/build/index.js:343:7)</failure>
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Pathfinding" name="should advance to next path point when close" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Obstacle Avoidance" name="should avoid obstacles" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Obstacle Avoidance" name="should not be affected by distant obstacles" time="0.007">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Update Loop" name="should update position based on velocity" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Update Loop" name="should make decisions at intervals" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Update Loop" name="should execute current behavior state" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Combat Behavior" name="should deal damage when attacking" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Combat Behavior" name="should continue hunting if not in attack range" time="0">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Advanced Pack Tactics" name="should coordinate flanking maneuvers" time="0.001">
+    </testcase>
+    <testcase classname="Wolf AI Behavior Tests › Advanced Pack Tactics" name="should fall back to hunting if pack disperses" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="tests/test-game.js" errors="0" failures="0" skipped="0" timestamp="2025-08-21T16:22:56" time="0.081" tests="22">
+    <testcase classname="Game Engine Core Tests › Entity Management" name="should create player entity" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Entity Management" name="should create enemy entity" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Entity Management" name="should create projectile" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Entity Management" name="should remove entity" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Entity Management" name="should get entity by id" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Entity Management" name="should update entity properties" time="0">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Collision Detection" name="should detect collision between entities" time="0">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Collision Detection" name="should not detect collision when entities are far apart" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Collision Detection" name="should handle player-enemy collision" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Collision Detection" name="should handle projectile-enemy collision" time="0">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Game State Management" name="should manage score" time="0.004">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Game State Management" name="should manage wave progression" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Game State Management" name="should pause and resume game" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Game State Management" name="should reset game state" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Game State Management" name="should not update when paused" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Power-ups" name="should apply health power-up" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Power-ups" name="should apply speed power-up" time="0">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Power-ups" name="should apply damage power-up" time="0">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Enemy Spawning" name="should spawn correct number of enemies" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Enemy Spawning" name="should increase enemy stats with wave" time="0.001">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Update Loop" name="should update entity positions" time="0">
+    </testcase>
+    <testcase classname="Game Engine Core Tests › Update Loop" name="should keep entities within bounds" time="0">
+    </testcase>
+  </testsuite>
+</testsuites>
