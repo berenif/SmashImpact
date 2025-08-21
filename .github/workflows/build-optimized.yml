@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: ["main"]
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'  # Run every Sunday at midnight
 
 # Cancel in-progress runs for the same branch
 concurrency:
@@ -187,8 +189,3 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-# Schedule weekly cache cleanup
-on:
-  schedule:
-    - cron: '0 0 * * 0'  # Run every Sunday at midnight
