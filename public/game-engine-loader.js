@@ -40,6 +40,14 @@ async function loadGameEngine() {
         // Import the module factory
         const createModule = (await import('./game_engine.js')).default;
         
+        // Add proper locateFile function to the config
+        moduleConfig.locateFile = (path) => {
+            if (path.endsWith('.wasm')) {
+                return './game_engine.wasm';
+            }
+            return path;
+        };
+        
         // Create the module instance with our configuration
         const wasmModule = await createModule(moduleConfig);
         

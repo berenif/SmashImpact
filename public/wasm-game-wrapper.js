@@ -31,7 +31,27 @@ export class WasmGameEngine {
     async initialize(width, height) {
         try {
             console.log('Initializing WebAssembly game engine...');
-            this.module = await createGameEngine();
+            
+            // Create the module instance with proper configuration
+            this.module = await createGameEngine({
+                print: (text) => console.log('[WASM]:', text),
+                printErr: (text) => console.error('[WASM Error]:', text),
+                locateFile: (path) => {
+                    if (path.endsWith('.wasm')) {
+                        return './game_engine.wasm';
+                    }
+                    return path;
+                },
+                onRuntimeInitialized: () => {
+                    console.log('✅ WASM runtime initialized');
+                }
+            });
+            
+            // Check if GameEngine class is available
+            if (!this.module.GameEngine) {
+                throw new Error('GameEngine class not found in WASM module');
+            }
+            
             this.engine = new this.module.GameEngine(width, height);
             this.initialized = true;
             console.log('✓ WebAssembly engine initialized successfully');

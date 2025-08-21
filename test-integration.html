@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Integration Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.1);
+            border-radius: 4px;
+        }
+        .error {
+            color: #f00;
+            border-color: #f00;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        .success {
+            color: #0f0;
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.2);
+        }
+        .info {
+            color: #00f0ff;
+            border-color: #00f0ff;
+            background: rgba(0, 240, 255, 0.1);
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+        canvas {
+            border: 2px solid #0f0;
+            display: block;
+            margin: 20px 0;
+            background: #000;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0a0;
+        }
+        button:disabled {
+            background: #555;
+            color: #999;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WASM Integration Test</h1>
+        
+        <div id="output"></div>
+        
+        <div class="controls">
+            <button id="testWasmLoader">Test WASMLoader</button>
+            <button id="testWasmWrapper">Test WasmGameEngine</button>
+            <button id="testGameCore">Test Game Core</button>
+            <button id="runAll">Run All Tests</button>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="600" style="display:none;"></canvas>
+    </div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        const canvas = document.getElementById('gameCanvas');
+        
+        function log(message, type = 'status') {
+            const div = document.createElement('div');
+            div.className = type;
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            div.innerHTML = `<pre>[${timestamp}] ${message}</pre>`;
+            output.appendChild(div);
+            console.log(`[${type}] ${message}`);
+        }
+        
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+        
+        // Test 1: WASMLoader from src/game/wasm-loader.js
+        async function testWasmLoader() {
+            log('=== Testing WASMLoader ===', 'info');
+            try {
+                const { default: WASMLoader } = await import('./src/game/wasm-loader.js');
+                log('WASMLoader imported successfully');
+                
+                const loader = new WASMLoader();
+                log('WASMLoader instance created');
+                
+                const success = await loader.initialize();
+                if (success) {
+                    log('✅ WASMLoader initialized successfully', 'success');
+                    
+                    const engine = loader.getEngine();
+                    if (engine) {
+                        log('✅ Engine instance retrieved', 'success');
+                        
+                        // Test basic operations
+                        const playerId = engine.createPlayer(400, 300);
+                        log(`Created player with ID: ${playerId}`, 'success');
+                        
+                        const enemyId = engine.createEnemy(200, 200, 2.0);
+                        log(`Created enemy with ID: ${enemyId}`, 'success');
+                        
+                        // Clean up
+                        loader.cleanup();
+                        log('✅ Loader cleaned up', 'success');
+                    }
+                } else {
+                    log('❌ WASMLoader initialization failed', 'error');
+                }
+            } catch (error) {
+                log(`❌ WASMLoader test failed: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        // Test 2: WasmGameEngine from public/wasm-game-wrapper.js
+        async function testWasmWrapper() {
+            log('=== Testing WasmGameEngine ===', 'info');
+            try {
+                const { WasmGameEngine } = await import('./public/wasm-game-wrapper.js');
+                log('WasmGameEngine imported successfully');
+                
+                const engine = new WasmGameEngine();
+                log('WasmGameEngine instance created');
+                
+                await engine.initialize(800, 600);
+                log('✅ WasmGameEngine initialized', 'success');
+                
+                // Test operations
+                const playerId = engine.createPlayer(400, 300);
+                log(`Created player with ID: ${playerId}`, 'success');
+                
+                engine.updatePlayerInput(0, 0, false);
+                log('Updated player input', 'success');
+                
+                engine.update(16);
+                log('Engine updated', 'success');
+                
+                const entities = engine.getAllEntities();
+                log(`Total entities: ${entities.length}`, 'success');
+                
+                // Clean up
+                engine.destroy();
+                log('✅ Engine destroyed', 'success');
+                
+            } catch (error) {
+                log(`❌ WasmGameEngine test failed: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        // Test 3: Game Core integration
+        async function testGameCore() {
+            log('=== Testing Game Core Integration ===', 'info');
+            try {
+                // Show canvas for this test
+                canvas.style.display = 'block';
+                
+                const { Game } = await import('./src/game/game-core.js');
+                log('Game class imported successfully');
+                
+                const game = new Game();
+                log('Game instance created');
+                
+                // Initialize with canvas
+                const success = await game.initialize('gameCanvas');
+                if (success) {
+                    log('✅ Game initialized successfully', 'success');
+                    
+                    // Let it run for a short time
+                    setTimeout(() => {
+                        game.cleanup();
+                        canvas.style.display = 'none';
+                        log('✅ Game cleaned up', 'success');
+                    }, 2000);
+                } else {
+                    log('❌ Game initialization failed', 'error');
+                    canvas.style.display = 'none';
+                }
+                
+            } catch (error) {
+                log(`❌ Game Core test failed: ${error.message}`, 'error');
+                console.error(error);
+                canvas.style.display = 'none';
+            }
+        }
+        
+        // Run all tests
+        async function runAllTests() {
+            clearOutput();
+            log('=== Running All Integration Tests ===', 'info');
+            
+            await testWasmLoader();
+            log('---', 'info');
+            
+            await testWasmWrapper();
+            log('---', 'info');
+            
+            await testGameCore();
+            
+            log('=== All Tests Complete ===', 'info');
+        }
+        
+        // Attach event listeners
+        document.getElementById('testWasmLoader').addEventListener('click', () => {
+            clearOutput();
+            testWasmLoader();
+        });
+        
+        document.getElementById('testWasmWrapper').addEventListener('click', () => {
+            clearOutput();
+            testWasmWrapper();
+        });
+        
+        document.getElementById('testGameCore').addEventListener('click', () => {
+            clearOutput();
+            testGameCore();
+        });
+        
+        document.getElementById('runAll').addEventListener('click', runAllTests);
+        
+        // Auto-run on load
+        log('Page loaded. Click a button to run tests.', 'info');
+    </script>
+</body>
+</html>

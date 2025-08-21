@@ -31,21 +31,53 @@ export class WASMLoader {
         try {
             this.updateLoading(10, 'Loading WASM module...');
             
-            // Try to load the WASM module
-            const module = await import('/public/game_engine.js');
+            // Import the Emscripten module factory
+            const moduleFactory = (await import('/public/game_engine.js')).default;
             this.updateLoading(30, 'Initializing WASM...');
             
-            // Initialize the WASM module properly
-            const createGameEngine = module.default;
-            this.module = await createGameEngine();
+            // Create the module instance with proper configuration
+            this.module = await moduleFactory({
+                // Optional configuration
+                print: (text) => console.log('[WASM]:', text),
+                printErr: (text) => console.error('[WASM Error]:', text),
+                
+                // Locate the WASM file
+                locateFile: (path) => {
+                    if (path.endsWith('.wasm')) {
+                        return '/public/game_engine.wasm';
+                    }
+                    return path;
+                },
+                
+                // Handle initialization
+                onRuntimeInitialized: () => {
+                    console.log('✅ WASM runtime initialized');
+                }
+            });
+            
             this.updateLoading(50, 'Creating game engine...');
+            
+            // Check if GameEngine class is available
+            if (!this.module.GameEngine) {
+                throw new Error('GameEngine class not found in WASM module');
+            }
             
             // Create game engine instance
             this.engine = new this.module.GameEngine(1920, 1080);
             this.updateLoading(70, 'Setting up renderer...');
             
-            // Generate initial obstacles
-            this.engine.generateObstacles(20);
+            // Note: generateObstacles might not exist, check first
+            if (typeof this.engine.generateObstacles === 'function') {
+                this.engine.generateObstacles(20);
+            } else if (typeof this.engine.createObstacle === 'function') {
+                // Create obstacles manually if generateObstacles doesn't exist
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * 1920;
+                    const y = Math.random() * 1080;
+                    const radius = 20 + Math.random() * 30;
+                    this.engine.createObstacle(x, y, radius);
+                }
+            }
             this.updateLoading(90, 'Finalizing...');
             
             console.log('WASM module loaded successfully');
