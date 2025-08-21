@@ -374,9 +374,31 @@ public:
                 velocity *= 0.9f;
             }
         } else if (target && target->active && !stunned) {
-            // Simple AI: move towards target
-            Vector2 direction = (target->position - position).normalized();
-            velocity = direction * speed;
+            // Calculate distance to target
+            float distToTarget = distanceTo(*target);
+            
+            // Define attack range and safe distance
+            const float ATTACK_RANGE = 50.0f;  // Distance at which enemy stops moving closer
+            const float RETREAT_RANGE = 30.0f; // Distance at which enemy backs away
+            
+            if (distToTarget < RETREAT_RANGE) {
+                // Too close - back away slightly
+                Vector2 direction = (position - target->position).normalized();
+                velocity = direction * speed * 0.5f;
+            } else if (distToTarget > ATTACK_RANGE) {
+                // Move towards target if too far
+                Vector2 direction = (target->position - position).normalized();
+                velocity = direction * speed;
+            } else {
+                // In attack range - circle around the target
+                Vector2 toTarget = target->position - position;
+                Vector2 perpendicular(-toTarget.y, toTarget.x);
+                perpendicular = perpendicular.normalized();
+                
+                // Add some movement variation
+                float circleDirection = (id % 2 == 0) ? 1.0f : -1.0f;
+                velocity = perpendicular * speed * 0.7f * circleDirection;
+            }
         }
         
         Entity::update(deltaTime);
