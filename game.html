@@ -1302,11 +1302,13 @@
                 // WASM engine update
                 Game.engine.update(dt / 1000);
                 
-                // Check collisions
-                Game.engine.checkCollisions();
+                // Check collisions - only if method exists
+                if (Game.engine.checkCollisions) {
+                    Game.engine.checkCollisions();
+                }
                 
-                // Get entity count
-                const entities = Game.engine.getAllEntities();
+                // Get entity count - only if method exists
+                const entities = Game.engine.getAllEntities ? Game.engine.getAllEntities() : [];
                 Game.stats.entities = entities.length;
                 
                 // Check wave completion
