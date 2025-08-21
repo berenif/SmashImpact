@@ -71,11 +71,30 @@
   // Enhanced Combat Game Class
   class EnhancedCombatGame {
     constructor(canvas) {
+      // Validate canvas parameter
+      if (!canvas) {
+        throw new Error('Canvas element is required but was not provided');
+      }
+      
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        throw new Error('Provided element is not a valid canvas element');
+      }
+      
       this.canvas = canvas;
-      this.ctx = canvas.getContext('2d');
+      
+      // Try to get 2D context with fallback options
+      try {
+        this.ctx = canvas.getContext('2d', { 
+          alpha: false,  // Disable alpha for better performance
+          desynchronized: true  // Hint for better performance
+        });
+      } catch (e) {
+        // Fallback to basic context
+        this.ctx = canvas.getContext('2d');
+      }
       
       if (!this.ctx) {
-        throw new Error('Failed to get 2D context from canvas');
+        throw new Error('Failed to get 2D context from canvas. Your browser may not support HTML5 Canvas.');
       }
       
       // Core game state
