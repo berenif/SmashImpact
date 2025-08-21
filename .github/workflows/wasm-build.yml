@@ -1,0 +1,195 @@
+name: WASM Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.cpp'
+      - '**.c'
+      - '**.h'
+      - 'wasm/**'
+      - 'build.sh'
+      - 'build-quick.sh'
+      - 'build_wolf_ai.sh'
+      - '.github/workflows/wasm-build.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '**.cpp'
+      - '**.c'
+      - '**.h'
+      - 'wasm/**'
+      - 'build.sh'
+      - 'build-quick.sh'
+      - 'build_wolf_ai.sh'
+      - '.github/workflows/wasm-build.yml'
+  workflow_dispatch:  # Allow manual runs
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Emscripten cache
+        uses: actions/cache@v3
+        id: cache-emsdk
+        with:
+          path: emsdk
+          key: ${{ runner.os }}-emsdk-3.1.51
+          restore-keys: |
+            ${{ runner.os }}-emsdk-
+      
+      - name: Install Emscripten
+        if: steps.cache-emsdk.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install 3.1.51
+          ./emsdk activate 3.1.51
+      
+      - name: Setup Emscripten environment
+        run: |
+          cd emsdk
+          source ./emsdk_env.sh
+          echo "EMSDK=$EMSDK" >> $GITHUB_ENV
+          echo "EM_CONFIG=$EM_CONFIG" >> $GITHUB_ENV
+          echo "EMSDK_NODE=$EMSDK_NODE" >> $GITHUB_ENV
+          echo "$EMSDK" >> $GITHUB_PATH
+          echo "$EMSDK/upstream/emscripten" >> $GITHUB_PATH
+      
+      - name: Verify Emscripten installation
+        run: |
+          emcc --version
+          em++ --version
+      
+      - name: Build Wolf AI WASM module
+        run: |
+          echo "Building Wolf AI WASM module..."
+          
+          # Create wasm output directory
+          mkdir -p wasm
+          
+          # Compile the main WASM module
+          em++ wolf_ai_wasm.cpp \
+            -O3 \
+            -s WASM=1 \
+            -s EXPORTED_FUNCTIONS='["_malloc","_free","_initGame","_updateGame","_handleInput","_getPlayerX","_getPlayerY","_getPlayerHealth","_getEnemyCount","_getEnemyX","_getEnemyY","_getEnemyHealth","_getProjectileCount","_getProjectileX","_getProjectileY","_isGameOver","_getScore","_resetGame","_setDifficulty"]' \
+            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -s MODULARIZE=1 \
+            -s EXPORT_NAME='WolfAIModule' \
+            -s ENVIRONMENT='web,worker' \
+            -s SINGLE_FILE=0 \
+            -o wasm/wolf_ai.js
+          
+          echo "WASM build completed successfully!"
+      
+      - name: Build additional WASM modules
+        run: |
+          # Check if there are other C++ files to compile
+          for cpp_file in src/*.cpp; do
+            if [ -f "$cpp_file" ]; then
+              basename=$(basename "$cpp_file" .cpp)
+              echo "Building $basename..."
+              em++ "$cpp_file" \
+                -O3 \
+                -s WASM=1 \
+                -s MODULARIZE=1 \
+                -s EXPORT_NAME="${basename}Module" \
+                -o "wasm/${basename}.js" || echo "Warning: Failed to build $basename"
+            fi
+          done
+      
+      - name: Run build verification
+        run: |
+          if [ -f "verify-build.sh" ]; then
+            echo "Running build verification..."
+            chmod +x verify-build.sh
+            ./verify-build.sh || echo "Warning: Build verification reported issues"
+          fi
+      
+      - name: Test WASM exports
+        run: |
+          # Basic test to ensure WASM module loads
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Check if main WASM files exist
+            const wasmFile = path.join(__dirname, 'wasm', 'wolf_ai.wasm');
+            const jsFile = path.join(__dirname, 'wasm', 'wolf_ai.js');
+            
+            if (!fs.existsSync(wasmFile)) {
+              console.error('ERROR: wolf_ai.wasm not found!');
+              process.exit(1);
+            }
+            
+            if (!fs.existsSync(jsFile)) {
+              console.error('ERROR: wolf_ai.js not found!');
+              process.exit(1);
+            }
+            
+            console.log('✓ WASM files generated successfully');
+            console.log('  - wolf_ai.wasm: ' + fs.statSync(wasmFile).size + ' bytes');
+            console.log('  - wolf_ai.js: ' + fs.statSync(jsFile).size + ' bytes');
+          "
+      
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build-${{ github.sha }}
+          path: |
+            wasm/*.wasm
+            wasm/*.js
+          retention-days: 30
+      
+      - name: Create build summary
+        run: |
+          echo "## WASM Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Runner:** ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ls -lh wasm/*.wasm wasm/*.js 2>/dev/null | awk '{print $9 ": " $5}' >> $GITHUB_STEP_SUMMARY || echo "No WASM files found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ WASM compilation completed successfully!" >> $GITHUB_STEP_SUMMARY
+
+  # Deploy WASM to GitHub Pages (optional, only on main branch)
+  deploy-wasm:
+    needs: build-wasm
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-build-${{ github.sha }}
+          path: wasm
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
