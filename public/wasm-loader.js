@@ -28,6 +28,12 @@ export class WASMLoader {
                 printErr: config.printErr || ((text) => console.error('[WASM Error]:', text)),
                 locateFile: config.locateFile || ((path) => {
                     if (path.endsWith('.wasm')) {
+                        // Check if we're on GitHub Pages
+                        const isGitHubPages = window.location.hostname.includes('github.io');
+                        if (isGitHubPages) {
+                            // Use the public directory path for GitHub Pages
+                            return './public/game_engine.wasm';
+                        }
                         return './game_engine.wasm';
                     }
                     return path;
