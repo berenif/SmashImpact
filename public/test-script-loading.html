@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Loading Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
+        pre { 
+            background: #000; 
+            padding: 10px; 
+            border: 1px solid #333;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>SmashImpact Script Loading Test</h1>
+    <div id="results"></div>
+    
+    <!-- Load scripts in the same order as game.html -->
+    <script src="wasm-init.js"></script>
+    <script src="wasm-global-wrapper.js"></script>
+    <script src="visual-effects.js"></script>
+    <script src="mobile-controls.js"></script>
+    <script src="wasm-targeting-button.js"></script>
+    <script src="enhanced-combat-game.js"></script>
+    
+    <!-- WASM Module Loader -->
+    <script type="module">
+        import GameEngineModule from './game_engine.js';
+        window.GameEngineModule = GameEngineModule;
+        console.log('WASM module imported');
+    </script>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            results.appendChild(div);
+            console.log(message);
+        }
+        
+        function checkComponent(name, checkFn, required = true) {
+            try {
+                const exists = checkFn();
+                if (exists) {
+                    log(`✓ ${name} loaded successfully`, 'success');
+                    return true;
+                } else {
+                    log(`✗ ${name} not found`, required ? 'error' : 'warning');
+                    return false;
+                }
+            } catch (error) {
+                log(`✗ ${name} check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Wait for page to load
+        window.addEventListener('load', async function() {
+            log('=== Starting Script Loading Test ===', 'info');
+            
+            // Give scripts time to load
+            setTimeout(() => {
+                log('\n--- Core Components ---', 'info');
+                
+                // Check required components
+                const checks = [
+                    checkComponent('EnhancedCombatGame', () => typeof EnhancedCombatGame !== 'undefined'),
+                    checkComponent('VisualEffects', () => typeof VisualEffects !== 'undefined'),
+                    checkComponent('wasmInitializer', () => typeof wasmInitializer !== 'undefined'),
+                    checkComponent('GameEngineModule', () => typeof GameEngineModule !== 'undefined')
+                ];
+                
+                log('\n--- Optional Components ---', 'info');
+                
+                // Check optional components
+                checkComponent('MobileControls', () => typeof MobileControls !== 'undefined', false);
+                checkComponent('WASMTargetingButton', () => typeof WASMTargetingButton !== 'undefined', false);
+                
+                // Check if we can create game instance
+                log('\n--- Game Instance Test ---', 'info');
+                try {
+                    const canvas = document.createElement('canvas');
+                    const testGame = new EnhancedCombatGame(canvas);
+                    log('✓ Game instance created successfully', 'success');
+                    
+                    // Check game methods
+                    if (testGame.init) {
+                        log('✓ Game has init method', 'success');
+                    }
+                    if (testGame.update) {
+                        log('✓ Game has update method', 'success');
+                    }
+                    if (testGame.render) {
+                        log('✓ Game has render method', 'success');
+                    }
+                } catch (error) {
+                    log(`✗ Failed to create game instance: ${error.message}`, 'error');
+                }
+                
+                // Check WASM status
+                log('\n--- WASM Status ---', 'info');
+                if (typeof wasmInitializer !== 'undefined') {
+                    try {
+                        const isReady = wasmInitializer.isReady && wasmInitializer.isReady();
+                        if (isReady) {
+                            log('✓ WASM is ready', 'success');
+                        } else {
+                            log('⚠ WASM not ready yet (this is okay, game can run without it)', 'warning');
+                        }
+                    } catch (error) {
+                        log(`⚠ WASM status check failed: ${error.message}`, 'warning');
+                    }
+                }
+                
+                // Summary
+                log('\n=== Test Complete ===', 'info');
+                const allRequired = checks.every(c => c);
+                if (allRequired) {
+                    log('✓ All required components loaded successfully!', 'success');
+                    log('The game should be able to start.', 'success');
+                } else {
+                    log('✗ Some required components failed to load', 'error');
+                    log('Please check the browser console for detailed errors', 'error');
+                }
+                
+            }, 2000); // Wait 2 seconds for scripts to load
+        });
+        
+        // Log any script errors
+        window.addEventListener('error', function(e) {
+            if (e.filename) {
+                log(`Script error in ${e.filename}: ${e.message} (line ${e.lineno})`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -90,10 +90,7 @@
         </div>
     </div>
 
-    <!-- WASM Module Loader -->
-    <script type="module" src="game_engine.js"></script>
-    
-    <!-- Core WASM Initialization -->
+    <!-- Core WASM Initialization (loaded first) -->
     <script src="wasm-init.js"></script>
     
     <!-- WASM Support Scripts -->
@@ -109,12 +106,22 @@
     <!-- Main Game Engine -->
     <script src="enhanced-combat-game.js"></script>
     
+    <!-- WASM Module Loader (loaded last as ES6 module) -->
+    <script type="module">
+        import GameEngineModule from './game_engine.js';
+        
+        // Make it globally available for the game
+        window.GameEngineModule = GameEngineModule;
+        console.log('WASM module imported successfully');
+    </script>
+    
     <!-- Game Initialization Script -->
     <script>
         // Game state
         let game = null;
         let wasmReady = false;
         let scriptsLoaded = false;
+        let scriptLoadErrors = [];
         
         // UI Elements
         const wasmStatus = document.getElementById('wasmStatus');
@@ -233,7 +240,14 @@
                 
                 // Check if scripts are loaded
                 if (!scriptsLoaded) {
-                    alert('Game is still loading. Please wait a moment and try again.');
+                    // Show detailed error information
+                    let errorMsg = 'Game is still loading. ';
+                    if (scriptLoadErrors.length > 0) {
+                        errorMsg += 'The following components failed to load: ' + scriptLoadErrors.join(', ');
+                    } else {
+                        errorMsg += 'Please wait a moment and try again.';
+                    }
+                    alert(errorMsg);
                     return;
                 }
                 
@@ -307,6 +321,27 @@
         }
         
         /**
+         * Check if a script is loaded
+         */
+        function checkScriptLoaded(scriptName, checkFunction) {
+            try {
+                const isLoaded = checkFunction();
+                if (isLoaded) {
+                    console.log(`✓ ${scriptName} loaded successfully`);
+                    return true;
+                } else {
+                    console.warn(`✗ ${scriptName} not loaded yet`);
+                    scriptLoadErrors.push(scriptName);
+                    return false;
+                }
+            } catch (error) {
+                console.error(`✗ ${scriptName} check failed:`, error);
+                scriptLoadErrors.push(scriptName);
+                return false;
+            }
+        }
+        
+        /**
          * Initialize when page loads
          */
         window.addEventListener('load', async function() {
@@ -315,29 +350,57 @@
             // Start WASM initialization (non-blocking)
             initializeWASM().then(success => {
                 console.log('WASM initialization completed:', success ? 'Success' : 'Failed');
+            }).catch(error => {
+                console.error('WASM initialization failed:', error);
+                updateWASMStatus({
+                    status: 'error',
+                    message: 'WASM initialization failed'
+                });
             });
             
-            // Check if all required scripts are loaded
+            // Check if all required scripts are loaded with detailed logging
             const checkScripts = () => {
-                const required = [
-                    typeof EnhancedCombatGame !== 'undefined',
-                    typeof VisualEffects !== 'undefined'
+                scriptLoadErrors = []; // Reset errors
+                
+                const checks = [
+                    checkScriptLoaded('EnhancedCombatGame', () => typeof EnhancedCombatGame !== 'undefined'),
+                    checkScriptLoaded('VisualEffects', () => typeof VisualEffects !== 'undefined'),
+                    checkScriptLoaded('wasmInitializer', () => typeof wasmInitializer !== 'undefined'),
+                    // Optional checks - don't fail if these are missing
+                    checkScriptLoaded('MobileControls (optional)', () => {
+                        // This is optional, so we just log its status
+                        const loaded = typeof MobileControls !== 'undefined';
+                        if (!loaded) {
+                            console.log('MobileControls not loaded (optional)');
+                            // Remove from errors since it's optional
+                            scriptLoadErrors = scriptLoadErrors.filter(e => !e.includes('MobileControls'));
+                        }
+                        return true; // Always return true for optional components
+                    })
                 ];
                 
-                return required.every(check => check);
+                // Filter out optional components from errors
+                scriptLoadErrors = scriptLoadErrors.filter(e => !e.includes('optional'));
+                
+                return checks.every(check => check);
             };
             
-            // Wait for scripts with timeout
+            // Wait for scripts with timeout and better error reporting
             let attempts = 0;
-            const maxAttempts = 50; // 5 seconds timeout
+            const maxAttempts = 100; // 10 seconds timeout (100 * 100ms)
             
             const scriptChecker = setInterval(() => {
                 attempts++;
                 
+                // Log progress every 10 attempts (1 second)
+                if (attempts % 10 === 0) {
+                    console.log(`Script loading progress: ${attempts}/${maxAttempts} attempts`);
+                }
+                
                 if (checkScripts()) {
                     clearInterval(scriptChecker);
                     scriptsLoaded = true;
-                    console.log('All scripts loaded successfully');
+                    console.log('✓ All required scripts loaded successfully');
                     
                     // Enable start button if not waiting for WASM
                     if (!wasmReady && startButton) {
@@ -345,8 +408,24 @@
                     }
                 } else if (attempts >= maxAttempts) {
                     clearInterval(scriptChecker);
-                    console.error('Timeout waiting for scripts to load');
-                    showError('Game scripts failed to load. Please refresh the page.');
+                    console.error('✗ Timeout waiting for scripts to load');
+                    
+                    // Provide detailed error message
+                    let errorMsg = 'Game scripts failed to load. ';
+                    if (scriptLoadErrors.length > 0) {
+                        errorMsg += 'Missing components: ' + scriptLoadErrors.join(', ') + '. ';
+                    }
+                    errorMsg += 'Please check your internet connection and refresh the page.';
+                    
+                    showError(errorMsg);
+                    
+                    // Still allow starting if only optional components are missing
+                    if (scriptLoadErrors.length === 0 || scriptLoadErrors.every(e => e.includes('optional'))) {
+                        scriptsLoaded = true;
+                        if (startButton) {
+                            startButton.disabled = false;
+                        }
+                    }
                 }
             }, 100);
         });
