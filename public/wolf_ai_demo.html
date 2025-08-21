@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf AI WASM Demo - Intelligent Pack Hunting</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #gameCanvas {
+            border: 3px solid #fff;
+            background: #0a0a0a;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .control-group {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-group h3 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        .info {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 900px;
+        }
+        
+        .wolf-info {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 5px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .wolf-info h4 {
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+        
+        .state {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .state-0 { background: #666; } /* IDLE */
+        .state-1 { background: #4444ff; } /* PATROL */
+        .state-2 { background: #ffaa00; } /* INVESTIGATE */
+        .state-3 { background: #ff0000; } /* HUNT */
+        .state-4 { background: #ff6600; } /* FLANK */
+        .state-5 { background: #ff8800; } /* SEARCH */
+        
+        .instructions {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            max-width: 900px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .instructions h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ul {
+            list-style-position: inside;
+            line-height: 1.6;
+        }
+        
+        .stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐺 Wolf AI WASM Demo - Intelligent Pack Hunting</h1>
+    
+    <div class="instructions">
+        <h3>How to Play:</h3>
+        <ul>
+            <li>🖱️ <strong>Click</strong> to move the player (green circle)</li>
+            <li>💨 <strong>Move quickly</strong> to trigger wolf hearing (they'll investigate sounds)</li>
+            <li>👁️ <strong>Stay in sight</strong> to trigger hunting behavior</li>
+            <li>🏃 <strong>Break line of sight</strong> to see wolves search for you</li>
+            <li>🐺 <strong>Add more wolves</strong> to see pack coordination and flanking</li>
+        </ul>
+    </div>
+    
+    <canvas id="gameCanvas" width="1200" height="600"></canvas>
+    
+    <div class="controls">
+        <div class="control-group">
+            <h3>Wolf Control</h3>
+            <button onclick="addWolf(false)">Add Wolf</button>
+            <button onclick="addWolf(true)">Add Alpha Wolf</button>
+            <button onclick="clearWolves()">Clear All Wolves</button>
+        </div>
+        
+        <div class="control-group">
+            <h3>Player Control</h3>
+            <button onclick="teleportPlayer()">Teleport Player</button>
+            <button onclick="togglePlayerSpeed()">Toggle Speed</button>
+        </div>
+        
+        <div class="control-group">
+            <h3>Visualization</h3>
+            <button onclick="toggleVisionCones()">Toggle Vision Cones</button>
+            <button onclick="togglePaths()">Toggle Paths</button>
+        </div>
+    </div>
+    
+    <div class="info" id="wolfInfo"></div>
+    
+    <script type="module">
+        import WolfAIModule from './wolf_ai.js';
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let wolfManager;
+        let wolves = [];
+        let player = { x: 600, y: 300, vx: 0, vy: 0, speed: 5 };
+        let lastPlayerPos = { x: 600, y: 300 };
+        let targetPos = null;
+        let showVisionCones = true;
+        let showPaths = false;
+        let playerFast = false;
+        
+        // State names and colors
+        const stateNames = ['IDLE', 'PATROL', 'INVESTIGATE', 'HUNT', 'FLANK', 'SEARCH'];
+        const stateColors = ['#666', '#4444ff', '#ffaa00', '#ff0000', '#ff6600', '#ff8800'];
+        
+        // Initialize WASM module
+        WolfAIModule().then(module => {
+            wolfManager = new module.WolfPackManager();
+            console.log('✅ Wolf AI WASM Module Loaded!');
+            
+            // Create initial wolves
+            addWolf(false);
+            addWolf(false);
+            addWolf(true); // Alpha wolf
+            
+            // Start animation
+            animate();
+        }).catch(err => {
+            console.error('Failed to load WASM module:', err);
+            alert('Failed to load Wolf AI module. Please check the console.');
+        });
+        
+        // Add wolf function
+        window.addWolf = function(isAlpha) {
+            if (!wolfManager) return;
+            
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 200 + Math.random() * 100;
+            const x = 600 + Math.cos(angle) * dist;
+            const y = 300 + Math.sin(angle) * dist;
+            
+            const id = wolfManager.createWolf(x, y, isAlpha);
+            wolves.push({
+                id: id,
+                path: [],
+                lastPos: { x, y }
+            });
+            
+            console.log(`Added ${isAlpha ? 'Alpha' : 'Regular'} Wolf (ID: ${id})`);
+        };
+        
+        // Clear wolves
+        window.clearWolves = function() {
+            if (!wolfManager) return;
+            wolfManager.clearWolves();
+            wolves = [];
+            console.log('Cleared all wolves');
+        };
+        
+        // Teleport player
+        window.teleportPlayer = function() {
+            player.x = Math.random() * canvas.width;
+            player.y = Math.random() * canvas.height;
+            targetPos = null;
+        };
+        
+        // Toggle player speed
+        window.togglePlayerSpeed = function() {
+            playerFast = !playerFast;
+            player.speed = playerFast ? 15 : 5;
+        };
+        
+        // Toggle vision cones
+        window.toggleVisionCones = function() {
+            showVisionCones = !showVisionCones;
+        };
+        
+        // Toggle paths
+        window.togglePaths = function() {
+            showPaths = !showPaths;
+        };
+        
+        // Mouse controls
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            targetPos = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        });
+        
+        // Animation loop
+        function animate() {
+            // Update player position
+            if (targetPos) {
+                const dx = targetPos.x - player.x;
+                const dy = targetPos.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 5) {
+                    player.vx = (dx / dist) * player.speed;
+                    player.vy = (dy / dist) * player.speed;
+                    player.x += player.vx;
+                    player.y += player.vy;
+                } else {
+                    targetPos = null;
+                    player.vx = 0;
+                    player.vy = 0;
+                }
+            } else {
+                player.vx *= 0.9;
+                player.vy *= 0.9;
+                player.x += player.vx;
+                player.y += player.vy;
+            }
+            
+            // Keep player in bounds
+            player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
+            player.y = Math.max(20, Math.min(canvas.height - 20, player.y));
+            
+            // Update wolves
+            wolves.forEach(wolf => {
+                const wolfX = wolfManager.getWolfX(wolf.id);
+                const wolfY = wolfManager.getWolfY(wolf.id);
+                const dist = Math.sqrt((player.x - wolfX) ** 2 + (player.y - wolfY) ** 2);
+                const playerVisible = dist < 400; // Simple visibility check
+                
+                wolfManager.updateWolf(
+                    wolf.id,
+                    0.016, // 60 FPS delta time
+                    player.x,
+                    player.y,
+                    player.vx,
+                    player.vy,
+                    playerVisible
+                );
+                
+                // Track path for visualization
+                if (showPaths) {
+                    wolf.path.push({ x: wolfX, y: wolfY });
+                    if (wolf.path.length > 100) wolf.path.shift();
+                }
+            });
+            
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw wolves
+            wolves.forEach(wolf => {
+                const x = wolfManager.getWolfX(wolf.id);
+                const y = wolfManager.getWolfY(wolf.id);
+                const rotation = wolfManager.getWolfRotation(wolf.id);
+                const state = wolfManager.getWolfState(wolf.id);
+                const alertLevel = wolfManager.getWolfAlertLevel(wolf.id);
+                const isAlpha = wolfManager.getWolfIsAlpha(wolf.id);
+                const health = wolfManager.getWolfHealth(wolf.id);
+                
+                // Draw path
+                if (showPaths && wolf.path.length > 1) {
+                    ctx.strokeStyle = stateColors[state] + '40';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(wolf.path[0].x, wolf.path[0].y);
+                    for (let i = 1; i < wolf.path.length; i++) {
+                        ctx.lineTo(wolf.path[i].x, wolf.path[i].y);
+                    }
+                    ctx.stroke();
+                }
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // Draw vision cone
+                if (showVisionCones && (state >= 2 || state === 1)) {
+                    ctx.save();
+                    ctx.rotate(rotation);
+                    ctx.strokeStyle = state === 3 ? 'rgba(255, 0, 0, 0.15)' : 'rgba(255, 255, 0, 0.1)';
+                    ctx.fillStyle = state === 3 ? 'rgba(255, 0, 0, 0.05)' : 'rgba(255, 255, 0, 0.03)';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, 0, 400, -Math.PI/3, Math.PI/3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                
+                // Draw wolf body
+                ctx.save();
+                ctx.rotate(rotation);
+                ctx.fillStyle = stateColors[state];
+                ctx.strokeStyle = isAlpha ? '#ffff00' : '#ffffff';
+                ctx.lineWidth = isAlpha ? 3 : 2;
+                ctx.beginPath();
+                ctx.moveTo(-20, -12);
+                ctx.lineTo(20, 0);
+                ctx.lineTo(-20, 12);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+                
+                // Draw alert indicator
+                if (alertLevel > 0) {
+                    ctx.fillStyle = alertLevel >= 2 ? '#ff0000' : '#ffff00';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(alertLevel >= 2 ? '!' : '?', 0, -25);
+                }
+                
+                // Draw health bar
+                if (health < (isAlpha ? 150 : 100)) {
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                    ctx.fillRect(-20, -30, 40, 4);
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(-20, -30, 40 * (health / (isAlpha ? 150 : 100)), 4);
+                }
+                
+                ctx.restore();
+            });
+            
+            // Draw player
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            // Player glow effect
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+            gradient.addColorStop(0, 'rgba(0, 255, 0, 1)');
+            gradient.addColorStop(1, 'rgba(0, 255, 0, 0.3)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Player core
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Speed indicator
+            if (playerFast) {
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, 18, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+            
+            // Draw target indicator
+            if (targetPos) {
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(targetPos.x, targetPos.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.beginPath();
+                ctx.arc(targetPos.x, targetPos.y, 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // Update wolf info display
+            updateWolfInfo();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Update wolf information display
+        function updateWolfInfo() {
+            const infoDiv = document.getElementById('wolfInfo');
+            infoDiv.innerHTML = '';
+            
+            wolves.forEach((wolf, index) => {
+                const state = wolfManager.getWolfState(wolf.id);
+                const alertLevel = wolfManager.getWolfAlertLevel(wolf.id);
+                const isAlpha = wolfManager.getWolfIsAlpha(wolf.id);
+                const health = wolfManager.getWolfHealth(wolf.id);
+                const x = wolfManager.getWolfX(wolf.id);
+                const y = wolfManager.getWolfY(wolf.id);
+                
+                const wolfDiv = document.createElement('div');
+                wolfDiv.className = 'wolf-info';
+                wolfDiv.innerHTML = `
+                    <h4>Wolf ${index + 1} ${isAlpha ? '(Alpha)' : ''}</h4>
+                    <div>State: <span class="state state-${state}">${stateNames[state]}</span></div>
+                    <div>Alert: ${alertLevel.toFixed(1)}</div>
+                    <div>Health: ${health.toFixed(0)}/${isAlpha ? 150 : 100}</div>
+                    <div>Position: ${x.toFixed(0)}, ${y.toFixed(0)}</div>
+                `;
+                infoDiv.appendChild(wolfDiv);
+            });
+        }
+    </script>
+</body>
+</html>
