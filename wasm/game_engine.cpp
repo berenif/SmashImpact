@@ -8,6 +8,9 @@
 #include <memory>
 #include <algorithm>
 #include <unordered_map>
+#include <limits>
+#include <emscripten/html5.h>
+#include <emscripten/val.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -49,6 +52,9 @@ namespace Config {
     constexpr float ROLL_COOLDOWN = 800.0f;
     constexpr float ROLL_SPEED_MULTIPLIER = 2.5f;
     constexpr float ROLL_ENERGY_COST = 15.0f;
+    
+    // Targeting system configuration
+    constexpr float MAX_TARGET_DISTANCE = 400.0f;
 }
 
 // Vector2 class for 2D math operations
