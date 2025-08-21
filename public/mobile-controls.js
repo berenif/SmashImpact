@@ -451,12 +451,23 @@ class MobileControls {
         });
         
         // Create WASM targeting button if available
-        if (window.WASMTargetingButton && this.game && this.game.gameEngine) {
-            this.targetButton = new window.WASMTargetingButton(this.canvas, this.game.gameEngine);
-            // Set initial position
-            if (this.game.gameEngine.setTargetButtonPosition) {
-                this.game.gameEngine.setTargetButtonPosition(this.canvas.width - 50, this.canvas.height - 280);
+        try {
+            if (window.WASMTargetingButton && this.game && this.game.gameEngine) {
+                this.targetButton = new window.WASMTargetingButton(this.canvas, this.game.gameEngine);
+                // Set initial position
+                if (this.game.gameEngine.setTargetButtonPosition) {
+                    this.game.gameEngine.setTargetButtonPosition(this.canvas.width - 50, this.canvas.height - 280);
+                }
+                console.log('WASM targeting button created successfully');
+            } else {
+                console.log('WASM targeting button not created - missing dependencies');
+                if (!window.WASMTargetingButton) console.log('  - WASMTargetingButton class not found');
+                if (!this.game) console.log('  - Game instance not found');
+                if (this.game && !this.game.gameEngine) console.log('  - Game engine (WASM) not found');
             }
+        } catch (error) {
+            console.warn('Failed to create WASM targeting button:', error);
+            // Continue without WASM targeting button
         }
         
         // Register controls with game

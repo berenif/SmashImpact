@@ -319,11 +319,36 @@
     <script>
         let game;
         let scriptsLoaded = false;
+        let wasmModule = null;
+        
+        // Initialize WASM if available
+        async function initializeWASM() {
+            if (typeof createGameEngine !== 'undefined') {
+                try {
+                    console.log('Initializing WASM module...');
+                    wasmModule = await createGameEngine();
+                    console.log('WASM module loaded successfully:', wasmModule);
+                    window.wasmModule = wasmModule; // Make it globally available
+                    return true;
+                } catch (error) {
+                    console.warn('Failed to initialize WASM:', error);
+                    console.warn('Game will run without WASM acceleration');
+                    return false;
+                }
+            } else {
+                console.log('WASM module not available, running in JavaScript mode');
+                return false;
+            }
+        }
         
         // Wait for all scripts to load
-        window.addEventListener('load', function() {
+        window.addEventListener('load', async function() {
+            // Try to initialize WASM first
+            const wasmAvailable = await initializeWASM();
+            
             scriptsLoaded = true;
             console.log('All scripts loaded. Game ready to start.');
+            console.log('WASM available:', wasmAvailable);
             
             // Check if required game classes are available
             if (typeof EnhancedCombatGame === 'undefined') {
@@ -331,6 +356,9 @@
             }
             if (typeof VisualEffects === 'undefined') {
                 console.warn('VisualEffects class not found after page load');
+            }
+            if (typeof createGameEngine === 'undefined') {
+                console.warn('createGameEngine function not found - WASM features will be disabled');
             }
         });
         
