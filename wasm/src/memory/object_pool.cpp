@@ -1,6 +1,7 @@
 #include "../../include/memory/object_pool.h"
 #include "../../include/entities/projectile.h"
 #include "../../include/effects/particle.h"
+#include <emscripten/val.h>
 
 // Global object pools for commonly created/destroyed entities
 namespace Pools {
@@ -39,7 +40,7 @@ namespace Pools {
             p->active = false;
             p->position = Vector2(0, 0);
             p->velocity = Vector2(0, 0);
-            p->color = 0xFFFFFF;
+            p->color = "#ffffff";
             p->size = 1.0f;
             p->lifetime = 0;
             p->maxLifetime = 0;

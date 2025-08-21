@@ -1,0 +1,9 @@
+/workspace/wasm/build/CMakeFiles/game_engine.dir
+/workspace/wasm/build/CMakeFiles/test.dir
+/workspace/wasm/build/CMakeFiles/benchmark.dir
+/workspace/wasm/build/CMakeFiles/edit_cache.dir
+/workspace/wasm/build/CMakeFiles/rebuild_cache.dir
+/workspace/wasm/build/CMakeFiles/list_install_components.dir
+/workspace/wasm/build/CMakeFiles/install.dir
+/workspace/wasm/build/CMakeFiles/install/local.dir
+/workspace/wasm/build/CMakeFiles/install/strip.dir

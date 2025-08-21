@@ -3,7 +3,8 @@
 
 #include <cmath>
 #include <wasm_simd128.h>
-#include <emmintrin.h>
+#include "vector2.h"  // Include Vector2 for conversion functions
+// Removed emmintrin.h - not needed for WebAssembly SIMD
 
 // SIMD-optimized Vector2 class for WebAssembly
 // Uses WASM SIMD128 instructions for better performance

@@ -37,8 +37,8 @@ if(EMSCRIPTEN)
         "-O3"
         "-flto"  # Link-time optimization
         "-ffast-math"  # Fast math operations
-        "-fno-rtti"  # Disable RTTI for smaller size
-        "-fno-exceptions"  # Disable exceptions for smaller size (if not needed)
+        # "-fno-rtti"  # RTTI is required for Emscripten bindings
+        # "-fno-exceptions"  # Exceptions are enabled for error handling
         "-DNDEBUG"
     )
     
@@ -75,7 +75,7 @@ set(SOURCES
     src/math/vector2_simd.cpp
     src/entities/player.cpp
     src/entities/enemy.cpp
-    src/entities/wolf.cpp
+    # src/entities/wolf.cpp  # Commented out - implementation is in header
     src/entities/projectile.cpp
     src/entities/powerup.cpp
     src/entities/obstacle.cpp
