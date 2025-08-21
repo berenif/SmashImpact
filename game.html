@@ -1108,7 +1108,7 @@
                     Game.engine.createWolf(x, y, waveNum > 10);
                 } else {
                     // Spawn regular enemy
-                    Game.engine.createEnemy(x, y);
+                    Game.engine.createEnemy(x, y, 100);
                 }
             }
             
@@ -1148,9 +1148,9 @@
                 case 1:
                     // Level 1: Introduction - Simple enemies
                     // Spawn 3 basic enemies in a triangle formation
-                    Game.engine.createEnemy(Game.canvas.width / 2 - 200, Game.canvas.height / 2 - 150);
-                    Game.engine.createEnemy(Game.canvas.width / 2 + 200, Game.canvas.height / 2 - 150);
-                    Game.engine.createEnemy(Game.canvas.width / 2, Game.canvas.height / 2 + 200);
+                    Game.engine.createEnemy(Game.canvas.width / 2 - 200, Game.canvas.height / 2 - 150, 100);
+                    Game.engine.createEnemy(Game.canvas.width / 2 + 200, Game.canvas.height / 2 - 150, 100);
+                    Game.engine.createEnemy(Game.canvas.width / 2, Game.canvas.height / 2 + 200, 100);
                     
                     // Add a health powerup
                     Game.engine.createPowerUp(
@@ -1167,7 +1167,7 @@
                         const dist = 250;
                         const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
                         const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
-                        Game.engine.createEnemy(x, y);
+                        Game.engine.createEnemy(x, y, 100);
                     }
                     
                     // Add obstacles
@@ -1193,7 +1193,7 @@
                         const dist = 300;
                         const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
                         const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
-                        Game.engine.createEnemy(x, y);
+                        Game.engine.createEnemy(x, y, 100);
                     }
                     
                     // Add wolves
@@ -1219,7 +1219,7 @@
                         const dist = 200 + Math.random() * 150;
                         const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
                         const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
-                        Game.engine.createEnemy(x, y);
+                        Game.engine.createEnemy(x, y, 100);
                     }
                     
                     // Spawn wolves
