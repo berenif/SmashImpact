@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct WASM Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #0f0;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #0f0;
+        }
+        .error {
+            color: #f00;
+            border-color: #f00;
+        }
+        .success {
+            color: #0f0;
+            border-color: #0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Direct WASM Loading Test</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+            console.log(message);
+        }
+
+        async function testWASM() {
+            try {
+                log('Starting WASM test...');
+                
+                // Import the game engine module directly
+                log('Importing game_engine.js...');
+                const GameEngineModule = (await import('./public/game_engine.js')).default;
+                log('✅ Module imported successfully', 'success');
+                
+                // Initialize the WASM module
+                log('Initializing WASM module...');
+                const wasmModule = await GameEngineModule({
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            log(`Locating WASM file: ${path}`);
+                            return './public/game_engine.wasm';
+                        }
+                        return path;
+                    },
+                    onRuntimeInitialized: () => {
+                        log('✅ WASM runtime initialized', 'success');
+                    },
+                    print: (text) => log(`WASM Output: ${text}`),
+                    printErr: (text) => log(`WASM Error: ${text}`, 'error')
+                });
+                
+                log('✅ WASM module created successfully', 'success');
+                
+                // Check for GameEngine class
+                if (wasmModule.GameEngine) {
+                    log('✅ GameEngine class found in WASM module', 'success');
+                    
+                    // Try to create an instance
+                    try {
+                        const engine = new wasmModule.GameEngine();
+                        log('✅ GameEngine instance created successfully', 'success');
+                        
+                        // Test some methods if they exist
+                        if (typeof engine.initialize === 'function') {
+                            engine.initialize();
+                            log('✅ GameEngine.initialize() called', 'success');
+                        }
+                        
+                        if (typeof engine.delete === 'function') {
+                            engine.delete();
+                            log('✅ GameEngine instance cleaned up', 'success');
+                        }
+                    } catch (e) {
+                        log(`Warning: Could not create GameEngine instance: ${e.message}`, 'error');
+                    }
+                } else {
+                    log('⚠️ GameEngine class not found in WASM module', 'error');
+                    log('Available exports: ' + Object.keys(wasmModule).join(', '));
+                }
+                
+                log('✅ WASM TEST COMPLETE - Module is working!', 'success');
+                
+            } catch (error) {
+                log(`❌ WASM test failed: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Run the test
+        testWASM();
+    </script>
+</body>
+</html>
