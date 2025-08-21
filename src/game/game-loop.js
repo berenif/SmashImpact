@@ -96,7 +96,13 @@ export class GameLoop {
         const wasmStart = performance.now();
         this.game.engine.update(dt);
         this.performanceMetrics.wasmTime = performance.now() - wasmStart;
-        
+
+        // Update animations for entities
+        const entities = this.game.engine.getEntityPositions();
+        if (this.game.renderer && entities) {
+            this.game.renderer.updateAnimations(dt, entities);
+        }
+
         // Check game state
         const gameState = this.game.engine.getGameState();
         

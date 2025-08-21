@@ -17,6 +17,15 @@ export class Renderer {
         this.camera = { x: 0, y: 0 };
         this.gridSize = 50;
         this.setupCanvas();
+
+        // Animation handling
+        this.animationStates = new Map();
+        this.frameDuration = 100; // ms per frame
+        this.sprites = {
+            idle: this.loadSprite('/assets/character-idle.png', 32, 32, 3),
+            move: this.loadSprite('/assets/character-move.png', 32, 32, 3),
+            attack: this.loadSprite('/assets/character-attack.png', 32, 32, 3)
+        };
     }
 
     /**
@@ -37,6 +46,47 @@ export class Renderer {
         if (this.minimap) {
             this.minimap.width = 200;
             this.minimap.height = 200;
+        }
+    }
+
+    /**
+     * Load a sprite sheet
+     */
+    loadSprite(src, frameWidth, frameHeight, frames) {
+        const img = new Image();
+        img.src = src;
+        return { image: img, frameWidth, frameHeight, frames };
+    }
+
+    /**
+     * Update animation state for all entities
+     */
+    updateAnimations(dt, entities) {
+        const now = performance.now();
+        const active = new Set();
+
+        entities.forEach(entity => {
+            const action = entity.attacking ? 'attack' : ((entity.vx || entity.vy) ? 'move' : 'idle');
+            active.add(entity.id);
+
+            let state = this.animationStates.get(entity.id);
+            if (!state || state.action !== action) {
+                state = { action, frameIndex: 0, lastFrameTime: now };
+                this.animationStates.set(entity.id, state);
+            }
+
+            const sprite = this.sprites[action];
+            if (sprite && now - state.lastFrameTime > this.frameDuration) {
+                state.frameIndex = (state.frameIndex + 1) % sprite.frames;
+                state.lastFrameTime = now;
+            }
+        });
+
+        // Remove states for entities that no longer exist
+        for (const id of Array.from(this.animationStates.keys())) {
+            if (!active.has(id)) {
+                this.animationStates.delete(id);
+            }
         }
     }
 
@@ -121,17 +171,49 @@ export class Renderer {
         // Safely handle rotation with fallback to 0
         const rotation = entity.rotation !== undefined ? entity.rotation : 0;
         ctx.rotate(rotation);
-        
+        // Sprite-based rendering for player and enemy
+        if (entity.type === 0 || entity.type === 1) {
+            const action = entity.attacking ? 'attack' : ((entity.vx || entity.vy) ? 'move' : 'idle');
+            const sprite = this.sprites[action];
+            const state = this.animationStates.get(entity.id) || { frameIndex: 0 };
+            if (sprite && sprite.image.complete) {
+                const sx = state.frameIndex * sprite.frameWidth;
+                ctx.drawImage(
+                    sprite.image,
+                    sx,
+                    0,
+                    sprite.frameWidth,
+                    sprite.frameHeight,
+                    -sprite.frameWidth / 2,
+                    -sprite.frameHeight / 2,
+                    sprite.frameWidth,
+                    sprite.frameHeight
+                );
+            } else {
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+
+            if (entity.type === 0) {
+                // Draw health bar for player
+                ctx.save();
+                ctx.translate(entity.x, entity.y - 25);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(-20, -3, 40, 6);
+                ctx.fillStyle = '#6ab04c';
+                const ratio = entity.maxHealth ? entity.health / entity.maxHealth : 0;
+                ctx.fillRect(-20, -3, 40 * ratio, 6);
+                ctx.restore();
+            }
+            return;
+        }
+
         // Set color based on entity type
         switch(entity.type) {
-            case 0: // Player
-                ctx.fillStyle = '#4834d4';
-                ctx.strokeStyle = '#686de0';
-                break;
-            case 1: // Enemy
-                ctx.fillStyle = '#ee5a24';
-                ctx.strokeStyle = '#ff6b6b';
-                break;
             case 2: // Projectile
                 ctx.fillStyle = '#f9ca24';
                 ctx.strokeStyle = '#f6e58d';
@@ -148,46 +230,15 @@ export class Renderer {
                 ctx.fillStyle = '#ffffff';
                 ctx.strokeStyle = '#ffffff';
         }
-        
+
         // Draw entity shape
         ctx.lineWidth = 2;
-        
-        if (entity.type === 0) { // Player - triangle
-            ctx.beginPath();
-            ctx.moveTo(15, 0);
-            ctx.lineTo(-10, -10);
-            ctx.lineTo(-10, 10);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            
-            // Draw health bar
-            ctx.restore();
-            ctx.save();
-            ctx.translate(entity.x, entity.y - 25);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(-20, -3, 40, 6);
-            ctx.fillStyle = '#6ab04c';
-            ctx.fillRect(-20, -3, 40 * (entity.health / 100), 6);
-        } else if (entity.type === 1) { // Enemy - hexagon
-            const sides = 6;
-            const radius = 12;
-            ctx.beginPath();
-            for (let i = 0; i < sides; i++) {
-                const angle = (Math.PI * 2 * i) / sides;
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        } else if (entity.type === 2) { // Projectile - circle
+
+        if (entity.type === 2) { // Projectile - circle
             ctx.beginPath();
             ctx.arc(0, 0, 4, 0, Math.PI * 2);
             ctx.fill();
-            
+
             // Add trail effect
             ctx.globalAlpha = 0.3;
             ctx.beginPath();
@@ -225,7 +276,7 @@ export class Renderer {
             ctx.fill();
             ctx.stroke();
         }
-        
+
         ctx.restore();
     }
 
