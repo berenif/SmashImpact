@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enemy Movement Fix Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #444;
+            border-radius: 5px;
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .warning {
+            color: #FFC107;
+        }
+        h1 {
+            color: #4a90e2;
+        }
+        ul {
+            line-height: 1.8;
+        }
+        code {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>✅ Enemy Movement Fix Applied</h1>
+        <p class="success"><strong>The enemy rushing behavior has been fixed!</strong></p>
+        
+        <h2>Changes Made:</h2>
+        <ul>
+            <li>Added <code>ATTACK_RANGE</code> (50 units) - enemies stop approaching when within this distance</li>
+            <li>Added <code>RETREAT_RANGE</code> (30 units) - enemies back away if too close to the player</li>
+            <li>Implemented circling behavior - enemies orbit around the player when in attack range</li>
+            <li>Enemies alternate between clockwise and counter-clockwise circling based on their ID</li>
+        </ul>
+        
+        <h2>Expected Behavior:</h2>
+        <ul>
+            <li>✅ Enemies will approach the player until they reach 50 units distance</li>
+            <li>✅ Enemies will circle around the player when in attack range (30-50 units)</li>
+            <li>✅ Enemies will back away if they get closer than 30 units</li>
+            <li>✅ No more rushing directly at the player</li>
+        </ul>
+        
+        <h2>Testing:</h2>
+        <p>To test the fix, open <strong>public/test-targeting.html</strong> in your browser.</p>
+        <p class="warning">Note: You may need to clear your browser cache (Ctrl+F5) to load the updated WASM module.</p>
+        
+        <h2>Files Modified:</h2>
+        <ul>
+            <li><code>/workspace/wasm/game_engine.cpp</code> - Updated Enemy::update() method</li>
+            <li>Rebuilt WASM module → <code>public/game_engine.wasm</code></li>
+            <li>Rebuilt JS wrapper → <code>public/game_engine.js</code></li>
+        </ul>
+    </div>
+</body>
+</html>
