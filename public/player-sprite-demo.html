@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Sprite Demo - SmashImpact</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .game-container {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        canvas {
+            border: 2px solid #444;
+            border-radius: 5px;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            background: #1a1a2e;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .control-group {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .control-group h3 {
+            margin-bottom: 10px;
+            color: #ffd700;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.active {
+            background: #ff6b6b;
+        }
+        
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        
+        .info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .sprite-preview {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        
+        .sprite-preview canvas {
+            margin-bottom: 5px;
+        }
+        
+        .keys {
+            display: grid;
+            grid-template-columns: repeat(3, 40px);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .key {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+            padding: 5px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .key.pressed {
+            background: #4CAF50;
+        }
+        
+        #status {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Player Sprite System Demo</h1>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        
+        <div class="controls">
+            <div class="control-group">
+                <h3>🎯 Movement</h3>
+                <div class="keys">
+                    <div class="key"></div>
+                    <div class="key" id="keyW">W</div>
+                    <div class="key"></div>
+                    <div class="key" id="keyA">A</div>
+                    <div class="key" id="keyS">S</div>
+                    <div class="key" id="keyD">D</div>
+                </div>
+                <p style="margin-top: 10px; font-size: 12px;">Use WASD or Arrow Keys</p>
+            </div>
+            
+            <div class="control-group">
+                <h3>⚔️ Actions</h3>
+                <button onclick="performAction('attack')">Attack (Space)</button>
+                <button onclick="performAction('block')">Block (Shift)</button>
+                <button onclick="performAction('hurt')">Hurt (H)</button>
+            </div>
+            
+            <div class="control-group">
+                <h3>🎨 Animation</h3>
+                <button onclick="setAnimation('idle')">Idle</button>
+                <button onclick="setAnimation('walk')">Walk</button>
+                <button onclick="setAnimation('run')">Run</button>
+            </div>
+            
+            <div class="control-group">
+                <h3>⚙️ Options</h3>
+                <button onclick="toggleGrid()">Toggle Grid</button>
+                <button onclick="changeScale()">Change Scale</button>
+                <button onclick="resetPosition()">Reset Position</button>
+            </div>
+        </div>
+        
+        <div class="info">
+            <p>Status: <span id="status">Loading...</span></p>
+            <p>Animation: <span id="currentAnimation">idle</span></p>
+            <p>Direction: <span id="currentDirection">down</span></p>
+            <p>Position: <span id="position">400, 200</span></p>
+            <p>Frame: <span id="frameInfo">0/4</span></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { SpriteLoader, Sprite, AnimationController } from './sprite-loader.js';
+        import { playerSpriteData, generateSpriteSheet } from './assets/player-sprites-data.js';
+        
+        // Game state
+        const game = {
+            canvas: null,
+            ctx: null,
+            player: {
+                x: 400,
+                y: 200,
+                vx: 0,
+                vy: 0,
+                speed: 2,
+                sprite: null,
+                scale: 2,
+                direction: 'down',
+                animation: 'idle',
+                isMoving: false,
+                isAttacking: false,
+                isBlocking: false
+            },
+            keys: {},
+            showGrid: true,
+            lastTime: 0,
+            animationController: new AnimationController()
+        };
+        
+        // Initialize canvas
+        function init() {
+            game.canvas = document.getElementById('gameCanvas');
+            game.ctx = game.canvas.getContext('2d');
+            
+            // Generate sprite sheet from pixel data
+            const spriteCanvas = generateSpriteSheet();
+            
+            // Create sprite configuration
+            const config = {
+                frameWidth: 32,
+                frameHeight: 32,
+                scale: game.player.scale,
+                animations: playerSpriteData.animations,
+                directions: { down: 0, left: 1, right: 2, up: 3 }
+            };
+            
+            // Create sprite from generated canvas
+            const spriteImage = new Image();
+            spriteImage.onload = () => {
+                game.player.sprite = new Sprite('player', config, spriteImage);
+                document.getElementById('status').textContent = 'Ready!';
+                requestAnimationFrame(gameLoop);
+            };
+            
+            // Convert canvas to image
+            spriteCanvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                spriteImage.src = url;
+            });
+            
+            // Setup input handlers
+            setupInputHandlers();
+        }
+        
+        // Setup keyboard input
+        function setupInputHandlers() {
+            document.addEventListener('keydown', (e) => {
+                game.keys[e.key.toLowerCase()] = true;
+                
+                // Update key visual feedback
+                updateKeyVisual(e.key.toLowerCase(), true);
+                
+                // Handle action keys
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    performAction('attack');
+                } else if (e.key.toLowerCase() === 'shift') {
+                    performAction('block');
+                } else if (e.key.toLowerCase() === 'h') {
+                    performAction('hurt');
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                game.keys[e.key.toLowerCase()] = false;
+                updateKeyVisual(e.key.toLowerCase(), false);
+            });
+        }
+        
+        // Update key visual feedback
+        function updateKeyVisual(key, pressed) {
+            const keyMap = {
+                'w': 'keyW',
+                'a': 'keyA',
+                's': 'keyS',
+                'd': 'keyD'
+            };
+            
+            const element = document.getElementById(keyMap[key]);
+            if (element) {
+                if (pressed) {
+                    element.classList.add('pressed');
+                } else {
+                    element.classList.remove('pressed');
+                }
+            }
+        }
+        
+        // Handle player input
+        function handleInput() {
+            const player = game.player;
+            player.vx = 0;
+            player.vy = 0;
+            
+            // Movement
+            if (game.keys['w'] || game.keys['arrowup']) {
+                player.vy = -player.speed;
+                player.direction = 'up';
+            }
+            if (game.keys['s'] || game.keys['arrowdown']) {
+                player.vy = player.speed;
+                player.direction = 'down';
+            }
+            if (game.keys['a'] || game.keys['arrowleft']) {
+                player.vx = -player.speed;
+                player.direction = 'left';
+            }
+            if (game.keys['d'] || game.keys['arrowright']) {
+                player.vx = player.speed;
+                player.direction = 'right';
+            }
+            
+            // Update animation based on movement
+            player.isMoving = player.vx !== 0 || player.vy !== 0;
+            
+            if (!player.isAttacking && !player.isBlocking) {
+                if (player.isMoving) {
+                    if (player.animation !== 'walk' && player.animation !== 'run') {
+                        player.animation = 'walk';
+                    }
+                } else {
+                    if (player.animation !== 'idle') {
+                        player.animation = 'idle';
+                    }
+                }
+            }
+        }
+        
+        // Update game state
+        function update(deltaTime) {
+            handleInput();
+            
+            const player = game.player;
+            
+            // Update position
+            player.x += player.vx;
+            player.y += player.vy;
+            
+            // Keep player in bounds
+            player.x = Math.max(32, Math.min(game.canvas.width - 32, player.x));
+            player.y = Math.max(32, Math.min(game.canvas.height - 32, player.y));
+            
+            // Update sprite
+            if (player.sprite) {
+                player.sprite.setAnimation(player.animation, player.direction);
+                player.sprite.update(deltaTime);
+                
+                // Check if attack animation is complete
+                if (player.isAttacking && player.sprite.isAnimationComplete()) {
+                    player.isAttacking = false;
+                    player.animation = player.isMoving ? 'walk' : 'idle';
+                }
+            }
+            
+            // Update UI
+            updateUI();
+        }
+        
+        // Render game
+        function render() {
+            const ctx = game.ctx;
+            
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, game.canvas.width, game.canvas.height);
+            
+            // Draw grid
+            if (game.showGrid) {
+                drawGrid();
+            }
+            
+            // Draw player sprite
+            if (game.player.sprite) {
+                game.player.sprite.draw(ctx, game.player.x, game.player.y);
+            }
+            
+            // Draw player position indicator
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(game.player.x, game.player.y, 30, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Draw grid
+        function drawGrid() {
+            const ctx = game.ctx;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 50;
+            
+            for (let x = 0; x <= game.canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, game.canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = 0; y <= game.canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(game.canvas.width, y);
+                ctx.stroke();
+            }
+        }
+        
+        // Game loop
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - game.lastTime;
+            game.lastTime = currentTime;
+            
+            update(deltaTime);
+            render();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Update UI elements
+        function updateUI() {
+            document.getElementById('currentAnimation').textContent = game.player.animation;
+            document.getElementById('currentDirection').textContent = game.player.direction;
+            document.getElementById('position').textContent = `${Math.round(game.player.x)}, ${Math.round(game.player.y)}`;
+            
+            if (game.player.sprite) {
+                const animation = game.player.sprite.animations[game.player.animation];
+                if (animation) {
+                    document.getElementById('frameInfo').textContent = 
+                        `${game.player.sprite.currentFrame + 1}/${animation.frames.length}`;
+                }
+            }
+        }
+        
+        // Action functions
+        window.performAction = function(action) {
+            const player = game.player;
+            
+            switch(action) {
+                case 'attack':
+                    if (!player.isAttacking) {
+                        player.isAttacking = true;
+                        player.animation = 'attack';
+                        if (player.sprite) {
+                            player.sprite.resetAnimation();
+                        }
+                    }
+                    break;
+                case 'block':
+                    player.isBlocking = !player.isBlocking;
+                    player.animation = player.isBlocking ? 'block' : 'idle';
+                    break;
+                case 'hurt':
+                    player.animation = 'hurt';
+                    setTimeout(() => {
+                        player.animation = 'idle';
+                    }, 300);
+                    break;
+            }
+        };
+        
+        window.setAnimation = function(anim) {
+            game.player.animation = anim;
+            if (game.player.sprite) {
+                game.player.sprite.resetAnimation();
+            }
+        };
+        
+        window.toggleGrid = function() {
+            game.showGrid = !game.showGrid;
+        };
+        
+        window.changeScale = function() {
+            game.player.scale = game.player.scale === 2 ? 3 : game.player.scale === 3 ? 1 : 2;
+            if (game.player.sprite) {
+                game.player.sprite.scale = game.player.scale;
+            }
+        };
+        
+        window.resetPosition = function() {
+            game.player.x = 400;
+            game.player.y = 200;
+            game.player.vx = 0;
+            game.player.vy = 0;
+            game.player.animation = 'idle';
+            game.player.direction = 'down';
+        };
+        
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
