@@ -107,9 +107,7 @@
                 
                 // Import the fixed module wrapper
                 log('Loading fixed WASM module wrapper...');
-                const scriptResponse = await fetch('./public/wasm-module-fix.js');
-                const scriptText = await scriptResponse.text();
-                eval(scriptText);
+                await import('./public/wasm-module-fix.js');
                 
                 log('Creating WASM module instance with fix...');
                 const wasmModule = await window.createFixedGameEngine();
