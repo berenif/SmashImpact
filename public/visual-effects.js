@@ -356,4 +356,6 @@ class VisualEffectsManager {
 // Export for use in game
 if (typeof window !== 'undefined') {
   window.VisualEffectsManager = VisualEffectsManager;
+  // Add alias for backward compatibility
+  window.VisualEffects = VisualEffectsManager;
 }

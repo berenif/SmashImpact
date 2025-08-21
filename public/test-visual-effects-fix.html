@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Effects Loading Test</title>
+</head>
+<body>
+    <h1>Visual Effects Loading Test</h1>
+    <div id="status"></div>
+    
+    <script src="visual-effects.js"></script>
+    
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const status = document.getElementById('status');
+            let html = '<h2>Test Results:</h2>';
+            
+            // Check if VisualEffectsManager is loaded
+            if (typeof VisualEffectsManager !== 'undefined') {
+                html += '<p style="color: green;">✅ VisualEffectsManager is loaded</p>';
+            } else {
+                html += '<p style="color: red;">❌ VisualEffectsManager is NOT loaded</p>';
+            }
+            
+            // Check if VisualEffects alias works
+            if (typeof VisualEffects !== 'undefined') {
+                html += '<p style="color: green;">✅ VisualEffects alias is available</p>';
+            } else {
+                html += '<p style="color: red;">❌ VisualEffects alias is NOT available</p>';
+            }
+            
+            // Check if they're the same
+            if (typeof VisualEffectsManager !== 'undefined' && typeof VisualEffects !== 'undefined') {
+                if (VisualEffectsManager === VisualEffects) {
+                    html += '<p style="color: green;">✅ VisualEffects correctly aliases VisualEffectsManager</p>';
+                } else {
+                    html += '<p style="color: red;">❌ VisualEffects alias is not pointing to VisualEffectsManager</p>';
+                }
+            }
+            
+            // Try to create an instance
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const vfx = new VisualEffectsManager(ctx, canvas);
+                html += '<p style="color: green;">✅ Successfully created VisualEffectsManager instance</p>';
+                
+                // Try with alias
+                const vfx2 = new VisualEffects(ctx, canvas);
+                html += '<p style="color: green;">✅ Successfully created instance using VisualEffects alias</p>';
+            } catch (error) {
+                html += '<p style="color: red;">❌ Error creating instance: ' + error.message + '</p>';
+            }
+            
+            status.innerHTML = html;
+        });
+    </script>
+</body>
+</html>
