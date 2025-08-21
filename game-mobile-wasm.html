@@ -247,9 +247,12 @@
                 
                 console.log('Using WASM engine');
             } else {
-                console.log('WASM not available, using fallback JavaScript engine');
-                // Create a simple fallback engine
-                Game.engine = createFallbackEngine();
+                console.log('WASM not available');
+                // WASM is required - show error
+                Game.engine = handleWasmNotAvailable();
+                if (!Game.engine) {
+                    return; // Stop initialization if WASM is not available
+                }
             }
             
             // Initialize mobile controls
@@ -270,104 +273,14 @@
             gameLoop();
         }
 
-        // Create fallback JavaScript engine
-        function createFallbackEngine() {
-            return {
-                player: { 
-                    id: 1, 
-                    x: Game.canvas.width / 2, 
-                    y: Game.canvas.height / 2,
-                    health: 100,
-                    maxHealth: 100,
-                    energy: 100,
-                    maxEnergy: 100,
-                    radius: 20
-                },
-                entities: [],
-                
-                createPlayer: function(x, y) {
-                    this.player.x = x;
-                    this.player.y = y;
-                    return this.player.id;
-                },
-                
-                createEnemy: function(x, y, speed) {
-                    this.entities.push({
-                        type: 'enemy',
-                        x: x,
-                        y: y,
-                        speed: speed,
-                        health: 50,
-                        radius: 15
-                    });
-                },
-                
-                setJoystickInput: function(x, y) {
-                    if (this.player) {
-                        this.player.x += x * 5;
-                        this.player.y += y * 5;
-                        
-                        // Keep player in bounds
-                        this.player.x = Math.max(20, Math.min(Game.canvas.width - 20, this.player.x));
-                        this.player.y = Math.max(20, Math.min(Game.canvas.height - 20, this.player.y));
-                    }
-                },
-                
-                playerAttack: function() {
-                    console.log('Player attacks!');
-                    // Remove nearby enemies
-                    this.entities = this.entities.filter(e => {
-                        const dist = Math.hypot(e.x - this.player.x, e.y - this.player.y);
-                        if (dist < 60) {
-                            Game.score += 10;
-                            return false;
-                        }
-                        return true;
-                    });
-                },
-                
-                startBlock: function(playerId) {
-                    console.log('Player blocks!');
-                    this.player.blocking = true;
-                },
-                
-                endBlock: function(playerId) {
-                    this.player.blocking = false;
-                },
-                
-                playerRoll: function() {
-                    console.log('Player rolls!');
-                    // Simple dodge animation
-                    this.player.rolling = true;
-                    setTimeout(() => {
-                        this.player.rolling = false;
-                    }, 300);
-                },
-                
-                update: function(deltaTime) {
-                    // Simple enemy AI
-                    this.entities.forEach(e => {
-                        if (e.type === 'enemy') {
-                            const dx = this.player.x - e.x;
-                            const dy = this.player.y - e.y;
-                            const dist = Math.hypot(dx, dy);
-                            
-                            if (dist > 0) {
-                                e.x += (dx / dist) * e.speed;
-                                e.y += (dy / dist) * e.speed;
-                            }
-                        }
-                    });
-                },
-                
-                getAllEntities: function() {
-                    return [this.player, ...this.entities];
-                },
-                
-                getPlayerState: function() {
-                    return this.player;
-                }
-            };
+        // WASM is required - no fallback implementation
+        function handleWasmNotAvailable() {
+            console.error('WASM is not available');
+            const errorMsg = document.createElement('div');
+            errorMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: red; text-align: center; z-index: 1000;';
+            errorMsg.innerHTML = '<h2>WebAssembly Not Supported</h2><p>This game requires WebAssembly support. Please use a modern browser.</p>';
+            document.body.appendChild(errorMsg);
+            return null;
         }
 
         // Setup input handlers
