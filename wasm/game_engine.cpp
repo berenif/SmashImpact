@@ -1304,14 +1304,6 @@ public:
     }
     
     // Get the count of active entities
-    int getEntityCount() {
-        int count = 0;
-        if (player && player->active) count++;
-        for (const auto& entity : entities) {
-            if (entity->active) count++;
-        }
-        return count;
-    }
     
     // Get all entities as a JavaScript array
     emscripten::val getEntities() {
@@ -1362,7 +1354,7 @@ public:
             entityObj.set("radius", entity->radius);
             entityObj.set("health", entity->health);
             entityObj.set("maxHealth", entity->maxHealth);
-            entityObj.set("speed", entity->speed);
+            // Speed is entity-type specific
             
             result.set(index++, entityObj);
         }
