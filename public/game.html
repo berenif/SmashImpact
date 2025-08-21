@@ -318,17 +318,89 @@
     
     <script>
         let game;
+        let scriptsLoaded = false;
+        let wasmModule = null;
+        
+        // Initialize WASM if available
+        async function initializeWASM() {
+            if (typeof createGameEngine !== 'undefined') {
+                try {
+                    console.log('Initializing WASM module...');
+                    wasmModule = await createGameEngine();
+                    console.log('WASM module loaded successfully:', wasmModule);
+                    window.wasmModule = wasmModule; // Make it globally available
+                    return true;
+                } catch (error) {
+                    console.warn('Failed to initialize WASM:', error);
+                    console.warn('Game will run without WASM acceleration');
+                    return false;
+                }
+            } else {
+                console.log('WASM module not available, running in JavaScript mode');
+                return false;
+            }
+        }
+        
+        // Wait for all scripts to load
+        window.addEventListener('load', async function() {
+            // Try to initialize WASM first
+            const wasmAvailable = await initializeWASM();
+            
+            scriptsLoaded = true;
+            console.log('All scripts loaded. Game ready to start.');
+            console.log('WASM available:', wasmAvailable);
+            
+            // Check if required game classes are available
+            if (typeof EnhancedCombatGame === 'undefined') {
+                console.error('EnhancedCombatGame class not found after page load');
+            }
+            if (typeof VisualEffects === 'undefined') {
+                console.warn('VisualEffects class not found after page load');
+            }
+            if (typeof createGameEngine === 'undefined') {
+                console.warn('createGameEngine function not found - WASM features will be disabled');
+            }
+        });
         
         function startGame() {
+            // Check if scripts are loaded
+            if (!scriptsLoaded) {
+                alert('Game is still loading. Please wait a moment and try again.');
+                return;
+            }
+            
             document.getElementById('startScreen').style.display = 'none';
             
             const canvas = document.getElementById('gameCanvas');
+            
+            // Check if canvas element exists
+            if (!canvas) {
+                console.error('Canvas element not found!');
+                alert('Error: Game canvas not found. Please refresh the page.');
+                return;
+            }
+            
+            // Log canvas info for debugging
+            console.log('Canvas found:', canvas);
+            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+            
+            // Check if EnhancedCombatGame is loaded
             if (typeof EnhancedCombatGame !== 'undefined') {
-                game = new EnhancedCombatGame(canvas);
-                game.init();
+                try {
+                    game = new EnhancedCombatGame(canvas);
+                    game.init();
+                    console.log('Game initialized successfully');
+                } catch (error) {
+                    console.error('Failed to initialize game:', error);
+                    alert('Error initializing game: ' + error.message);
+                    // Show start screen again so user can retry
+                    document.getElementById('startScreen').style.display = 'flex';
+                }
             } else {
-                console.error('EnhancedCombatGame not found. Creating it now...');
-                // Fallback to create the game if the script isn't loaded
+                console.error('EnhancedCombatGame not found. Make sure enhanced-combat-game.js is loaded.');
+                alert('Error: Game engine not loaded. Please refresh the page.');
+                // Show start screen again so user can retry
+                document.getElementById('startScreen').style.display = 'flex';
             }
         }
         
