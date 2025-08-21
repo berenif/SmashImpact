@@ -605,8 +605,8 @@
                 Game.wasmModule = null;
                 Game.engine = null;
                 
-                // Fallback to JavaScript implementation
-                loadFallback();
+                // Handle WASM failure
+                handleWasmFailure(error);
                 return false;
             }
         }
@@ -619,27 +619,16 @@
             }
         }
         
-        // Fallback to JavaScript if WASM fails
-        async function loadFallback() {
-            updateLoading(50, 'Loading JavaScript fallback...');
+        // WASM is required - no fallback
+        function handleWasmFailure(error) {
+            console.error('Failed to load WASM:', error);
+            updateLoading(100, 'Failed to load game engine!');
             
-            try {
-                // Load the unified game script
-                await loadScript('public/unified-game-wasm.js');
-                await loadScript('public/visual-effects.js');
-                await loadScript('public/wolf-ai.js');
-                
-                updateLoading(100, 'Ready!');
-                
-                setTimeout(() => {
-                    document.getElementById('loadingScreen').style.display = 'none';
-                    document.getElementById('mainMenu').style.display = 'flex';
-                }, 500);
-                
-                console.log('✅ JavaScript fallback loaded');
-            } catch (error) {
-                console.error('Failed to load fallback:', error);
-            }
+            // Show error message
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: red; text-align: center;';
+            errorDiv.innerHTML = '<h2>Failed to load game engine</h2><p>Please refresh the page to try again.</p>';
+            document.getElementById('loadingScreen').appendChild(errorDiv);
         }
         
         // Load script helper

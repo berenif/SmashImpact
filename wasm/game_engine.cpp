@@ -1297,6 +1297,73 @@ public:
         
         createProjectile(px, py, vx, vy, 25, player->id);
     }
+    
+    // Get the count of active entities
+    int getEntityCount() {
+        int count = 0;
+        if (player && player->active) count++;
+        for (const auto& entity : entities) {
+            if (entity->active) count++;
+        }
+        return count;
+    }
+    
+    // Get all entities as a JavaScript array
+    emscripten::val getEntities() {
+        emscripten::val result = emscripten::val::array();
+        int index = 0;
+        
+        // Add player first
+        if (player && player->active) {
+            emscripten::val playerObj = emscripten::val::object();
+            playerObj.set("id", player->id);
+            playerObj.set("type", "player");
+            playerObj.set("x", player->position.x);
+            playerObj.set("y", player->position.y);
+            playerObj.set("vx", player->velocity.x);
+            playerObj.set("vy", player->velocity.y);
+            playerObj.set("radius", player->radius);
+            playerObj.set("health", player->health);
+            playerObj.set("maxHealth", player->maxHealth);
+            playerObj.set("energy", player->energy);
+            playerObj.set("maxEnergy", player->maxEnergy);
+            playerObj.set("facing", player->facing);
+            result.set(index++, playerObj);
+        }
+        
+        // Add other entities
+        for (const auto& entity : entities) {
+            if (!entity->active) continue;
+            
+            emscripten::val entityObj = emscripten::val::object();
+            entityObj.set("id", entity->id);
+            
+            // Set type string based on EntityType
+            std::string typeStr;
+            switch(entity->type) {
+                case EntityType::ENEMY: typeStr = "enemy"; break;
+                case EntityType::WOLF: typeStr = "wolf"; break;
+                case EntityType::PROJECTILE: typeStr = "projectile"; break;
+                case EntityType::POWERUP: typeStr = "powerup"; break;
+                case EntityType::OBSTACLE: typeStr = "obstacle"; break;
+                default: typeStr = "unknown"; break;
+            }
+            entityObj.set("type", typeStr);
+            
+            entityObj.set("x", entity->position.x);
+            entityObj.set("y", entity->position.y);
+            entityObj.set("vx", entity->velocity.x);
+            entityObj.set("vy", entity->velocity.y);
+            entityObj.set("radius", entity->radius);
+            entityObj.set("health", entity->health);
+            entityObj.set("maxHealth", entity->maxHealth);
+            entityObj.set("speed", entity->speed);
+            
+            result.set(index++, entityObj);
+        }
+        
+        return result;
+    }
 };
 
 // Bindings for JavaScript
@@ -1343,5 +1410,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("onTargetButtonTouchEnd", &GameEngine::onTargetButtonTouchEnd)
         .function("setTargetButtonPosition", &GameEngine::setTargetButtonPosition)
         .function("setTargetButtonVisible", &GameEngine::setTargetButtonVisible)
-        .function("getTargetButtonState", &GameEngine::getTargetButtonState);
+        .function("getTargetButtonState", &GameEngine::getTargetButtonState)
+        .function("getEntityCount", &GameEngine::getEntityCount)
+        .function("getEntities", &GameEngine::getEntities);
 }
