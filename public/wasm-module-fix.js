@@ -24,7 +24,7 @@ async function createFixedGameEngine() {
             // Locate the WASM file
             locateFile: (path) => {
                 if (path.endsWith('.wasm')) {
-                    return './public/game_engine.wasm';
+                    return 'public/game_engine.wasm';
                 }
                 return path;
             },
@@ -81,6 +81,7 @@ function createFallbackGameEngine() {
                 y,
                 vx: 0,
                 vy: 0,
+                radius: 20,
                 health: 100,
                 maxHealth: 100
             });
@@ -96,6 +97,7 @@ function createFallbackGameEngine() {
                 y,
                 vx: 0,
                 vy: 0,
+                radius: 15,
                 speed,
                 health: 50,
                 maxHealth: 50
@@ -112,6 +114,7 @@ function createFallbackGameEngine() {
                 y,
                 vx: 0,
                 vy: 0,
+                radius: 18,
                 speed: 3.0,
                 health: 75,
                 maxHealth: 75
@@ -157,6 +160,48 @@ function createFallbackGameEngine() {
         
         getEntities() {
             return this.entities;
+        }
+        
+        getAllEntities() {
+            // Return a copy of entities array with proper structure
+            return this.entities.map(e => ({
+                id: e.id,
+                type: e.type,
+                x: e.x,
+                y: e.y,
+                vx: e.vx || 0,
+                vy: e.vy || 0,
+                radius: e.radius || 20,
+                health: e.health || 100,
+                maxHealth: e.maxHealth || 100,
+                speed: e.speed || 0
+            }));
+        }
+        
+        checkCollisions() {
+            // Basic collision detection
+            const player = this.entities.find(e => e.type === 'player');
+            if (!player) return;
+            
+            for (const entity of this.entities) {
+                if (entity.type === 'enemy' || entity.type === 'wolf') {
+                    const dx = player.x - entity.x;
+                    const dy = player.y - entity.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < 40) { // Basic collision radius
+                        player.health = Math.max(0, player.health - 1);
+                    }
+                }
+            }
+        }
+        
+        setJoystickInput(x, y) {
+            const player = this.entities.find(e => e.type === 'player');
+            if (player) {
+                player.vx = x * 300; // Speed multiplier
+                player.vy = y * 300;
+            }
         }
         
         delete() {
