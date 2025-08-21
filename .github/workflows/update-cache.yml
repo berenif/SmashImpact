@@ -8,52 +8,74 @@ on:
       - 'multiplayer.js'
       - 'visual-effects.js'
       - '*.html'
+      - 'src/**/*.js'
+      - 'public/**/*.js'
+
+# Prevent concurrent runs
+concurrency:
+  group: cache-update-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   update-cache:
     runs-on: ubuntu-latest
+    # Only run if not triggered by a bot
+    if: github.actor != 'github-actions[bot]'
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0  # Shallow clone
     
-    - name: Update cache version
+    - name: Check if update needed
+      id: check
       run: |
-        # Generate version based on timestamp
-        VERSION=$(date +%s)
+        # Check if files actually changed (not just cache version updates)
+        CHANGED_FILES=$(git diff --name-only HEAD HEAD~1 2>/dev/null || echo "")
+        REAL_CHANGES=false
         
-        # Update game-iso.html with new version numbers if it exists
-        if [ -f game-iso.html ]; then
-          sed -i "s/\?v=[0-9.]*/?v=$VERSION/g" game-iso.html
-          echo "✅ Updated game-iso.html cache version to: $VERSION"
-        else
-          echo "⚠️ Warning: game-iso.html not found, skipping version update"
-        fi
-        
-        # Update game.html if it exists and has versioned scripts
-        if [ -f game.html ]; then
-          if grep -q "\.js?v=" game.html; then
-            sed -i "s/\?v=[0-9.]*/?v=$VERSION/g" game.html
-            echo "✅ Updated game.html cache version to: $VERSION"
-          fi
-        fi
-        
-        # Update other HTML files with versioned scripts
-        for file in *.html; do
-          if [[ "$file" != "game-iso.html" && "$file" != "game.html" ]]; then
-            if grep -q "\.js?v=" "$file" 2>/dev/null; then
-              sed -i "s/\?v=[0-9.]*/?v=$VERSION/g" "$file"
-              echo "✅ Updated $file cache version to: $VERSION"
+        for file in $CHANGED_FILES; do
+          if [[ "$file" == *.js || "$file" == *.html ]]; then
+            # Check if the change is just a version update
+            if ! git diff HEAD~1 HEAD -- "$file" | grep -q "^\+.*?v=[0-9]*$"; then
+              REAL_CHANGES=true
+              break
             fi
           fi
         done
         
-        echo "📦 Cache version update complete! Version: $VERSION"
+        echo "needs_update=$REAL_CHANGES" >> $GITHUB_OUTPUT
+    
+    - name: Update cache version
+      if: steps.check.outputs.needs_update == 'true'
+      run: |
+        # Generate version based on short commit hash for better tracking
+        VERSION="${{ github.sha }}"
+        VERSION_SHORT="${VERSION:0:8}"
+        
+        # Batch update all HTML files with version parameters
+        echo "📦 Updating cache versions to: $VERSION_SHORT"
+        
+        # Use find for more efficient file processing
+        find . -maxdepth 1 -name "*.html" -type f | while read -r file; do
+          if grep -q "\.js?v=" "$file" 2>/dev/null; then
+            # Update version parameters
+            sed -i "s/\?v=[0-9a-zA-Z.]*/\?v=$VERSION_SHORT/g" "$file"
+            echo "✅ Updated $(basename "$file")"
+          fi
+        done
+        
+        echo "📦 Cache version update complete! Version: $VERSION_SHORT"
     
     - name: Commit and push if changed
+      if: steps.check.outputs.needs_update == 'true'
       run: |
-        git config --global user.name 'GitHub Actions'
-        git config --global user.email 'actions@github.com'
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add -A
-        git diff --staged --quiet || (git commit -m "Auto-update cache version to $(date +%s)" && git push)
+        if ! git diff --staged --quiet; then
+          git commit -m "Auto-update cache version to ${{ github.sha }}" \
+                     -m "Triggered by: ${{ github.event.head_commit.message }}"
+          git push
+        fi
