@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Test</title>
+</head>
+<body>
+    <h1>Game Testing</h1>
+    <p>Testing game functionality...</p>
+    <div id="results"></div>
+    
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        async function testGame() {
+            try {
+                // Test 1: Check if WASM module can be loaded
+                results.innerHTML += '<p>Testing WASM module loading...</p>';
+                const module = await import('./public/game_engine.js');
+                results.innerHTML += '<p style="color: green;">✓ WASM module loaded successfully</p>';
+                
+                // Test 2: Initialize WASM
+                results.innerHTML += '<p>Initializing WASM...</p>';
+                const GameEngineModule = module.default;
+                const wasmModule = await GameEngineModule();
+                results.innerHTML += '<p style="color: green;">✓ WASM initialized successfully</p>';
+                
+                // Test 3: Create game engine
+                results.innerHTML += '<p>Creating game engine...</p>';
+                const engine = new wasmModule.GameEngine(1920, 1080);
+                results.innerHTML += '<p style="color: green;">✓ Game engine created successfully</p>';
+                
+                // Test 4: Test basic operations
+                results.innerHTML += '<p>Testing game operations...</p>';
+                engine.clearEntities();
+                const player = engine.createPlayer(960, 540);
+                results.innerHTML += '<p style="color: green;">✓ Player created successfully</p>';
+                
+                // Test 5: Create some entities
+                engine.createEnemy(100, 100);
+                engine.createPowerUp(200, 200, 1);
+                const entities = engine.getAllEntities();
+                results.innerHTML += `<p style="color: green;">✓ Entities created: ${entities.length} total</p>`;
+                
+                results.innerHTML += '<h2 style="color: green;">All tests passed! Game engine is working.</h2>';
+                results.innerHTML += '<p><a href="game.html">Go to the game</a></p>';
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Error: ${error.message}</p>`;
+                console.error('Test failed:', error);
+            }
+        }
+        
+        testGame();
+    </script>
+</body>
+</html>
