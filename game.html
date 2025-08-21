@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Ultimate WASM Game Engine - Fixed</title>
+    <title>Ultimate WASM Game Engine - Wolf AI & Combat</title>
     <style>
         * {
             margin: 0;
@@ -89,7 +89,7 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
-        .health-bar {
+        .health-bar, .energy-bar {
             width: 200px;
             height: 20px;
             background: rgba(0,0,0,0.5);
@@ -104,12 +104,72 @@
             transition: width 0.3s;
             width: 100%;
         }
+
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0099ff, #00ffff);
+            transition: width 0.3s;
+            width: 100%;
+        }
+
+        .combat-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            pointer-events: all;
+        }
+
+        .combat-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #fff;
+            color: #fff;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .combat-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .combat-btn:active {
+            transform: scale(0.95);
+        }
+
+        .combat-btn.cooldown {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .wolf-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .wolf-count {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div id="loadingScreen">
         <div class="loader"></div>
-        <div class="loading-text">Loading Game...</div>
+        <div class="loading-text">Loading WASM Engine...</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -120,6 +180,19 @@
             <div class="health-bar">
                 <div class="health-fill" id="healthBar"></div>
             </div>
+            <div class="energy-bar">
+                <div class="energy-fill" id="energyBar"></div>
+            </div>
+        </div>
+
+        <div class="wolf-indicator">
+            Wolves: <span class="wolf-count" id="wolfCount">0</span>
+        </div>
+
+        <div class="combat-controls">
+            <div class="combat-btn" id="attackBtn" title="Attack (K)">⚔️</div>
+            <div class="combat-btn" id="blockBtn" title="Block (L)">🛡️</div>
+            <div class="combat-btn" id="rollBtn" title="Roll (M)">💨</div>
         </div>
     </div>
 
@@ -131,11 +204,317 @@
             running: false,
             score: 0,
             entities: [],
+            wolves: [],
             player: null,
             lastTime: 0,
             keys: {},
-            mouse: { x: 0, y: 0, down: false }
+            mouse: { x: 0, y: 0, down: false },
+            wasmModule: null,
+            engine: null,
+            useWasm: false
         };
+
+        // Combat configuration
+        const COMBAT_CONFIG = {
+            // Attack settings
+            ATTACK_RANGE: 60,
+            ATTACK_ARC: Math.PI / 3,
+            ATTACK_DAMAGE: 30,
+            ATTACK_COOLDOWN: 400,
+            ATTACK_ENERGY_COST: 10,
+            
+            // Block settings
+            BLOCK_DURATION: 2000,
+            BLOCK_COOLDOWN: 500,
+            BLOCK_DAMAGE_REDUCTION: 0.7,
+            PERFECT_BLOCK_WINDOW: 150,
+            PERFECT_BLOCK_STUN: 1500,
+            
+            // Roll settings
+            ROLL_DISTANCE: 75,
+            ROLL_DURATION: 300,
+            ROLL_COOLDOWN: 800,
+            ROLL_INVULNERABILITY: true,
+            ROLL_ENERGY_COST: 15
+        };
+
+        // Wolf AI configuration
+        const WOLF_CONFIG = {
+            BASE_SPEED: 2.5,
+            SPRINT_SPEED: 4.0,
+            DETECTION_RANGE: 200,
+            ATTACK_RANGE: 40,
+            LUNGE_DISTANCE: 100,
+            LUNGE_SPEED: 6,
+            HEALTH: 50,
+            DAMAGE: 15,
+            PACK_BONUS: 0.15
+        };
+
+        // Wolf states
+        const WolfState = {
+            IDLE: 'idle',
+            PATROL: 'patrol',
+            STALKING: 'stalking',
+            LUNGING: 'lunging',
+            ATTACKING: 'attacking',
+            RETREATING: 'retreating'
+        };
+
+        // Wolf AI Class
+        class Wolf {
+            constructor(x, y, isAlpha = false) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = isAlpha ? 18 : 15;
+                this.health = isAlpha ? WOLF_CONFIG.HEALTH * 1.5 : WOLF_CONFIG.HEALTH;
+                this.maxHealth = this.health;
+                this.damage = isAlpha ? WOLF_CONFIG.DAMAGE * 1.2 : WOLF_CONFIG.DAMAGE;
+                this.speed = WOLF_CONFIG.BASE_SPEED;
+                this.state = WolfState.PATROL;
+                this.isAlpha = isAlpha;
+                this.color = isAlpha ? '#ff4444' : '#cc0000';
+                this.target = null;
+                this.patrolTarget = this.generatePatrolTarget();
+                this.lungeCooldown = 0;
+                this.attackCooldown = 0;
+                this.stateTimer = 0;
+            }
+
+            generatePatrolTarget() {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 100 + Math.random() * 200;
+                return {
+                    x: this.x + Math.cos(angle) * distance,
+                    y: this.y + Math.sin(angle) * distance
+                };
+            }
+
+            update(deltaTime, player, otherWolves) {
+                // Update cooldowns
+                if (this.lungeCooldown > 0) this.lungeCooldown -= deltaTime;
+                if (this.attackCooldown > 0) this.attackCooldown -= deltaTime;
+                if (this.stateTimer > 0) this.stateTimer -= deltaTime;
+
+                // Check distance to player
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const distToPlayer = Math.sqrt(dx * dx + dy * dy);
+
+                // State machine
+                switch (this.state) {
+                    case WolfState.PATROL:
+                        this.patrol(deltaTime);
+                        if (distToPlayer < WOLF_CONFIG.DETECTION_RANGE) {
+                            this.state = WolfState.STALKING;
+                            this.target = player;
+                        }
+                        break;
+
+                    case WolfState.STALKING:
+                        this.stalk(deltaTime, player, otherWolves);
+                        if (distToPlayer < WOLF_CONFIG.LUNGE_DISTANCE && this.lungeCooldown <= 0) {
+                            this.startLunge(player);
+                        } else if (distToPlayer > WOLF_CONFIG.DETECTION_RANGE * 1.5) {
+                            this.state = WolfState.PATROL;
+                            this.target = null;
+                        }
+                        break;
+
+                    case WolfState.LUNGING:
+                        this.performLunge(deltaTime);
+                        if (this.stateTimer <= 0) {
+                            this.state = WolfState.ATTACKING;
+                            this.stateTimer = 500;
+                        }
+                        break;
+
+                    case WolfState.ATTACKING:
+                        if (distToPlayer < WOLF_CONFIG.ATTACK_RANGE && this.attackCooldown <= 0) {
+                            this.attack(player);
+                        }
+                        if (this.stateTimer <= 0) {
+                            this.state = WolfState.RETREATING;
+                            this.stateTimer = 1000;
+                        }
+                        break;
+
+                    case WolfState.RETREATING:
+                        this.retreat(deltaTime, player);
+                        if (this.stateTimer <= 0) {
+                            this.state = WolfState.STALKING;
+                        }
+                        break;
+                }
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Apply friction
+                this.vx *= 0.95;
+                this.vy *= 0.95;
+
+                // Keep within bounds
+                this.x = Math.max(this.radius, Math.min(Game.canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(Game.canvas.height - this.radius, this.y));
+            }
+
+            patrol(deltaTime) {
+                const dx = this.patrolTarget.x - this.x;
+                const dy = this.patrolTarget.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 20) {
+                    this.patrolTarget = this.generatePatrolTarget();
+                } else {
+                    this.vx = (dx / dist) * this.speed * 0.5;
+                    this.vy = (dy / dist) * this.speed * 0.5;
+                }
+            }
+
+            stalk(deltaTime, player, otherWolves) {
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Circle around the player
+                if (dist > WOLF_CONFIG.ATTACK_RANGE * 3) {
+                    // Move closer
+                    this.vx = (dx / dist) * this.speed;
+                    this.vy = (dy / dist) * this.speed;
+                } else {
+                    // Circle around
+                    const perpX = -dy / dist;
+                    const perpY = dx / dist;
+                    const circleDirection = Math.random() < 0.02 ? -1 : 1;
+                    
+                    this.vx = (dx / dist * 0.3 + perpX * 0.7 * circleDirection) * this.speed;
+                    this.vy = (dy / dist * 0.3 + perpY * 0.7 * circleDirection) * this.speed;
+                }
+
+                // Pack coordination - spread out
+                for (const wolf of otherWolves) {
+                    if (wolf !== this) {
+                        const wolfDx = wolf.x - this.x;
+                        const wolfDy = wolf.y - this.y;
+                        const wolfDist = Math.sqrt(wolfDx * wolfDx + wolfDy * wolfDy);
+                        
+                        if (wolfDist < 50 && wolfDist > 0) {
+                            // Repel from other wolves to avoid clustering
+                            this.vx -= (wolfDx / wolfDist) * 2;
+                            this.vy -= (wolfDy / wolfDist) * 2;
+                        }
+                    }
+                }
+            }
+
+            startLunge(player) {
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                this.state = WolfState.LUNGING;
+                this.vx = (dx / dist) * WOLF_CONFIG.LUNGE_SPEED;
+                this.vy = (dy / dist) * WOLF_CONFIG.LUNGE_SPEED;
+                this.lungeCooldown = 2000;
+                this.stateTimer = 300;
+            }
+
+            performLunge(deltaTime) {
+                // Lunge momentum carries the wolf forward
+                // Velocity is already set in startLunge
+            }
+
+            attack(player) {
+                if (!player.invulnerable && !player.rolling) {
+                    let damage = this.damage;
+                    
+                    if (player.blocking) {
+                        damage *= (1 - COMBAT_CONFIG.BLOCK_DAMAGE_REDUCTION);
+                        // Check for perfect block
+                        if (Date.now() - player.blockStartTime < COMBAT_CONFIG.PERFECT_BLOCK_WINDOW) {
+                            damage = 0;
+                            this.stun(COMBAT_CONFIG.PERFECT_BLOCK_STUN);
+                        }
+                    }
+                    
+                    player.health -= damage;
+                    this.attackCooldown = 1500;
+                    updateHealth();
+                }
+            }
+
+            retreat(deltaTime, player) {
+                const dx = this.x - player.x;
+                const dy = this.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 0) {
+                    this.vx = (dx / dist) * this.speed * 0.8;
+                    this.vy = (dy / dist) * this.speed * 0.8;
+                }
+            }
+
+            stun(duration) {
+                this.state = WolfState.RETREATING;
+                this.stateTimer = duration;
+                this.vx *= -0.5;
+                this.vy *= -0.5;
+            }
+
+            takeDamage(damage) {
+                this.health -= damage;
+                if (this.health <= 0) {
+                    return true; // Wolf is dead
+                }
+                return false;
+            }
+
+            render(ctx) {
+                ctx.save();
+                
+                // Draw wolf body
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw eyes
+                ctx.fillStyle = '#ffff00';
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = '#ffff00';
+                const eyeOffset = this.radius * 0.3;
+                ctx.beginPath();
+                ctx.arc(this.x - eyeOffset, this.y - eyeOffset, 2, 0, Math.PI * 2);
+                ctx.arc(this.x + eyeOffset, this.y - eyeOffset, 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw health bar
+                if (this.health < this.maxHealth) {
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+                    ctx.fillRect(this.x - this.radius, this.y - this.radius - 10, this.radius * 2, 4);
+                    ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+                    ctx.fillRect(this.x - this.radius, this.y - this.radius - 10, 
+                                (this.radius * 2) * (this.health / this.maxHealth), 4);
+                }
+                
+                // Draw alpha indicator
+                if (this.isAlpha) {
+                    ctx.strokeStyle = '#ffaa00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
+        }
 
         // Initialize game
         async function init() {
@@ -152,16 +531,16 @@
                 setupInput();
                 
                 // Try to load WASM module
-                let wasmLoaded = false;
                 try {
                     const module = await import('./public/game_engine.js');
                     const GameEngineModule = module.default;
                     Game.wasmModule = await GameEngineModule();
                     Game.engine = new Game.wasmModule.GameEngine(Game.canvas.width, Game.canvas.height);
-                    wasmLoaded = true;
+                    Game.useWasm = true;
                     console.log('✅ WASM module loaded successfully');
                 } catch (error) {
                     console.warn('WASM module not available, using JavaScript fallback:', error);
+                    Game.useWasm = false;
                 }
                 
                 // Initialize game entities
@@ -190,11 +569,29 @@
             // Keyboard
             window.addEventListener('keydown', (e) => {
                 Game.keys[e.key.toLowerCase()] = true;
+                
+                // Combat controls
+                switch(e.key.toLowerCase()) {
+                    case 'k':
+                        performAttack();
+                        break;
+                    case 'l':
+                        performBlock();
+                        break;
+                    case 'm':
+                        performRoll();
+                        break;
+                }
+                
                 if (e.key === ' ') e.preventDefault();
             });
             
             window.addEventListener('keyup', (e) => {
                 Game.keys[e.key.toLowerCase()] = false;
+                
+                if (e.key.toLowerCase() === 'l') {
+                    endBlock();
+                }
             });
             
             // Mouse
@@ -231,10 +628,18 @@
                 e.preventDefault();
                 Game.mouse.down = false;
             });
+            
+            // Combat button controls
+            document.getElementById('attackBtn').addEventListener('click', performAttack);
+            document.getElementById('blockBtn').addEventListener('mousedown', performBlock);
+            document.getElementById('blockBtn').addEventListener('mouseup', endBlock);
+            document.getElementById('blockBtn').addEventListener('touchstart', performBlock);
+            document.getElementById('blockBtn').addEventListener('touchend', endBlock);
+            document.getElementById('rollBtn').addEventListener('click', performRoll);
         }
 
         function initGame() {
-            // Create player
+            // Create player with combat abilities
             Game.player = {
                 x: Game.canvas.width / 2,
                 y: Game.canvas.height / 2,
@@ -242,27 +647,37 @@
                 vy: 0,
                 radius: 20,
                 health: 100,
+                maxHealth: 100,
+                energy: 100,
+                maxEnergy: 100,
                 color: '#00ff00',
-                speed: 5
+                speed: 5,
+                
+                // Combat properties
+                attacking: false,
+                attackCooldown: 0,
+                attackAngle: 0,
+                
+                blocking: false,
+                blockStartTime: 0,
+                blockCooldown: 0,
+                
+                rolling: false,
+                rollDirection: { x: 0, y: 0 },
+                rollCooldown: 0,
+                rollStartTime: 0,
+                
+                invulnerable: false,
+                facing: 0
             };
             
             // Add player to entities
             Game.entities = [Game.player];
             
-            // Create some enemies
-            for (let i = 0; i < 5; i++) {
-                Game.entities.push({
-                    x: Math.random() * Game.canvas.width,
-                    y: Math.random() * Game.canvas.height,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: (Math.random() - 0.5) * 2,
-                    radius: 15,
-                    color: '#ff0000',
-                    type: 'enemy'
-                });
-            }
+            // Spawn initial wolves
+            spawnWolfPack(3);
             
-            // Create power-ups
+            // Create some power-ups
             for (let i = 0; i < 3; i++) {
                 Game.entities.push({
                     x: Math.random() * Game.canvas.width,
@@ -274,121 +689,230 @@
             }
         }
 
-        function update(deltaTime) {
-            // Update player based on input
-            if (Game.keys['w'] || Game.keys['arrowup']) Game.player.vy = -Game.player.speed;
-            else if (Game.keys['s'] || Game.keys['arrowdown']) Game.player.vy = Game.player.speed;
-            else Game.player.vy *= 0.9;
-            
-            if (Game.keys['a'] || Game.keys['arrowleft']) Game.player.vx = -Game.player.speed;
-            else if (Game.keys['d'] || Game.keys['arrowright']) Game.player.vx = Game.player.speed;
-            else Game.player.vx *= 0.9;
-            
-            // Update all entities
-            for (let entity of Game.entities) {
-                if (entity.vx) entity.x += entity.vx;
-                if (entity.vy) entity.y += entity.vy;
-                
-                // Wrap around screen
-                if (entity.x < 0) entity.x = Game.canvas.width;
-                if (entity.x > Game.canvas.width) entity.x = 0;
-                if (entity.y < 0) entity.y = Game.canvas.height;
-                if (entity.y > Game.canvas.height) entity.y = 0;
-                
-                // Enemy AI - move towards player
-                if (entity.type === 'enemy') {
-                    const dx = Game.player.x - entity.x;
-                    const dy = Game.player.y - entity.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist > 0) {
-                        entity.vx = (dx / dist) * 1.5;
-                        entity.vy = (dy / dist) * 1.5;
-                    }
-                }
+        function spawnWolfPack(count) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count;
+                const distance = 200 + Math.random() * 100;
+                const wolf = new Wolf(
+                    Game.player.x + Math.cos(angle) * distance,
+                    Game.player.y + Math.sin(angle) * distance,
+                    i === 0 // First wolf is alpha
+                );
+                Game.wolves.push(wolf);
+            }
+            updateWolfCount();
+        }
+
+        function performAttack() {
+            if (Game.player.attackCooldown > 0 || Game.player.energy < COMBAT_CONFIG.ATTACK_ENERGY_COST) {
+                return;
             }
             
-            // Check collisions
-            for (let i = 0; i < Game.entities.length; i++) {
-                for (let j = i + 1; j < Game.entities.length; j++) {
-                    const e1 = Game.entities[i];
-                    const e2 = Game.entities[j];
-                    const dx = e2.x - e1.x;
-                    const dy = e2.y - e1.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+            Game.player.attacking = true;
+            Game.player.attackCooldown = COMBAT_CONFIG.ATTACK_COOLDOWN;
+            Game.player.energy -= COMBAT_CONFIG.ATTACK_ENERGY_COST;
+            
+            // Calculate attack angle based on mouse position
+            const dx = Game.mouse.x - Game.player.x;
+            const dy = Game.mouse.y - Game.player.y;
+            Game.player.attackAngle = Math.atan2(dy, dx);
+            
+            // Check for hit wolves
+            for (let i = Game.wolves.length - 1; i >= 0; i--) {
+                const wolf = Game.wolves[i];
+                const wolfDx = wolf.x - Game.player.x;
+                const wolfDy = wolf.y - Game.player.y;
+                const dist = Math.sqrt(wolfDx * wolfDx + wolfDy * wolfDy);
+                
+                if (dist <= COMBAT_CONFIG.ATTACK_RANGE + wolf.radius) {
+                    const angleToWolf = Math.atan2(wolfDy, wolfDx);
+                    let angleDiff = Math.abs(angleToWolf - Game.player.attackAngle);
+                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
                     
-                    if (dist < e1.radius + e2.radius) {
-                        // Handle collision
-                        if (e1 === Game.player && e2.type === 'enemy') {
-                            Game.player.health -= 1;
-                            updateHealth();
-                        } else if (e1 === Game.player && e2.type === 'powerup') {
+                    if (angleDiff <= COMBAT_CONFIG.ATTACK_ARC / 2) {
+                        if (wolf.takeDamage(COMBAT_CONFIG.ATTACK_DAMAGE)) {
+                            // Wolf is dead
+                            Game.wolves.splice(i, 1);
                             Game.score += 100;
                             updateScore();
-                            // Remove powerup
-                            Game.entities.splice(j, 1);
-                            j--;
+                        } else {
+                            // Knockback
+                            wolf.vx = (wolfDx / dist) * 10;
+                            wolf.vy = (wolfDy / dist) * 10;
                         }
                     }
                 }
             }
             
-            // Shoot projectiles
-            if (Game.mouse.down) {
-                if (!Game.lastShot || Date.now() - Game.lastShot > 200) {
-                    const dx = Game.mouse.x - Game.player.x;
-                    const dy = Game.mouse.y - Game.player.y;
+            updateEnergy();
+            
+            // Visual feedback
+            setTimeout(() => {
+                Game.player.attacking = false;
+            }, 200);
+        }
+
+        function performBlock() {
+            if (Game.player.blockCooldown > 0 || Game.player.rolling) {
+                return;
+            }
+            
+            Game.player.blocking = true;
+            Game.player.blockStartTime = Date.now();
+        }
+
+        function endBlock() {
+            if (Game.player.blocking) {
+                Game.player.blocking = false;
+                Game.player.blockCooldown = COMBAT_CONFIG.BLOCK_COOLDOWN;
+            }
+        }
+
+        function performRoll() {
+            if (Game.player.rollCooldown > 0 || Game.player.energy < COMBAT_CONFIG.ROLL_ENERGY_COST) {
+                return;
+            }
+            
+            // Calculate roll direction based on movement or mouse
+            let rollDx = 0, rollDy = 0;
+            
+            if (Game.keys['w'] || Game.keys['arrowup']) rollDy = -1;
+            if (Game.keys['s'] || Game.keys['arrowdown']) rollDy = 1;
+            if (Game.keys['a'] || Game.keys['arrowleft']) rollDx = -1;
+            if (Game.keys['d'] || Game.keys['arrowright']) rollDx = 1;
+            
+            if (rollDx === 0 && rollDy === 0) {
+                // Roll towards mouse if no movement input
+                rollDx = Game.mouse.x - Game.player.x;
+                rollDy = Game.mouse.y - Game.player.y;
+            }
+            
+            const rollDist = Math.sqrt(rollDx * rollDx + rollDy * rollDy);
+            if (rollDist > 0) {
+                Game.player.rolling = true;
+                Game.player.rollDirection.x = (rollDx / rollDist) * COMBAT_CONFIG.ROLL_DISTANCE;
+                Game.player.rollDirection.y = (rollDy / rollDist) * COMBAT_CONFIG.ROLL_DISTANCE;
+                Game.player.rollCooldown = COMBAT_CONFIG.ROLL_COOLDOWN;
+                Game.player.rollStartTime = Date.now();
+                Game.player.energy -= COMBAT_CONFIG.ROLL_ENERGY_COST;
+                
+                if (COMBAT_CONFIG.ROLL_INVULNERABILITY) {
+                    Game.player.invulnerable = true;
+                }
+                
+                updateEnergy();
+            }
+        }
+
+        function update(deltaTime) {
+            // Update player based on input
+            if (!Game.player.rolling) {
+                if (Game.keys['w'] || Game.keys['arrowup']) Game.player.vy = -Game.player.speed;
+                else if (Game.keys['s'] || Game.keys['arrowdown']) Game.player.vy = Game.player.speed;
+                else Game.player.vy *= 0.9;
+                
+                if (Game.keys['a'] || Game.keys['arrowleft']) Game.player.vx = -Game.player.speed;
+                else if (Game.keys['d'] || Game.keys['arrowright']) Game.player.vx = Game.player.speed;
+                else Game.player.vx *= 0.9;
+            }
+            
+            // Update roll
+            if (Game.player.rolling) {
+                const rollProgress = (Date.now() - Game.player.rollStartTime) / COMBAT_CONFIG.ROLL_DURATION;
+                if (rollProgress >= 1) {
+                    Game.player.rolling = false;
+                    Game.player.invulnerable = false;
+                } else {
+                    const rollSpeed = 1 - rollProgress;
+                    Game.player.vx = Game.player.rollDirection.x * rollSpeed / 10;
+                    Game.player.vy = Game.player.rollDirection.y * rollSpeed / 10;
+                }
+            }
+            
+            // Update cooldowns
+            if (Game.player.attackCooldown > 0) {
+                Game.player.attackCooldown -= deltaTime;
+            }
+            if (Game.player.blockCooldown > 0) {
+                Game.player.blockCooldown -= deltaTime;
+            }
+            if (Game.player.rollCooldown > 0) {
+                Game.player.rollCooldown -= deltaTime;
+            }
+            
+            // Regenerate energy
+            if (Game.player.energy < Game.player.maxEnergy) {
+                Game.player.energy = Math.min(Game.player.maxEnergy, Game.player.energy + 0.1);
+                updateEnergy();
+            }
+            
+            // Update player position
+            Game.player.x += Game.player.vx;
+            Game.player.y += Game.player.vy;
+            
+            // Keep player within bounds
+            Game.player.x = Math.max(Game.player.radius, Math.min(Game.canvas.width - Game.player.radius, Game.player.x));
+            Game.player.y = Math.max(Game.player.radius, Math.min(Game.canvas.height - Game.player.radius, Game.player.y));
+            
+            // Update wolves
+            for (const wolf of Game.wolves) {
+                wolf.update(deltaTime, Game.player, Game.wolves);
+            }
+            
+            // Update other entities
+            for (let entity of Game.entities) {
+                if (entity !== Game.player && entity.vx) {
+                    entity.x += entity.vx;
+                    entity.y += entity.vy;
+                    
+                    // Wrap around screen
+                    if (entity.x < 0) entity.x = Game.canvas.width;
+                    if (entity.x > Game.canvas.width) entity.x = 0;
+                    if (entity.y < 0) entity.y = Game.canvas.height;
+                    if (entity.y > Game.canvas.height) entity.y = 0;
+                }
+            }
+            
+            // Check collisions with power-ups
+            for (let i = Game.entities.length - 1; i >= 0; i--) {
+                const entity = Game.entities[i];
+                if (entity.type === 'powerup') {
+                    const dx = entity.x - Game.player.x;
+                    const dy = entity.y - Game.player.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     
-                    Game.entities.push({
-                        x: Game.player.x,
-                        y: Game.player.y,
-                        vx: (dx / dist) * 10,
-                        vy: (dy / dist) * 10,
-                        radius: 5,
-                        color: '#00ffff',
-                        type: 'projectile'
-                    });
-                    
-                    Game.lastShot = Date.now();
-                }
-            }
-            
-            // Remove projectiles that hit enemies
-            for (let i = Game.entities.length - 1; i >= 0; i--) {
-                const projectile = Game.entities[i];
-                if (projectile.type === 'projectile') {
-                    for (let j = Game.entities.length - 1; j >= 0; j--) {
-                        const enemy = Game.entities[j];
-                        if (enemy.type === 'enemy') {
-                            const dx = enemy.x - projectile.x;
-                            const dy = enemy.y - projectile.y;
-                            const dist = Math.sqrt(dx * dx + dy * dy);
-                            
-                            if (dist < projectile.radius + enemy.radius) {
-                                // Remove both
-                                Game.entities.splice(j, 1);
-                                if (i > j) i--;
-                                Game.entities.splice(i, 1);
-                                Game.score += 10;
-                                updateScore();
-                                break;
-                            }
-                        }
+                    if (dist < Game.player.radius + entity.radius) {
+                        Game.score += 50;
+                        Game.player.health = Math.min(Game.player.maxHealth, Game.player.health + 20);
+                        Game.player.energy = Math.min(Game.player.maxEnergy, Game.player.energy + 30);
+                        updateScore();
+                        updateHealth();
+                        updateEnergy();
+                        Game.entities.splice(i, 1);
                     }
                 }
             }
             
-            // Spawn new enemies occasionally
-            if (Math.random() < 0.01) {
+            // Spawn new power-ups occasionally
+            if (Math.random() < 0.002) {
                 Game.entities.push({
                     x: Math.random() * Game.canvas.width,
                     y: Math.random() * Game.canvas.height,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: (Math.random() - 0.5) * 2,
-                    radius: 15,
-                    color: '#ff0000',
-                    type: 'enemy'
+                    radius: 10,
+                    color: '#ffff00',
+                    type: 'powerup'
                 });
+            }
+            
+            // Spawn new wolves occasionally
+            if (Math.random() < 0.005 && Game.wolves.length < 10) {
+                const wolf = new Wolf(
+                    Math.random() * Game.canvas.width,
+                    Math.random() * Game.canvas.height,
+                    false
+                );
+                Game.wolves.push(wolf);
+                updateWolfCount();
             }
         }
 
@@ -420,15 +944,67 @@
             
             // Draw entities
             for (let entity of Game.entities) {
-                ctx.save();
-                ctx.fillStyle = entity.color;
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = entity.color;
+                if (entity.type !== 'player') {
+                    ctx.save();
+                    ctx.fillStyle = entity.color;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = entity.color;
+                    ctx.beginPath();
+                    ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+            
+            // Draw wolves
+            for (const wolf of Game.wolves) {
+                wolf.render(ctx);
+            }
+            
+            // Draw player
+            ctx.save();
+            
+            // Draw roll effect
+            if (Game.player.rolling) {
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
                 ctx.beginPath();
-                ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+                ctx.arc(Game.player.x, Game.player.y, Game.player.radius * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw block effect
+            if (Game.player.blocking) {
+                ctx.strokeStyle = '#00aaff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(Game.player.x, Game.player.y, Game.player.radius + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // Draw attack effect
+            if (Game.player.attacking) {
+                ctx.save();
+                ctx.translate(Game.player.x, Game.player.y);
+                ctx.rotate(Game.player.attackAngle);
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                ctx.beginPath();
+                ctx.arc(0, 0, COMBAT_CONFIG.ATTACK_RANGE, 
+                        -COMBAT_CONFIG.ATTACK_ARC / 2, 
+                        COMBAT_CONFIG.ATTACK_ARC / 2);
+                ctx.lineTo(0, 0);
                 ctx.fill();
                 ctx.restore();
             }
+            
+            // Draw player
+            ctx.fillStyle = Game.player.color;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = Game.player.color;
+            ctx.beginPath();
+            ctx.arc(Game.player.x, Game.player.y, Game.player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
         }
 
         function updateScore() {
@@ -442,6 +1018,14 @@
                 Game.running = false;
                 location.reload();
             }
+        }
+
+        function updateEnergy() {
+            document.getElementById('energyBar').style.width = Game.player.energy + '%';
+        }
+
+        function updateWolfCount() {
+            document.getElementById('wolfCount').textContent = Game.wolves.length;
         }
 
         function gameLoop(currentTime) {
