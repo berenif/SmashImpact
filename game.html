@@ -961,39 +961,133 @@
         
         // Initialize game
         function initGame() {
-            if (!Game.engine) {
-                console.error('Game engine not initialized!');
-                return;
-            }
-            
-            // Clear existing entities
-            Game.engine.clearEntities();
-            
-            // Spawn initial enemies based on mode
-            if (Game.mode === 'survival') {
-                // Create player for survival mode
-                Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
-                spawnWave(1);
-            } else if (Game.mode === 'campaign') {
-                // loadLevel will create the player
-                loadLevel(1);
-            } else if (Game.mode === 'sandbox') {
-                // Create player for sandbox mode
-                Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+            // If WASM engine exists, use it
+            if (Game.engine && Game.engine.clearEntities) {
+                console.log('Using WASM engine');
                 
-                // Sandbox mode - spawn some test entities
-                for (let i = 0; i < 5; i++) {
-                    Game.engine.createPowerUp(
-                        Math.random() * Game.canvas.width,
-                        Math.random() * Game.canvas.height,
-                        Math.floor(Math.random() * 4)
-                    );
+                // Clear existing entities
+                Game.engine.clearEntities();
+                
+                // Spawn initial enemies based on mode
+                if (Game.mode === 'survival') {
+                    // Create player for survival mode
+                    Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                    spawnWave(1);
+                } else if (Game.mode === 'campaign') {
+                    // loadLevel will create the player
+                    loadLevel(1);
+                } else if (Game.mode === 'sandbox') {
+                    // Create player for sandbox mode
+                    Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                    
+                    // Sandbox mode - spawn some test entities
+                    for (let i = 0; i < 5; i++) {
+                        Game.engine.createPowerUp(
+                            Math.random() * Game.canvas.width,
+                            Math.random() * Game.canvas.height,
+                            Math.floor(Math.random() * 4)
+                        );
+                    }
+                } else if (Game.mode === 'multiplayer') {
+                    // Create player for multiplayer mode
+                    Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                    // Additional multiplayer setup would go here
                 }
-            } else if (Game.mode === 'multiplayer') {
-                // Create player for multiplayer mode
-                Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
-                // Additional multiplayer setup would go here
+            } else {
+                // Fallback to JavaScript implementation
+                console.log('Using JavaScript fallback');
+                initGameJS();
             }
+        }
+        
+        // JavaScript fallback initialization
+        function initGameJS() {
+            // Clear existing entities
+            Game.enemies = [];
+            Game.projectiles = [];
+            Game.particles = [];
+            Game.powerups = [];
+            Game.obstacles = [];
+            
+            // Create player
+            Game.player = {
+                x: Game.canvas.width / 2,
+                y: Game.canvas.height / 2,
+                vx: 0,
+                vy: 0,
+                radius: 20,
+                health: 100,
+                energy: 100,
+                speed: 300,
+                type: 'player'
+            };
+            
+            // Spawn enemies based on mode
+            if (Game.mode === 'survival') {
+                spawnWaveJS(1);
+            } else if (Game.mode === 'campaign') {
+                loadLevelJS(1);
+            } else if (Game.mode === 'sandbox') {
+                // Spawn test entities
+                for (let i = 0; i < 5; i++) {
+                    Game.powerups.push({
+                        x: Math.random() * Game.canvas.width,
+                        y: Math.random() * Game.canvas.height,
+                        type: 'powerup',
+                        powerType: Math.floor(Math.random() * 4),
+                        radius: 15
+                    });
+                }
+            }
+        }
+        
+        // JavaScript wave spawning
+        function spawnWaveJS(waveNum) {
+            const enemyCount = 5 + waveNum * 2;
+            
+            for (let i = 0; i < enemyCount; i++) {
+                const angle = (Math.PI * 2 * i) / enemyCount;
+                const dist = 300 + Math.random() * 200;
+                const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                
+                Game.enemies.push({
+                    x: x,
+                    y: y,
+                    vx: 0,
+                    vy: 0,
+                    radius: 15,
+                    health: 50,
+                    speed: 100,
+                    type: 'enemy'
+                });
+            }
+            
+            document.getElementById('waveNum').textContent = waveNum;
+        }
+        
+        // JavaScript level loading
+        function loadLevelJS(levelNum) {
+            // Simple level with enemies
+            for (let i = 0; i < 3 + levelNum; i++) {
+                const angle = (Math.PI * 2 * i) / (3 + levelNum);
+                const dist = 250;
+                const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                
+                Game.enemies.push({
+                    x: x,
+                    y: y,
+                    vx: 0,
+                    vy: 0,
+                    radius: 15,
+                    health: 50,
+                    speed: 100,
+                    type: 'enemy'
+                });
+            }
+            
+            document.getElementById('waveNum').textContent = `Level ${levelNum}`;
         }
         
         // Spawn wave
@@ -1192,39 +1286,145 @@
         
         // Update game
         function update(dt) {
-            if (!Game.engine) return;
-            
             // Handle input
             handleInput();
             
-            // Update WASM engine
-            Game.engine.update(dt / 1000);
-            
-            // Check collisions
-            Game.engine.checkCollisions();
-            
-            // Get entity count
-            const entities = Game.engine.getAllEntities();
-            Game.stats.entities = entities.length;
+            if (Game.engine && Game.engine.update) {
+                // WASM engine update
+                Game.engine.update(dt / 1000);
+                
+                // Check collisions
+                Game.engine.checkCollisions();
+                
+                // Get entity count
+                const entities = Game.engine.getAllEntities();
+                Game.stats.entities = entities.length;
+                
+                // Check wave completion
+                if (Game.mode === 'survival') {
+                    const enemies = entities.filter(e => e.type === 'enemy' || e.type === 'wolf');
+                    if (enemies.length === 0) {
+                        Game.wave++;
+                        spawnWave(Game.wave);
+                    }
+                    document.getElementById('enemyCount').textContent = enemies.length;
+                }
+            } else {
+                // JavaScript fallback update
+                updateJS(dt / 1000);
+            }
             
             // Update HUD
             updateHUD();
+        }
+        
+        // JavaScript update function
+        function updateJS(dt) {
+            // Update player
+            if (Game.player) {
+                // Apply velocity
+                Game.player.x += Game.player.vx * dt;
+                Game.player.y += Game.player.vy * dt;
+                
+                // Apply friction
+                Game.player.vx *= 0.9;
+                Game.player.vy *= 0.9;
+                
+                // Keep in bounds
+                Game.player.x = Math.max(Game.player.radius, Math.min(Game.canvas.width - Game.player.radius, Game.player.x));
+                Game.player.y = Math.max(Game.player.radius, Math.min(Game.canvas.height - Game.player.radius, Game.player.y));
+            }
+            
+            // Update enemies
+            Game.enemies.forEach(enemy => {
+                if (Game.player) {
+                    // Move towards player
+                    const dx = Game.player.x - enemy.x;
+                    const dy = Game.player.y - enemy.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 0) {
+                        enemy.vx = (dx / dist) * enemy.speed;
+                        enemy.vy = (dy / dist) * enemy.speed;
+                    }
+                    
+                    enemy.x += enemy.vx * dt;
+                    enemy.y += enemy.vy * dt;
+                }
+            });
+            
+            // Update projectiles
+            Game.projectiles = Game.projectiles.filter(proj => {
+                proj.x += proj.vx * dt;
+                proj.y += proj.vy * dt;
+                
+                // Remove if out of bounds
+                return proj.x > 0 && proj.x < Game.canvas.width && 
+                       proj.y > 0 && proj.y < Game.canvas.height;
+            });
+            
+            // Check collisions
+            checkCollisionsJS();
+            
+            // Update entity count
+            Game.stats.entities = 1 + Game.enemies.length + Game.projectiles.length + Game.powerups.length;
             
             // Check wave completion
             if (Game.mode === 'survival') {
-                const enemies = entities.filter(e => e.type === 'enemy' || e.type === 'wolf');
-                if (enemies.length === 0) {
+                if (Game.enemies.length === 0) {
                     Game.wave++;
-                    spawnWave(Game.wave);
+                    spawnWaveJS(Game.wave);
                 }
-                document.getElementById('enemyCount').textContent = enemies.length;
+                document.getElementById('enemyCount').textContent = Game.enemies.length;
             }
+        }
+        
+        // JavaScript collision detection
+        function checkCollisionsJS() {
+            if (!Game.player) return;
+            
+            // Check enemy-player collisions
+            Game.enemies.forEach(enemy => {
+                const dx = Game.player.x - enemy.x;
+                const dy = Game.player.y - enemy.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < Game.player.radius + enemy.radius) {
+                    // Damage player
+                    Game.player.health -= 1;
+                    
+                    // Push enemy back
+                    enemy.x -= dx * 0.1;
+                    enemy.y -= dy * 0.1;
+                }
+            });
+            
+            // Check projectile-enemy collisions
+            Game.projectiles.forEach((proj, projIndex) => {
+                Game.enemies.forEach((enemy, enemyIndex) => {
+                    const dx = proj.x - enemy.x;
+                    const dy = proj.y - enemy.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < enemy.radius + 5) {
+                        // Damage enemy
+                        enemy.health -= 25;
+                        
+                        // Remove projectile
+                        Game.projectiles.splice(projIndex, 1);
+                        
+                        // Remove enemy if dead
+                        if (enemy.health <= 0) {
+                            Game.enemies.splice(enemyIndex, 1);
+                            Game.score += 100;
+                        }
+                    }
+                });
+            });
         }
         
         // Handle input
         function handleInput() {
-            if (!Game.engine) return;
-            
             // Movement
             let dx = 0, dy = 0;
             
@@ -1233,29 +1433,56 @@
             if (Game.input.keys['a'] || Game.input.keys['arrowleft']) dx = -1;
             if (Game.input.keys['d'] || Game.input.keys['arrowright']) dx = 1;
             
-            // Mobile joystick input (handled directly by MobileControlsWASM)
-            // The mobile controls send input directly to WASM engine via setJoystickInput
-            
-            // Aim
-            const aimX = Game.input.mouse.x - Game.canvas.width / 2;
-            const aimY = Game.input.mouse.y - Game.canvas.height / 2;
-            
-            // Update player input
-            Game.engine.updatePlayerInput(dx, dy, aimX, aimY);
-            
-            // Shooting (mobile handled by MobileControlsWASM attack button)
-            if (Game.input.mouse.down) {
-                Game.engine.playerShoot();
-            }
-            
-            // Boost (mobile handled by MobileControlsWASM)
-            if (Game.input.keys[' ']) {
-                Game.engine.playerBoost();
-            }
-            
-            // Special ability (mobile handled by MobileControlsWASM special button)
-            if (Game.input.keys['q']) {
-                Game.engine.playerSpecialAbility();
+            if (Game.engine && Game.engine.updatePlayerInput) {
+                // WASM engine input
+                // Mobile joystick input (handled directly by MobileControlsWASM)
+                // The mobile controls send input directly to WASM engine via setJoystickInput
+                
+                // Aim
+                const aimX = Game.input.mouse.x - Game.canvas.width / 2;
+                const aimY = Game.input.mouse.y - Game.canvas.height / 2;
+                
+                // Update player input
+                Game.engine.updatePlayerInput(dx, dy, aimX, aimY);
+                
+                // Shooting (mobile handled by MobileControlsWASM attack button)
+                if (Game.input.mouse.down) {
+                    Game.engine.playerShoot();
+                }
+                
+                // Boost (mobile handled by MobileControlsWASM)
+                if (Game.input.keys[' ']) {
+                    Game.engine.playerBoost();
+                }
+                
+                // Special ability (mobile handled by MobileControlsWASM special button)
+                if (Game.input.keys['q']) {
+                    Game.engine.playerSpecialAbility();
+                }
+            } else if (Game.player) {
+                // JavaScript fallback input
+                Game.player.vx += dx * Game.player.speed;
+                Game.player.vy += dy * Game.player.speed;
+                
+                // Shooting
+                if (Game.input.mouse.down && !Game.lastShot) {
+                    const aimX = Game.input.mouse.x - Game.player.x;
+                    const aimY = Game.input.mouse.y - Game.player.y;
+                    const aimDist = Math.sqrt(aimX * aimX + aimY * aimY);
+                    
+                    if (aimDist > 0) {
+                        Game.projectiles.push({
+                            x: Game.player.x,
+                            y: Game.player.y,
+                            vx: (aimX / aimDist) * 500,
+                            vy: (aimY / aimDist) * 500,
+                            type: 'projectile'
+                        });
+                    }
+                    Game.lastShot = true;
+                } else if (!Game.input.mouse.down) {
+                    Game.lastShot = false;
+                }
             }
         }
         
@@ -1270,18 +1497,57 @@
             // Draw grid
             drawGrid();
             
-            if (!Game.engine) return;
+            if (Game.engine && Game.engine.getAllEntities) {
+                // WASM rendering
+                const entities = Game.engine.getAllEntities();
+                
+                // Render entities
+                entities.forEach(entity => {
+                    renderEntity(entity);
+                });
+                
+                // Render minimap
+                renderMinimap(entities);
+            } else {
+                // JavaScript fallback rendering
+                renderJS();
+            }
+        }
+        
+        // JavaScript rendering
+        function renderJS() {
+            const ctx = Game.ctx;
             
-            // Get all entities
-            const entities = Game.engine.getAllEntities();
+            // Render player
+            if (Game.player) {
+                renderEntity(Game.player);
+            }
             
-            // Render entities
-            entities.forEach(entity => {
-                renderEntity(entity);
+            // Render enemies
+            Game.enemies.forEach(enemy => {
+                renderEntity(enemy);
             });
             
-            // Render minimap
-            renderMinimap(entities);
+            // Render projectiles
+            Game.projectiles.forEach(proj => {
+                renderEntity(proj);
+            });
+            
+            // Render powerups
+            Game.powerups.forEach(powerup => {
+                renderEntity(powerup);
+            });
+            
+            // Render obstacles
+            Game.obstacles.forEach(obstacle => {
+                renderEntity(obstacle);
+            });
+            
+            // Render minimap with JavaScript entities
+            const allEntities = [];
+            if (Game.player) allEntities.push(Game.player);
+            allEntities.push(...Game.enemies, ...Game.projectiles, ...Game.powerups, ...Game.obstacles);
+            renderMinimap(allEntities);
         }
         
         // Draw grid
@@ -1404,12 +1670,17 @@
         
         // Update HUD
         function updateHUD() {
-            if (!Game.engine) return;
-            
-            const player = Game.engine.getPlayerState();
-            if (player) {
-                document.getElementById('healthBar').style.width = player.health + '%';
-                document.getElementById('energyBar').style.width = player.energy + '%';
+            if (Game.engine && Game.engine.getPlayerState) {
+                // WASM player state
+                const player = Game.engine.getPlayerState();
+                if (player) {
+                    document.getElementById('healthBar').style.width = player.health + '%';
+                    document.getElementById('energyBar').style.width = player.energy + '%';
+                }
+            } else if (Game.player) {
+                // JavaScript player state
+                document.getElementById('healthBar').style.width = Game.player.health + '%';
+                document.getElementById('energyBar').style.width = Game.player.energy + '%';
             }
             
             document.getElementById('score').textContent = Game.score;
