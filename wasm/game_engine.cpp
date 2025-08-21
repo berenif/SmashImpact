@@ -50,7 +50,7 @@ namespace Config {
     constexpr float ROLL_DISTANCE = 150.0f;
     constexpr float ROLL_DURATION = 300.0f;
     constexpr float ROLL_COOLDOWN = 800.0f;
-    constexpr float ROLL_SPEED_MULTIPLIER = 2.5f;
+    constexpr float ROLL_SPEED_MULTIPLIER = 1.5f;  // Reduced from 2.5f to make roll shorter
     constexpr float ROLL_ENERGY_COST = 15.0f;
     
     // Targeting system configuration

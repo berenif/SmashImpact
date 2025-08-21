@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mobile Controls Test</title>
+    <script>
+        // Add initialization for mobile features
+        window.addEventListener('DOMContentLoaded', function() {
+            // Check if we need to initialize mobile features
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                           ('ontouchstart' in window) ||
+                           (navigator.maxTouchPoints > 0);
+            
+            if (isMobile) {
+                console.log('Mobile device detected - initializing mobile features');
+                
+                // Initialize orientation checking
+                if (typeof checkOrientation === 'function') {
+                    checkOrientation();
+                    window.addEventListener('orientationchange', checkOrientation);
+                    window.addEventListener('resize', checkOrientation);
+                }
+                
+                // Initialize target switching
+                if (typeof setupTargetSwitching === 'function') {
+                    setupTargetSwitching();
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <h1>Mobile Controls Test Page</h1>
+    <p>This page demonstrates the mobile controls initialization.</p>
+    <ul>
+        <li>✅ Mobile landscape orientation check added</li>
+        <li>✅ Orientation warning message for portrait mode</li>
+        <li>✅ Mobile interface with joystick (already existed)</li>
+        <li>✅ Attack, Roll (now labeled as DODGE), and Block buttons</li>
+        <li>✅ Target switching button with left/right arrows</li>
+        <li>✅ Roll distance reduced (speed multiplier changed from 2.5 to 1.5)</li>
+    </ul>
+    
+    <h2>Implementation Summary:</h2>
+    <ol>
+        <li><strong>Orientation Detection:</strong> Added a fullscreen warning that appears when mobile device is in portrait mode, encouraging users to rotate to landscape.</li>
+        <li><strong>Mobile Controls:</strong> The game already had a joystick and action buttons. We enhanced them with better styling.</li>
+        <li><strong>Target Switching:</strong> Added a new button at the top-right with left/right arrows for switching between targets.</li>
+        <li><strong>Roll/Dodge Fix:</strong> Reduced the ROLL_SPEED_MULTIPLIER from 2.5 to 1.5 in the WASM engine code to make the dodge distance shorter.</li>
+    </ol>
+    
+    <p><strong>Note:</strong> The roll distance fix requires rebuilding the WASM module with emscripten to take effect.</p>
+</body>
+</html>

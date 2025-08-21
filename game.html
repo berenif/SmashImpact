@@ -21,6 +21,49 @@
             -webkit-user-select: none;
         }
 
+        /* Landscape orientation warning */
+        #orientationWarning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #orientationWarning.show {
+            display: flex;
+        }
+
+        .orientation-icon {
+            font-size: 80px;
+            margin-bottom: 30px;
+            animation: rotate-phone 2s ease-in-out infinite;
+        }
+
+        @keyframes rotate-phone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+
+        .orientation-message {
+            font-size: 24px;
+            font-weight: 300;
+            margin-bottom: 15px;
+        }
+
+        .orientation-submessage {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+
         #gameCanvas {
             display: block;
             width: 100vw;
@@ -353,6 +396,46 @@
             border-color: rgba(200, 100, 255, 0.5);
         }
 
+        /* Target Switch Button */
+        #targetSwitchBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 120px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 0 10px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            z-index: 102;
+        }
+
+        #targetSwitchBtn:active {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(0.95);
+        }
+
+        .target-arrow {
+            font-size: 20px;
+            transition: transform 0.2s;
+        }
+
+        #targetSwitchBtn:active .target-arrow.left {
+            transform: translateX(-3px);
+        }
+
+        #targetSwitchBtn:active .target-arrow.right {
+            transform: translateX(3px);
+        }
+
         #pauseMenu {
             position: fixed;
             top: 50%;
@@ -402,6 +485,13 @@
     </style>
 </head>
 <body>
+    <!-- Orientation Warning for Mobile -->
+    <div id="orientationWarning">
+        <div class="orientation-icon">📱</div>
+        <div class="orientation-message">Please rotate your device</div>
+        <div class="orientation-submessage">This game is best played in landscape mode</div>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
     
     <!-- Loading Screen -->
@@ -466,6 +556,13 @@
     
     <!-- Enhanced Mobile Controls with WASM Integration -->
     <div id="mobileControls">
+        <!-- Target Switch Button -->
+        <button id="targetSwitchBtn">
+            <span class="target-arrow left">◀</span>
+            <span>TARGET</span>
+            <span class="target-arrow right">▶</span>
+        </button>
+        
         <!-- Virtual Joystick -->
         <div class="virtual-joystick" id="virtualJoystick">
             <div class="joystick-base"></div>
@@ -484,7 +581,7 @@
             </button>
             <button class="action-btn" id="rollBtn" data-action="roll">
                 <span class="icon">💨</span>
-                ROLL
+                DODGE
             </button>
             <button class="action-btn" id="specialBtn" data-action="special">
                 <span class="icon">✨</span>
@@ -964,7 +1061,96 @@
                 };
             }
         }
-        
+
+        // Orientation detection for mobile devices
+        function checkOrientation() {
+            const orientationWarning = document.getElementById('orientationWarning');
+            if (!orientationWarning) return;
+            
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                           ('ontouchstart' in window) ||
+                           (navigator.maxTouchPoints > 0);
+            
+            if (isMobile) {
+                const isLandscape = window.innerWidth > window.innerHeight;
+                
+                if (!isLandscape) {
+                    orientationWarning.classList.add('show');
+                    // Pause game if running
+                    if (Game.running && !Game.paused) {
+                        Game.wasPausedByOrientation = true;
+                        Game.togglePause();
+                    }
+                } else {
+                    orientationWarning.classList.remove('show');
+                    // Resume game if it was paused by orientation
+                    if (Game.wasPausedByOrientation && Game.paused) {
+                        Game.wasPausedByOrientation = false;
+                        Game.togglePause();
+                    }
+                }
+            }
+        }
+
+        // Target switching functionality
+        function setupTargetSwitching() {
+            const targetSwitchBtn = document.getElementById('targetSwitchBtn');
+            if (!targetSwitchBtn) return;
+            
+            // Handle target switch button clicks
+            targetSwitchBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Determine direction based on which side of button was clicked
+                const rect = targetSwitchBtn.getBoundingClientRect();
+                const clickX = e.clientX || (e.touches && e.touches[0].clientX);
+                const buttonCenter = rect.left + rect.width / 2;
+                const direction = clickX < buttonCenter ? -1 : 1;
+                
+                // Call WASM engine's target switching
+                if (Game.engine && Game.engine.switchTarget) {
+                    Game.engine.switchTarget(direction);
+                }
+                
+                // Haptic feedback
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+            
+            // Touch events for better mobile support
+            targetSwitchBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = targetSwitchBtn.getBoundingClientRect();
+                const buttonCenter = rect.left + rect.width / 2;
+                const direction = touch.clientX < buttonCenter ? -1 : 1;
+                
+                if (Game.engine && Game.engine.switchTarget) {
+                    Game.engine.switchTarget(direction);
+                }
+                
+                // Visual feedback
+                if (direction < 0) {
+                    targetSwitchBtn.querySelector('.target-arrow.left').style.transform = 'translateX(-5px)';
+                } else {
+                    targetSwitchBtn.querySelector('.target-arrow.right').style.transform = 'translateX(5px)';
+                }
+                
+                // Haptic feedback
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            }, { passive: false });
+            
+            targetSwitchBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                // Reset arrow positions
+                targetSwitchBtn.querySelector('.target-arrow.left').style.transform = '';
+                targetSwitchBtn.querySelector('.target-arrow.right').style.transform = '';
+            }, { passive: false });
+        }
+
         function setupInput() {
             // Keyboard
             window.addEventListener('keydown', (e) => {
