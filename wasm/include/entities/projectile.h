@@ -3,6 +3,7 @@
 
 #include "entity.h"
 #include "../config/game_config.h"
+#include <cmath>
 
 class Projectile : public Entity {
 public:
@@ -20,6 +21,7 @@ public:
           ownerId(owner),
           direction(dir.normalized()) {
         velocity = direction * speed;
+        rotation = atan2(direction.y, direction.x);
     }
     
     void update(float deltaTime) override {

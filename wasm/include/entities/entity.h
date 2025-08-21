@@ -33,6 +33,7 @@ public:
     EntityType type;
     Vector2 position;
     Vector2 velocity;
+    float rotation;  // Rotation angle in radians
     float radius;
     float health;
     float maxHealth;
@@ -42,7 +43,7 @@ public:
     
     Entity(EntityType type, const Vector2& pos, float radius)
         : id(nextId++), type(type), position(pos), velocity(0, 0),
-          radius(radius), health(100), maxHealth(100), active(true),
+          rotation(0), radius(radius), health(100), maxHealth(100), active(true),
           invulnerable(false), invulnerabilityTimer(0) {}
     
     virtual ~Entity() = default;

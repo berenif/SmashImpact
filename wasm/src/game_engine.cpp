@@ -3,6 +3,7 @@
 #include <emscripten/val.h>
 #include <cstdlib>
 #include <ctime>
+#include <cmath>
 
 GameEngine::GameEngine(float width, float height)
     : worldWidth(width), worldHeight(height),
@@ -122,6 +123,12 @@ void GameEngine::updatePlayerInput(float dx, float dy, float aimX, float aimY) {
     // Apply friction
     if (!player->boosting) {
         player->velocity *= Config::PLAYER_FRICTION;
+    }
+    
+    // Update player rotation based on aim direction
+    Vector2 aimDirection(aimX - player->position.x, aimY - player->position.y);
+    if (aimDirection.magnitude() > 0.0f) {
+        player->rotation = atan2(aimDirection.y, aimDirection.x);
     }
 }
 
@@ -420,6 +427,7 @@ emscripten::val GameEngine::getEntityPositions() {
             entityData.set("y", entity->position.y);
             entityData.set("vx", entity->velocity.x);
             entityData.set("vy", entity->velocity.y);
+            entityData.set("rotation", entity->rotation);
             entityData.set("radius", entity->radius);
             entityData.set("health", entity->health);
             entityData.set("maxHealth", entity->maxHealth);
