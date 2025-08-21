@@ -118,7 +118,9 @@ export class Renderer {
         
         ctx.save();
         ctx.translate(entity.x, entity.y);
-        ctx.rotate(entity.rotation);
+        // Safely handle rotation with fallback to 0
+        const rotation = entity.rotation !== undefined ? entity.rotation : 0;
+        ctx.rotate(rotation);
         
         // Set color based on entity type
         switch(entity.type) {

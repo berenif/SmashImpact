@@ -1,4 +1,4 @@
 #include "../include/entities/entity.h"
 
-// Initialize static member
+// Define the static member
 int Entity::nextId = 1;

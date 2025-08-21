@@ -3,6 +3,7 @@
 
 #include "entity.h"
 #include "../config/game_config.h"
+#include <cmath>
 
 class Enemy : public Entity {
 public:
@@ -80,6 +81,8 @@ public:
                 if (distanceToTarget > Config::WOLF_ATTACK_RADIUS) {
                     Vector2 direction = (target->position - position).normalized();
                     velocity = direction * speed;
+                    // Update rotation to face target
+                    rotation = atan2(direction.y, direction.x);
                 } else {
                     aiState = AIState::ATTACKING;
                     velocity = Vector2(0, 0);
