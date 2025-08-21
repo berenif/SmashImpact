@@ -1403,8 +1403,13 @@
             });
             
             // Check projectile-enemy collisions
-            Game.projectiles.forEach((proj, projIndex) => {
-                Game.enemies.forEach((enemy, enemyIndex) => {
+            // Use reverse iteration to safely remove items during iteration
+            for (let projIndex = Game.projectiles.length - 1; projIndex >= 0; projIndex--) {
+                const proj = Game.projectiles[projIndex];
+                let projHit = false;
+                
+                for (let enemyIndex = Game.enemies.length - 1; enemyIndex >= 0; enemyIndex--) {
+                    const enemy = Game.enemies[enemyIndex];
                     const dx = proj.x - enemy.x;
                     const dy = proj.y - enemy.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1413,17 +1418,24 @@
                         // Damage enemy
                         enemy.health -= 25;
                         
-                        // Remove projectile
-                        Game.projectiles.splice(projIndex, 1);
+                        // Mark projectile for removal
+                        projHit = true;
                         
                         // Remove enemy if dead
                         if (enemy.health <= 0) {
                             Game.enemies.splice(enemyIndex, 1);
                             Game.score += 100;
                         }
+                        
+                        break; // Projectile can only hit one enemy
                     }
-                });
-            });
+                }
+                
+                // Remove projectile if it hit something
+                if (projHit) {
+                    Game.projectiles.splice(projIndex, 1);
+                }
+            }
         }
         
         // Handle input
@@ -1673,28 +1685,37 @@
         
         // Update HUD
         function updateHUD() {
+            const healthBar = document.getElementById('healthBar');
+            const energyBar = document.getElementById('energyBar');
+            const scoreElement = document.getElementById('score');
+            
             if (Game.engine && Game.engine.getPlayerState) {
                 // WASM player state
                 const player = Game.engine.getPlayerState();
                 if (player) {
-                    document.getElementById('healthBar').style.width = player.health + '%';
-                    document.getElementById('energyBar').style.width = player.energy + '%';
+                    if (healthBar) healthBar.style.width = Math.max(0, Math.min(100, player.health)) + '%';
+                    if (energyBar) energyBar.style.width = Math.max(0, Math.min(100, player.energy)) + '%';
                 }
             } else if (Game.player) {
                 // JavaScript player state
-                document.getElementById('healthBar').style.width = Game.player.health + '%';
-                document.getElementById('energyBar').style.width = Game.player.energy + '%';
+                if (healthBar) healthBar.style.width = Math.max(0, Math.min(100, Game.player.health)) + '%';
+                if (energyBar) energyBar.style.width = Math.max(0, Math.min(100, Game.player.energy)) + '%';
             }
             
-            document.getElementById('score').textContent = Game.score;
+            if (scoreElement) scoreElement.textContent = Game.score || 0;
         }
         
         // Update stats
         function updateStats() {
-            document.getElementById('fps').textContent = Game.stats.fps;
-            document.getElementById('ms').textContent = (1000 / Game.stats.fps).toFixed(1);
-            document.getElementById('wasmMs').textContent = Game.stats.wasmTime.toFixed(1);
-            document.getElementById('entities').textContent = Game.stats.entities;
+            const fpsElement = document.getElementById('fps');
+            const msElement = document.getElementById('ms');
+            const wasmMsElement = document.getElementById('wasmMs');
+            const entitiesElement = document.getElementById('entities');
+            
+            if (fpsElement) fpsElement.textContent = Game.stats.fps || 0;
+            if (msElement) msElement.textContent = Game.stats.fps > 0 ? (1000 / Game.stats.fps).toFixed(1) : '0';
+            if (wasmMsElement) wasmMsElement.textContent = (Game.stats.wasmTime || 0).toFixed(1);
+            if (entitiesElement) entitiesElement.textContent = Game.stats.entities || 0;
         }
         
         // Toggle pause
