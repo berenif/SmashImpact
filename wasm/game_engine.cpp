@@ -538,6 +538,11 @@ private:
     float worldWidth;
     float worldHeight;
     
+    // Targeting system
+    Entity* currentTarget;
+    bool targetLockEnabled;
+    float targetingDisabledUntil;
+    
     // Performance metrics
     float physicsTime;
     float collisionTime;
@@ -546,6 +551,7 @@ private:
 public:
     GameEngine(float width, float height)
         : player(nullptr), nextEntityId(1), worldWidth(width), worldHeight(height),
+          currentTarget(nullptr), targetLockEnabled(true), targetingDisabledUntil(0),
           physicsTime(0), collisionTime(0), collisionChecks(0) {}
     
     int createPlayer(float x, float y) {
@@ -1022,6 +1028,119 @@ public:
         entityMap[id] = obstacle.get();
         entities.push_back(std::move(obstacle));
         return id;
+    }
+    
+    // Targeting system methods
+    Entity* findClosestEnemy() {
+        if (!player || !player->active) return nullptr;
+        
+        Entity* closest = nullptr;
+        float closestDistance = std::numeric_limits<float>::max();
+        
+        for (const auto& entity : entities) {
+            if (!entity->active) continue;
+            if (entity->type != EntityType::ENEMY && entity->type != EntityType::WOLF) continue;
+            
+            float dist = player->distanceTo(*entity);
+            if (dist < closestDistance && dist <= Config::MAX_TARGET_DISTANCE) {
+                closestDistance = dist;
+                closest = entity.get();
+            }
+        }
+        
+        return closest;
+    }
+    
+    void switchToNextTarget() {
+        std::vector<Entity*> targetableEnemies;
+        
+        // Collect all targetable enemies within range
+        for (const auto& entity : entities) {
+            if (!entity->active) continue;
+            if (entity->type != EntityType::ENEMY && entity->type != EntityType::WOLF) continue;
+            
+            float dist = player->distanceTo(*entity);
+            if (dist <= Config::MAX_TARGET_DISTANCE) {
+                targetableEnemies.push_back(entity.get());
+            }
+        }
+        
+        if (targetableEnemies.empty()) {
+            currentTarget = nullptr;
+            return;
+        }
+        
+        // If no current target or current target is invalid, get closest
+        if (!currentTarget || std::find(targetableEnemies.begin(), targetableEnemies.end(), currentTarget) == targetableEnemies.end()) {
+            currentTarget = findClosestEnemy();
+            return;
+        }
+        
+        // Find current target index and switch to next
+        auto it = std::find(targetableEnemies.begin(), targetableEnemies.end(), currentTarget);
+        if (it != targetableEnemies.end()) {
+            size_t currentIndex = std::distance(targetableEnemies.begin(), it);
+            size_t nextIndex = (currentIndex + 1) % targetableEnemies.size();
+            currentTarget = targetableEnemies[nextIndex];
+        }
+    }
+    
+    void enableTargeting() {
+        targetLockEnabled = true;
+        targetingDisabledUntil = 0;
+    }
+    
+    void disableTargeting(float duration) {
+        targetLockEnabled = false;
+        targetingDisabledUntil = emscripten_get_now() + duration * 1000; // Convert to milliseconds
+        currentTarget = nullptr;
+    }
+    
+    void updateTargeting(float deltaTime) {
+        // Re-enable targeting if disabled period has passed
+        if (!targetLockEnabled && targetingDisabledUntil > 0) {
+            if (emscripten_get_now() >= targetingDisabledUntil) {
+                enableTargeting();
+            }
+        }
+        
+        if (!targetLockEnabled) {
+            currentTarget = nullptr;
+            return;
+        }
+        
+        // Validate current target
+        if (currentTarget) {
+            if (!currentTarget->active) {
+                currentTarget = findClosestEnemy();
+            } else {
+                float dist = player->distanceTo(*currentTarget);
+                if (dist > Config::MAX_TARGET_DISTANCE) {
+                    currentTarget = findClosestEnemy();
+                }
+            }
+        } else {
+            // Auto-acquire target if none
+            currentTarget = findClosestEnemy();
+        }
+        
+        // Update player facing to look at target
+        if (currentTarget && player) {
+            float dx = currentTarget->position.x - player->position.x;
+            float dy = currentTarget->position.y - player->position.y;
+            player->facing = std::atan2(dy, dx);
+        }
+    }
+    
+    int getCurrentTargetId() {
+        if (currentTarget && currentTarget->active) {
+            return currentTarget->id;
+        }
+        return -1;
+    }
+    
+    bool isTargetingEnabled() {
+        return targetLockEnabled;
     }
     
     // Player shoot projectile
