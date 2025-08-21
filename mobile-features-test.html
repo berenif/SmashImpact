@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mobile Features Test - Complete Implementation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .feature-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .feature-section.warning {
+            border-left-color: #FFC107;
+        }
+        
+        .feature-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: normal;
+        }
+        
+        .status.complete {
+            background: #4CAF50;
+        }
+        
+        .status.partial {
+            background: #FFC107;
+            color: #333;
+        }
+        
+        ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        .code-block {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        
+        .test-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            margin: 10px 5px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .summary-box {
+            background: rgba(76, 175, 80, 0.2);
+            border: 2px solid #4CAF50;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+        
+        .summary-title {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Mobile Features Implementation Status</h1>
+        
+        <div class="feature-section">
+            <div class="feature-title">
+                ✅ 1. Mobile Landscape Orientation Check
+                <span class="status complete">COMPLETE</span>
+            </div>
+            <p>A fullscreen orientation warning appears when mobile devices are in portrait mode.</p>
+            <ul>
+                <li>✅ Detects mobile devices using user agent and touch capabilities</li>
+                <li>✅ Shows animated phone rotation icon</li>
+                <li>✅ Message: "Please rotate your device - This game is best played in landscape mode"</li>
+                <li>✅ Automatically pauses game when in portrait mode</li>
+                <li>✅ Resumes game when rotated to landscape</li>
+            </ul>
+            <div class="code-block">
+                Location: game.html (lines 24-65, 1084-1108)
+            </div>
+        </div>
+        
+        <div class="feature-section">
+            <div class="feature-title">
+                ✅ 2. Mobile Interface with Joystick
+                <span class="status complete">COMPLETE</span>
+            </div>
+            <p>Virtual joystick for movement control on mobile devices.</p>
+            <ul>
+                <li>✅ Touch-responsive joystick with visual feedback</li>
+                <li>✅ Dead zone configuration for precision</li>
+                <li>✅ Smooth analog movement input</li>
+                <li>✅ Visual knob that follows touch position</li>
+                <li>✅ Automatically sends input to WASM engine</li>
+            </ul>
+            <div class="code-block">
+                Location: game.html (MobileControlsWASM class, lines 850-1067)
+            </div>
+        </div>
+        
+        <div class="feature-section">
+            <div class="feature-title">
+                ✅ 3. Mobile Action Buttons
+                <span class="status complete">COMPLETE</span>
+            </div>
+            <p>Three main action buttons for combat mechanics.</p>
+            <ul>
+                <li>✅ <strong>Attack Button (⚔️)</strong> - Triggers player attack</li>
+                <li>✅ <strong>Roll/Dodge Button (💨)</strong> - Performs evasive roll</li>
+                <li>✅ <strong>Block Button (🛡️)</strong> - Activates defensive stance</li>
+                <li>✅ Haptic feedback on button press (10ms vibration)</li>
+                <li>✅ Visual press feedback with scaling animation</li>
+            </ul>
+            <div class="code-block">
+                Location: game.html (lines 570-586, 987-1029)
+            </div>
+        </div>
+        
+        <div class="feature-section">
+            <div class="feature-title">
+                ✅ 4. Target Switching Button
+                <span class="status complete">COMPLETE</span>
+            </div>
+            <p>Dedicated button for switching between targets.</p>
+            <ul>
+                <li>✅ Positioned at top-right of screen</li>
+                <li>✅ Left/Right arrows (◀ TARGET ▶)</li>
+                <li>✅ Click left side for previous target</li>
+                <li>✅ Click right side for next target</li>
+                <li>✅ Visual feedback on press</li>
+                <li>✅ WASM engine integration with switchTarget(direction)</li>
+            </ul>
+            <div class="code-block">
+                WASM: game_engine.cpp - switchTarget(int direction)<br>
+                HTML: game.html (lines 560-564, 1114-1170)
+            </div>
+        </div>
+        
+        <div class="feature-section">
+            <div class="feature-title">
+                ✅ 5. Roll/Dodge Duration Fix
+                <span class="status complete">COMPLETE</span>
+            </div>
+            <p>Optimized roll mechanics for better gameplay.</p>
+            <ul>
+                <li>✅ Roll duration reduced from 300ms to 200ms</li>
+                <li>✅ Roll speed multiplier already at 1.5x (previously reduced from 2.5x)</li>
+                <li>✅ Roll distance remains at 150 units</li>
+                <li>✅ Roll cooldown: 800ms</li>
+                <li>✅ Energy cost: 15 units</li>
+            </ul>
+            <div class="code-block">
+                Location: wasm/game_engine.cpp (lines 49-54)<br>
+                Config::ROLL_DURATION = 200.0f (was 300.0f)
+            </div>
+        </div>
+        
+        <div class="feature-section warning">
+            <div class="feature-title">
+                ⚠️ Build Requirements
+                <span class="status partial">ACTION NEEDED</span>
+            </div>
+            <p>The WASM modules have been rebuilt with the latest changes.</p>
+            <ul>
+                <li>✅ Main game engine rebuilt (game_engine.wasm)</li>
+                <li>✅ Wolf AI module rebuilt (wolf_ai.wasm)</li>
+                <li>✅ Both modules successfully compiled with Emscripten</li>
+            </ul>
+        </div>
+        
+        <div class="summary-box">
+            <div class="summary-title">📊 Implementation Summary</div>
+            <p><strong>All requested features have been successfully implemented:</strong></p>
+            <ol>
+                <li>✅ Mobile landscape orientation check with invitation message</li>
+                <li>✅ Mobile interface with joystick control (already existed, verified working)</li>
+                <li>✅ Three action buttons: Attack, Roll/Dodge, Block</li>
+                <li>✅ Target switching button with left/right directional control</li>
+                <li>✅ Roll duration reduced from 300ms to 200ms for quicker response</li>
+            </ol>
+            
+            <p style="margin-top: 20px;"><strong>Key Improvements Made:</strong></p>
+            <ul>
+                <li>Added bidirectional target switching in WASM engine</li>
+                <li>Reduced roll duration for more responsive gameplay</li>
+                <li>Enhanced mobile controls with haptic feedback</li>
+                <li>Automatic game pausing when device orientation changes</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="game.html" class="test-button">🎮 Test Game</a>
+            <a href="mobile-test.html" class="test-button">📱 Mobile Test Page</a>
+        </div>
+    </div>
+</body>
+</html>

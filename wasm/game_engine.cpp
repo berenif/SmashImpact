@@ -48,7 +48,7 @@ namespace Config {
     
     // Roll/Dodge configuration
     constexpr float ROLL_DISTANCE = 150.0f;
-    constexpr float ROLL_DURATION = 300.0f;
+    constexpr float ROLL_DURATION = 200.0f;  // Reduced from 300.0f for quicker, more responsive rolls
     constexpr float ROLL_COOLDOWN = 800.0f;
     constexpr float ROLL_SPEED_MULTIPLIER = 1.5f;  // Reduced from 2.5f to make roll shorter
     constexpr float ROLL_ENERGY_COST = 15.0f;
@@ -1132,6 +1132,12 @@ public:
     }
     
     void switchToNextTarget() {
+        switchTarget(1);  // Use the new bidirectional function
+    }
+    
+    // New bidirectional target switching function
+    // direction: -1 for previous target, 1 for next target
+    void switchTarget(int direction) {
         std::vector<Entity*> targetableEnemies;
         
         // Collect all targetable enemies within range
@@ -1150,17 +1156,39 @@ public:
             return;
         }
         
+        // Sort enemies by angle from player for consistent ordering
+        if (player) {
+            std::sort(targetableEnemies.begin(), targetableEnemies.end(), 
+                [this](Entity* a, Entity* b) {
+                    float angleA = std::atan2(a->position.y - player->position.y, 
+                                            a->position.x - player->position.x);
+                    float angleB = std::atan2(b->position.y - player->position.y, 
+                                            b->position.x - player->position.x);
+                    return angleA < angleB;
+                });
+        }
+        
         // If no current target or current target is invalid, get closest
         if (!currentTarget || std::find(targetableEnemies.begin(), targetableEnemies.end(), currentTarget) == targetableEnemies.end()) {
             currentTarget = findClosestEnemy();
             return;
         }
         
-        // Find current target index and switch to next
+        // Find current target index and switch based on direction
         auto it = std::find(targetableEnemies.begin(), targetableEnemies.end(), currentTarget);
         if (it != targetableEnemies.end()) {
             size_t currentIndex = std::distance(targetableEnemies.begin(), it);
-            size_t nextIndex = (currentIndex + 1) % targetableEnemies.size();
+            size_t targetCount = targetableEnemies.size();
+            size_t nextIndex;
+            
+            if (direction > 0) {
+                // Next target
+                nextIndex = (currentIndex + 1) % targetCount;
+            } else {
+                // Previous target
+                nextIndex = (currentIndex + targetCount - 1) % targetCount;
+            }
+            
             currentTarget = targetableEnemies[nextIndex];
         }
     }
@@ -1465,6 +1493,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("isBlocking", &GameEngine::isBlocking)
         .function("isPerfectParryWindow", &GameEngine::isPerfectParryWindow)
         .function("switchToNextTarget", &GameEngine::switchToNextTarget)
+        .function("switchTarget", &GameEngine::switchTarget)
         .function("enableTargeting", &GameEngine::enableTargeting)
         .function("disableTargeting", &GameEngine::disableTargeting)
         .function("getCurrentTargetId", &GameEngine::getCurrentTargetId)
