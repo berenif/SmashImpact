@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Targeting System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        canvas {
+            border: 2px solid #444;
+            touch-action: none;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="info">
+        <h3>WASM Targeting Test</h3>
+        <p>Target ID: <span id="targetId">None</span></p>
+        <p>Targeting Enabled: <span id="targetingEnabled">Yes</span></p>
+        <p>Button State: <span id="buttonState">Ready</span></p>
+    </div>
+    
+    <div id="controls">
+        <button onclick="testQuickPress()">Test Quick Press</button>
+        <button onclick="testLongPress()">Test Long Press</button>
+        <button onclick="spawnEnemy()">Spawn Enemy</button>
+    </div>
+
+    <script src="game_engine.js"></script>
+    <script src="wasm-targeting-button.js"></script>
+    <script>
+        let gameEngine = null;
+        let targetButton = null;
+        let canvas = document.getElementById('gameCanvas');
+        let ctx = canvas.getContext('2d');
+        let enemies = [];
+        let player = null;
+        
+        // Initialize WASM module
+        createGameEngine().then(Module => {
+            gameEngine = new Module.GameEngine(canvas.width, canvas.height);
+            
+            // Create player
+            let playerId = gameEngine.createPlayer(canvas.width / 2, canvas.height / 2);
+            player = { id: playerId, x: canvas.width / 2, y: canvas.height / 2 };
+            
+            // Create some enemies
+            for (let i = 0; i < 3; i++) {
+                let angle = (Math.PI * 2 / 3) * i;
+                let x = canvas.width / 2 + Math.cos(angle) * 200;
+                let y = canvas.height / 2 + Math.sin(angle) * 200;
+                let enemyId = gameEngine.createEnemy(x, y, 2);
+                enemies.push({ id: enemyId, x: x, y: y });
+            }
+            
+            // Create targeting button
+            targetButton = new WASMTargetingButton(canvas, gameEngine);
+            
+            // Start game loop
+            gameLoop();
+        });
+        
+        function testQuickPress() {
+            if (gameEngine) {
+                gameEngine.handleTargetingButton(100); // 100ms press
+                updateInfo();
+            }
+        }
+        
+        function testLongPress() {
+            if (gameEngine) {
+                gameEngine.handleTargetingButton(600); // 600ms press
+                updateInfo();
+            }
+        }
+        
+        function spawnEnemy() {
+            if (gameEngine) {
+                let x = Math.random() * canvas.width;
+                let y = Math.random() * canvas.height;
+                let enemyId = gameEngine.createEnemy(x, y, 2);
+                enemies.push({ id: enemyId, x: x, y: y });
+            }
+        }
+        
+        function updateInfo() {
+            if (gameEngine) {
+                document.getElementById('targetId').textContent = gameEngine.getCurrentTargetId();
+                document.getElementById('targetingEnabled').textContent = gameEngine.isTargetingEnabled() ? 'Yes' : 'No';
+                
+                let buttonState = gameEngine.getTargetButtonState();
+                let stateText = 'Ready';
+                if (buttonState.disabled) {
+                    stateText = `Disabled (${Math.ceil(buttonState.disableTimeRemaining)}s)`;
+                } else if (buttonState.active) {
+                    stateText = 'Pressed';
+                } else if (buttonState.hasTarget) {
+                    stateText = 'Target Locked';
+                }
+                document.getElementById('buttonState').textContent = stateText;
+            }
+        }
+        
+        function gameLoop() {
+            // Clear canvas
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update game
+            if (gameEngine) {
+                gameEngine.update(16); // 16ms per frame
+                
+                // Get entities
+                let entities = gameEngine.getEntityPositions();
+                
+                // Draw entities
+                for (let i = 0; i < entities.size(); i++) {
+                    let entity = entities.get(i);
+                    
+                    // Draw based on type
+                    if (entity.type === 0) { // Player
+                        ctx.fillStyle = '#4a90e2';
+                        ctx.beginPath();
+                        ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (entity.type === 1) { // Enemy
+                        let isTarget = entity.id === gameEngine.getCurrentTargetId();
+                        ctx.fillStyle = isTarget ? '#ff6666' : '#ff4444';
+                        ctx.beginPath();
+                        ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // Draw target indicator
+                        if (isTarget) {
+                            ctx.strokeStyle = '#ffff00';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.arc(entity.x, entity.y, entity.radius + 10, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                // Draw targeting button
+                if (targetButton) {
+                    targetButton.render(ctx);
+                }
+                
+                // Update info
+                updateInfo();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>

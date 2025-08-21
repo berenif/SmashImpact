@@ -8,6 +8,9 @@
 #include <memory>
 #include <algorithm>
 #include <unordered_map>
+#include <limits>
+#include <emscripten/html5.h>
+#include <emscripten/val.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -49,6 +52,9 @@ namespace Config {
     constexpr float ROLL_COOLDOWN = 800.0f;
     constexpr float ROLL_SPEED_MULTIPLIER = 2.5f;
     constexpr float ROLL_ENERGY_COST = 15.0f;
+    
+    // Targeting system configuration
+    constexpr float MAX_TARGET_DISTANCE = 400.0f;
 }
 
 // Vector2 class for 2D math operations
@@ -538,6 +544,24 @@ private:
     float worldWidth;
     float worldHeight;
     
+    // Targeting system
+    Entity* currentTarget;
+    bool targetLockEnabled;
+    float targetingDisabledUntil;
+    
+    // Targeting button state
+    struct TargetingButton {
+        float x, y, radius;
+        bool active;
+        bool visible;
+        float touchStartTime;
+        float disabledUntil;
+        int touchId;
+        
+        TargetingButton() : x(0), y(0), radius(40), active(false), visible(true),
+                           touchStartTime(0), disabledUntil(0), touchId(-1) {}
+    } targetButton;
+    
     // Performance metrics
     float physicsTime;
     float collisionTime;
@@ -546,7 +570,14 @@ private:
 public:
     GameEngine(float width, float height)
         : player(nullptr), nextEntityId(1), worldWidth(width), worldHeight(height),
-          physicsTime(0), collisionTime(0), collisionChecks(0) {}
+          currentTarget(nullptr), targetLockEnabled(true), targetingDisabledUntil(0),
+          physicsTime(0), collisionTime(0), collisionChecks(0) {
+        // Initialize targeting button position (top-right for mobile)
+        targetButton.x = width - 50;
+        targetButton.y = height - 280;
+        targetButton.radius = 40;
+        targetButton.visible = true;
+    }
     
     int createPlayer(float x, float y) {
         auto playerEntity = std::make_unique<Player>(nextEntityId++, x, y);
@@ -605,6 +636,9 @@ public:
     
     void update(float deltaTime) {
         auto startTime = emscripten_get_now();
+        
+        // Update targeting system
+        updateTargeting(deltaTime);
         
         // Update all entities
         for (auto& entity : entities) {
@@ -1024,6 +1058,203 @@ public:
         return id;
     }
     
+    // Targeting system methods
+    Entity* findClosestEnemy() {
+        if (!player || !player->active) return nullptr;
+        
+        Entity* closest = nullptr;
+        float closestDistance = std::numeric_limits<float>::max();
+        
+        for (const auto& entity : entities) {
+            if (!entity->active) continue;
+            if (entity->type != EntityType::ENEMY && entity->type != EntityType::WOLF) continue;
+            
+            float dist = player->distanceTo(*entity);
+            if (dist < closestDistance && dist <= Config::MAX_TARGET_DISTANCE) {
+                closestDistance = dist;
+                closest = entity.get();
+            }
+        }
+        
+        return closest;
+    }
+    
+    void switchToNextTarget() {
+        std::vector<Entity*> targetableEnemies;
+        
+        // Collect all targetable enemies within range
+        for (const auto& entity : entities) {
+            if (!entity->active) continue;
+            if (entity->type != EntityType::ENEMY && entity->type != EntityType::WOLF) continue;
+            
+            float dist = player->distanceTo(*entity);
+            if (dist <= Config::MAX_TARGET_DISTANCE) {
+                targetableEnemies.push_back(entity.get());
+            }
+        }
+        
+        if (targetableEnemies.empty()) {
+            currentTarget = nullptr;
+            return;
+        }
+        
+        // If no current target or current target is invalid, get closest
+        if (!currentTarget || std::find(targetableEnemies.begin(), targetableEnemies.end(), currentTarget) == targetableEnemies.end()) {
+            currentTarget = findClosestEnemy();
+            return;
+        }
+        
+        // Find current target index and switch to next
+        auto it = std::find(targetableEnemies.begin(), targetableEnemies.end(), currentTarget);
+        if (it != targetableEnemies.end()) {
+            size_t currentIndex = std::distance(targetableEnemies.begin(), it);
+            size_t nextIndex = (currentIndex + 1) % targetableEnemies.size();
+            currentTarget = targetableEnemies[nextIndex];
+        }
+    }
+    
+    void enableTargeting() {
+        targetLockEnabled = true;
+        targetingDisabledUntil = 0;
+    }
+    
+    void disableTargeting(float duration) {
+        targetLockEnabled = false;
+        targetingDisabledUntil = emscripten_get_now() + duration * 1000; // Convert to milliseconds
+        currentTarget = nullptr;
+    }
+    
+    void updateTargeting(float deltaTime) {
+        // Re-enable targeting if disabled period has passed
+        if (!targetLockEnabled && targetingDisabledUntil > 0) {
+            if (emscripten_get_now() >= targetingDisabledUntil) {
+                enableTargeting();
+            }
+        }
+        
+        if (!targetLockEnabled) {
+            currentTarget = nullptr;
+            return;
+        }
+        
+        // Validate current target
+        if (currentTarget) {
+            if (!currentTarget->active) {
+                currentTarget = findClosestEnemy();
+            } else {
+                float dist = player->distanceTo(*currentTarget);
+                if (dist > Config::MAX_TARGET_DISTANCE) {
+                    currentTarget = findClosestEnemy();
+                }
+            }
+        } else {
+            // Auto-acquire target if none
+            currentTarget = findClosestEnemy();
+        }
+        
+        // Update player facing to look at target
+        if (currentTarget && player) {
+            float dx = currentTarget->position.x - player->position.x;
+            float dy = currentTarget->position.y - player->position.y;
+            player->facing = std::atan2(dy, dx);
+        }
+    }
+    
+    int getCurrentTargetId() {
+        if (currentTarget && currentTarget->active) {
+            return currentTarget->id;
+        }
+        return -1;
+    }
+    
+    bool isTargetingEnabled() {
+        return targetLockEnabled;
+    }
+    
+    // Handle targeting button touch start
+    void onTargetButtonTouchStart(float x, float y, int touchId) {
+        // Check if touch is within button bounds
+        float dx = x - targetButton.x;
+        float dy = y - targetButton.y;
+        float distance = std::sqrt(dx * dx + dy * dy);
+        
+        if (distance <= targetButton.radius && !targetButton.active) {
+            targetButton.active = true;
+            targetButton.touchId = touchId;
+            targetButton.touchStartTime = emscripten_get_now();
+        }
+    }
+    
+    // Handle targeting button touch end
+    void onTargetButtonTouchEnd(int touchId) {
+        if (targetButton.active && targetButton.touchId == touchId) {
+            float pressDuration = emscripten_get_now() - targetButton.touchStartTime;
+            
+            // Check if button is not disabled
+            if (emscripten_get_now() >= targetButton.disabledUntil) {
+                if (pressDuration < 500) {
+                    // Quick press - switch to next target
+                    switchToNextTarget();
+                } else {
+                    // Long press - disable targeting for 2 seconds
+                    disableTargeting(2.0f);
+                    targetButton.disabledUntil = emscripten_get_now() + 2000;
+                }
+            }
+            
+            targetButton.active = false;
+            targetButton.touchId = -1;
+        }
+    }
+    
+    // Update targeting button position (for resize)
+    void setTargetButtonPosition(float x, float y) {
+        targetButton.x = x;
+        targetButton.y = y;
+    }
+    
+    // Set targeting button visibility
+    void setTargetButtonVisible(bool visible) {
+        targetButton.visible = visible;
+    }
+    
+    // Get targeting button state for rendering
+    emscripten::val getTargetButtonState() {
+        emscripten::val state = emscripten::val::object();
+        state.set("x", targetButton.x);
+        state.set("y", targetButton.y);
+        state.set("radius", targetButton.radius);
+        state.set("active", targetButton.active);
+        state.set("visible", targetButton.visible);
+        state.set("disabled", emscripten_get_now() < targetButton.disabledUntil);
+        state.set("hasTarget", currentTarget != nullptr && currentTarget->active);
+        state.set("targetingEnabled", targetLockEnabled);
+        
+        // Calculate remaining disable time
+        if (emscripten_get_now() < targetButton.disabledUntil) {
+            float remainingTime = (targetButton.disabledUntil - emscripten_get_now()) / 1000.0f;
+            state.set("disableTimeRemaining", remainingTime);
+        } else {
+            state.set("disableTimeRemaining", 0.0f);
+        }
+        
+        return state;
+    }
+    
+    // Handle targeting button press (legacy method for compatibility)
+    // pressDuration in milliseconds
+    // Quick press (<500ms): switch target
+    // Long press (>=500ms): disable targeting for 2 seconds
+    void handleTargetingButton(float pressDuration) {
+        if (pressDuration < 500) {
+            // Quick press - switch to next target
+            switchToNextTarget();
+        } else {
+            // Long press - disable targeting for 2 seconds
+            disableTargeting(2.0f);
+        }
+    }
+    
     // Player shoot projectile
     void playerShoot(float aimX, float aimY) {
         if (!player || !player->active) return;
@@ -1079,5 +1310,16 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("startBlock", &GameEngine::startBlock)
         .function("endBlock", &GameEngine::endBlock)
         .function("isBlocking", &GameEngine::isBlocking)
-        .function("isPerfectParryWindow", &GameEngine::isPerfectParryWindow);
+        .function("isPerfectParryWindow", &GameEngine::isPerfectParryWindow)
+        .function("switchToNextTarget", &GameEngine::switchToNextTarget)
+        .function("enableTargeting", &GameEngine::enableTargeting)
+        .function("disableTargeting", &GameEngine::disableTargeting)
+        .function("getCurrentTargetId", &GameEngine::getCurrentTargetId)
+        .function("isTargetingEnabled", &GameEngine::isTargetingEnabled)
+        .function("handleTargetingButton", &GameEngine::handleTargetingButton)
+        .function("onTargetButtonTouchStart", &GameEngine::onTargetButtonTouchStart)
+        .function("onTargetButtonTouchEnd", &GameEngine::onTargetButtonTouchEnd)
+        .function("setTargetButtonPosition", &GameEngine::setTargetButtonPosition)
+        .function("setTargetButtonVisible", &GameEngine::setTargetButtonVisible)
+        .function("getTargetButtonState", &GameEngine::getTargetButtonState);
 }
