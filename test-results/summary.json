@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-08-21T16:31:03.345Z",
+  "duration": 338,
+  "environment": {
+    "node": "v22.16.0",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "metrics": {
+    "startTime": 1755793863007,
+    "totalTests": 0,
+    "passedTests": 0,
+    "failedTests": 0,
+    "skippedTests": 0
+  }
+}
