@@ -1,0 +1,129 @@
+{
+  "name": "WASM Game Engine Build Configuration",
+  "version": "1.0.0",
+  "description": "Configuration file for WASM module build system",
+  
+  "paths": {
+    "workspace": "/workspace",
+    "wasm_dir": "wasm",
+    "public_dir": "public",
+    "emsdk_dir": "emsdk",
+    "cache_dir": ".build-cache",
+    "logs_dir": "logs"
+  },
+  
+  "source_files": {
+    "main": "wasm/game_engine.cpp",
+    "additional": [
+      "wasm/src/entity.cpp"
+    ],
+    "headers": [
+      "wasm/include/*.h"
+    ]
+  },
+  
+  "output": {
+    "js_file": "public/game_engine.js",
+    "wasm_file": "public/game_engine.wasm",
+    "module_name": "GameEngineModule"
+  },
+  
+  "build_modes": {
+    "debug": {
+      "optimization": "-O0",
+      "flags": [
+        "-g4",
+        "-s ASSERTIONS=2",
+        "-s SAFE_HEAP=1",
+        "-s STACK_OVERFLOW_CHECK=2",
+        "-s DEMANGLE_SUPPORT=1"
+      ],
+      "description": "Debug build with full assertions and stack checking"
+    },
+    "profile": {
+      "optimization": "-O2",
+      "flags": [
+        "-g2",
+        "--profiling",
+        "-s ASSERTIONS=1"
+      ],
+      "description": "Optimized build with profiling support"
+    },
+    "release": {
+      "optimization": "-O3",
+      "flags": [
+        "-s MALLOC=emmalloc",
+        "--closure 1",
+        "-flto"
+      ],
+      "description": "Production build with maximum optimization"
+    }
+  },
+  
+  "common_flags": [
+    "-s WASM=1",
+    "-s ALLOW_MEMORY_GROWTH=1",
+    "-s MODULARIZE=1",
+    "-s EXPORT_NAME='GameEngineModule'",
+    "--bind",
+    "-std=c++17",
+    "-s ENVIRONMENT='web'",
+    "-s EXPORT_ES6=1",
+    "-s FILESYSTEM=0",
+    "-s NO_EXIT_RUNTIME=1"
+  ],
+  
+  "include_directories": [
+    "wasm/include"
+  ],
+  
+  "watch": {
+    "enabled": true,
+    "patterns": [
+      "wasm/**/*.cpp",
+      "wasm/**/*.h",
+      "wasm/**/*.hpp"
+    ],
+    "ignore": [
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/*.wasm",
+      "**/*.js.map"
+    ],
+    "debounce_ms": 1000
+  },
+  
+  "cache": {
+    "enabled": true,
+    "hash_algorithm": "md5",
+    "clean_on_error": true
+  },
+  
+  "notifications": {
+    "on_success": true,
+    "on_error": true,
+    "sound": false,
+    "desktop": false
+  },
+  
+  "testing": {
+    "enabled": true,
+    "test_files": [
+      "tests/test-wasm.js",
+      "tests/wolf-ai-tests.js"
+    ],
+    "run_after_build": false
+  },
+  
+  "docker": {
+    "image": "emscripten/emsdk:3.1.50",
+    "auto_build": true,
+    "mount_cache": true
+  },
+  
+  "performance": {
+    "parallel_compilation": true,
+    "max_workers": 4,
+    "memory_limit_mb": 4096
+  }
+}
