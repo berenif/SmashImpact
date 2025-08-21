@@ -90,7 +90,7 @@
                         const entitiesAfter = engine.getEntityPositions();
                         outputEl.textContent += `  - Entities after clear: ${entitiesAfter.length}\n`;
                         
-                        if (entitiesAfter.size() === 0) {
+                        if (entitiesAfter.length === 0) {
                             outputEl.textContent += '\n✅ clearEntities() works correctly!';
                         } else {
                             outputEl.textContent += '\n⚠️ clearEntities() called but entities remain';
