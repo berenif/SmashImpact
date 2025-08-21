@@ -503,6 +503,9 @@
     
     <!-- Load WASM and Game Scripts -->
     <script type="module">
+        // Import the game engine module directly
+        import GameEngineModule from './public/game_engine.js';
+        
         // Game namespace
         window.Game = {
             wasmModule: null,
@@ -543,21 +546,24 @@
             try {
                 updateLoading(10, 'Loading WASM module...');
                 
-                // Load the fixed WASM module wrapper
-                const script = document.createElement('script');
-                script.src = 'public/wasm-module-fix.js';
-                document.head.appendChild(script);
-                
-                // Wait for the script to load
-                await new Promise((resolve, reject) => {
-                    script.onload = resolve;
-                    script.onerror = reject;
-                });
-                
+                // Create the WASM module instance directly
                 updateLoading(30, 'Initializing WASM...');
                 
-                // Use the fixed module creator
-                Game.wasmModule = await window.createFixedGameEngine();
+                // Initialize the module with proper configuration
+                Game.wasmModule = await GameEngineModule({
+                    print: (text) => console.log('[WASM]:', text),
+                    printErr: (text) => console.error('[WASM Error]:', text),
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            return 'public/game_engine.wasm';
+                        }
+                        return path;
+                    },
+                    onRuntimeInitialized: () => {
+                        console.log('✅ WASM runtime initialized');
+                    }
+                });
+                
                 updateLoading(50, 'Creating game engine...');
                 
                 // Create game engine instance
