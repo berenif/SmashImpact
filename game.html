@@ -631,7 +631,6 @@
             player: null,
             enemies: [],
             wolves: [],
-            wolfAIs: [],
             projectiles: [],
             particles: [],
             powerups: [],
@@ -687,6 +686,9 @@
                 
                 // Initialize mobile controls with WASM engine
                 Game.mobileControls = new MobileControlsWASM(Game.canvas, Game.engine);
+                
+                // Initialize Wolf AI WASM module
+                await initWolfAI();
                 
                 updateLoading(100, 'Ready!');
                 
@@ -1064,499 +1066,22 @@
             }
         }
 
-        // Wolf AI System - Smart Hunting Behaviors
-        class WolfAI {
-            constructor(wolf) {
-                this.wolf = wolf;
-                this.state = 'idle';
-                this.target = null;
-                this.lastSeenPosition = null;
-                this.lastSeenTime = 0;
-                this.investigateTimer = 0;
-                this.alertLevel = 0;
-                this.packMembers = [];
-                this.role = 'hunter'; // 'hunter', 'flanker', 'tracker'
-                this.searchPattern = 0;
-                this.patrolPath = [];
-                this.patrolIndex = 0;
-                this.communicationCooldown = 0;
-                this.predictedInterceptPoint = null;
-                this.coverSpots = [];
-                this.soundMemory = [];
-                this.maxSoundMemory = 5;
-                
-                // Behavior parameters
-                this.sightRange = 400;
-                this.hearingRange = 600;
-                this.attackRange = 50;
-                this.walkSpeed = 100;
-                this.runSpeed = 250;
-                this.investigateSpeed = 150;
-                this.memoryDuration = 5000; // 5 seconds
-                this.communicationRange = 500;
-                this.flankDistance = 200;
-                this.interceptLookahead = 1.5; // seconds
-                
-                // Initialize patrol path
-                this.generatePatrolPath();
-            }
-            
-            update(dt, player, allWolves, obstacles) {
-                // Update communication cooldown
-                this.communicationCooldown = Math.max(0, this.communicationCooldown - dt);
-                
-                // Update pack awareness
-                this.updatePackAwareness(allWolves);
-                
-                // Perception checks
-                const canSeePlayer = this.checkLineOfSight(player, obstacles);
-                const heardSound = this.checkForSounds(player);
-                
-                // State machine
-                switch(this.state) {
-                    case 'idle':
-                        this.handleIdleState(dt, canSeePlayer, heardSound, player);
-                        break;
-                    case 'patrol':
-                        this.handlePatrolState(dt, canSeePlayer, heardSound, player);
-                        break;
-                    case 'investigate':
-                        this.handleInvestigateState(dt, canSeePlayer, heardSound, player, obstacles);
-                        break;
-                    case 'hunt':
-                        this.handleHuntState(dt, canSeePlayer, player, obstacles);
-                        break;
-                    case 'flank':
-                        this.handleFlankState(dt, canSeePlayer, player, obstacles);
-                        break;
-                    case 'search':
-                        this.handleSearchState(dt, canSeePlayer, heardSound, player, obstacles);
-                        break;
-                }
-                
-                // Clean old sound memories
-                this.cleanSoundMemory();
-            }
-            
-            handleIdleState(dt, canSeePlayer, heardSound, player) {
-                if (canSeePlayer) {
-                    this.enterHuntState(player);
-                } else if (heardSound) {
-                    this.enterInvestigateState(heardSound.position);
-                } else {
-                    // Occasionally start patrolling
-                    if (Math.random() < 0.01) {
-                        this.state = 'patrol';
-                        this.generatePatrolPath();
-                    }
-                }
-            }
-            
-            handlePatrolState(dt, canSeePlayer, heardSound, player) {
-                if (canSeePlayer) {
-                    this.enterHuntState(player);
-                    return;
-                }
-                
-                if (heardSound) {
-                    this.enterInvestigateState(heardSound.position);
-                    return;
-                }
-                
-                // Follow patrol path
-                if (this.patrolPath.length > 0) {
-                    const target = this.patrolPath[this.patrolIndex];
-                    const dx = target.x - this.wolf.x;
-                    const dy = target.y - this.wolf.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 30) {
-                        // Reached waypoint
-                        this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
-                    } else {
-                        // Move towards waypoint
-                        const speed = this.walkSpeed * dt;
-                        this.wolf.x += (dx / dist) * speed;
-                        this.wolf.y += (dy / dist) * speed;
-                        this.wolf.rotation = Math.atan2(dy, dx);
-                    }
-                }
-            }
-            
-            handleInvestigateState(dt, canSeePlayer, heardSound, player, obstacles) {
-                if (canSeePlayer) {
-                    this.enterHuntState(player);
-                    return;
-                }
-                
-                // Move cautiously towards investigation point
-                if (this.lastSeenPosition) {
-                    const dx = this.lastSeenPosition.x - this.wolf.x;
-                    const dy = this.lastSeenPosition.y - this.wolf.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 50) {
-                        // Reached investigation point - start searching
-                        this.enterSearchState();
-                    } else {
-                        // Move towards point with caution
-                        const speed = this.investigateSpeed * dt;
-                        this.wolf.x += (dx / dist) * speed;
-                        this.wolf.y += (dy / dist) * speed;
-                        this.wolf.rotation = Math.atan2(dy, dx);
-                        
-                        // Look around while moving
-                        this.wolf.rotation += Math.sin(Date.now() * 0.003) * 0.5;
-                    }
-                }
-                
-                this.investigateTimer -= dt;
-                if (this.investigateTimer <= 0) {
-                    this.state = 'idle';
-                }
-            }
-            
-            handleHuntState(dt, canSeePlayer, player, obstacles) {
-                if (!canSeePlayer) {
-                    // Lost sight - go to last seen position
-                    if (Date.now() - this.lastSeenTime < this.memoryDuration) {
-                        this.enterInvestigateState(this.lastSeenPosition);
-                    } else {
-                        this.enterSearchState();
-                    }
-                    return;
-                }
-                
-                // Update last seen position
-                this.lastSeenPosition = { x: player.x, y: player.y };
-                this.lastSeenTime = Date.now();
-                
-                // Check if pack members are nearby for coordination
-                const nearbyPackMembers = this.packMembers.filter(w => {
-                    const dist = this.getDistance(this.wolf, w.wolf);
-                    return dist < this.communicationRange && w.state === 'hunt';
-                });
-                
-                // Coordinate attack
-                if (nearbyPackMembers.length > 0 && this.communicationCooldown <= 0) {
-                    this.coordinateAttack(nearbyPackMembers, player);
-                }
-                
-                // Calculate intercept point instead of chasing directly
-                const interceptPoint = this.calculateInterceptPoint(player);
-                
-                const dx = interceptPoint.x - this.wolf.x;
-                const dy = interceptPoint.y - this.wolf.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist < this.attackRange) {
-                    // Attack!
-                    this.performAttack(player);
-                } else {
-                    // Move towards intercept point
-                    const speed = this.runSpeed * dt;
-                    this.wolf.x += (dx / dist) * speed;
-                    this.wolf.y += (dy / dist) * speed;
-                    this.wolf.rotation = Math.atan2(dy, dx);
-                }
-                
-                // Alert nearby wolves
-                this.alertNearbyWolves(player);
-            }
-            
-            handleFlankState(dt, canSeePlayer, player, obstacles) {
-                if (!this.target) {
-                    this.state = 'hunt';
-                    return;
-                }
-                
-                // Calculate flanking position
-                const flankAngle = this.role === 'flanker' ? Math.PI / 3 : -Math.PI / 3;
-                const playerVel = this.estimatePlayerVelocity(player);
-                const playerDir = Math.atan2(playerVel.y, playerVel.x);
-                
-                const flankX = player.x + Math.cos(playerDir + flankAngle) * this.flankDistance;
-                const flankY = player.y + Math.sin(playerDir + flankAngle) * this.flankDistance;
-                
-                const dx = flankX - this.wolf.x;
-                const dy = flankY - this.wolf.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist < 50) {
-                    // In position - switch to hunt
-                    this.state = 'hunt';
-                } else {
-                    // Move to flanking position
-                    const speed = this.runSpeed * dt;
-                    this.wolf.x += (dx / dist) * speed;
-                    this.wolf.y += (dy / dist) * speed;
-                    this.wolf.rotation = Math.atan2(dy, dx);
-                }
-            }
-            
-            handleSearchState(dt, canSeePlayer, heardSound, player, obstacles) {
-                if (canSeePlayer) {
-                    this.enterHuntState(player);
-                    return;
-                }
-                
-                if (heardSound) {
-                    this.enterInvestigateState(heardSound.position);
-                    return;
-                }
-                
-                // Fan out search pattern from last known position
-                if (this.lastSeenPosition) {
-                    const searchRadius = 100 + this.searchPattern * 50;
-                    const searchAngle = (this.searchPattern * Math.PI / 4) + (Date.now() * 0.001);
-                    
-                    const searchX = this.lastSeenPosition.x + Math.cos(searchAngle) * searchRadius;
-                    const searchY = this.lastSeenPosition.y + Math.sin(searchAngle) * searchRadius;
-                    
-                    const dx = searchX - this.wolf.x;
-                    const dy = searchY - this.wolf.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 30) {
-                        // Reached search point
-                        this.searchPattern = (this.searchPattern + 1) % 8;
-                        
-                        // Check likely hiding spots
-                        this.checkCoverSpots(obstacles);
-                    } else {
-                        // Move to search point
-                        const speed = this.investigateSpeed * dt;
-                        this.wolf.x += (dx / dist) * speed;
-                        this.wolf.y += (dy / dist) * speed;
-                        this.wolf.rotation = Math.atan2(dy, dx);
-                    }
-                }
-                
-                // Give up search after some time
-                if (Date.now() - this.lastSeenTime > this.memoryDuration * 2) {
-                    this.state = 'idle';
-                    this.searchPattern = 0;
-                }
-            }
-            
-            enterHuntState(player) {
-                this.state = 'hunt';
-                this.target = player;
-                this.lastSeenPosition = { x: player.x, y: player.y };
-                this.lastSeenTime = Date.now();
-                this.alertLevel = 2;
-                
-                // Call for backup
-                this.alertNearbyWolves(player);
-            }
-            
-            enterInvestigateState(position) {
-                this.state = 'investigate';
-                this.lastSeenPosition = position;
-                this.investigateTimer = 3; // 3 seconds
-                this.alertLevel = 1;
-            }
-            
-            enterSearchState() {
-                this.state = 'search';
-                this.searchPattern = 0;
-                this.alertLevel = 1;
-            }
-            
-            checkLineOfSight(player, obstacles) {
-                const dx = player.x - this.wolf.x;
-                const dy = player.y - this.wolf.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                if (dist > this.sightRange) return false;
-                
-                // Check if player is in front of wolf (120 degree cone)
-                const angleToPlayer = Math.atan2(dy, dx);
-                const angleDiff = Math.abs(this.normalizeAngle(angleToPlayer - this.wolf.rotation));
-                if (angleDiff > Math.PI / 3) return false;
-                
-                // Check for obstacles blocking view
-                for (let obstacle of obstacles) {
-                    if (this.lineIntersectsCircle(
-                        this.wolf.x, this.wolf.y,
-                        player.x, player.y,
-                        obstacle.x, obstacle.y, obstacle.radius
-                    )) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            }
-            
-            checkForSounds(player) {
-                // Check if player made noise (moving fast, shooting, etc.)
-                const playerSpeed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
-                const dist = this.getDistance(this.wolf, player);
-                
-                if (dist < this.hearingRange) {
-                    if (playerSpeed > 150 || player.isShooting) {
-                        const sound = {
-                            position: { x: player.x, y: player.y },
-                            intensity: playerSpeed > 200 ? 2 : 1,
-                            time: Date.now()
-                        };
-                        this.soundMemory.push(sound);
-                        return sound;
-                    }
-                }
-                
+        // Wolf AI is now handled by WASM module
+        // The WolfAI functionality has been moved to wolf_ai.wasm
+        // Load it using: import WolfAIModule from './public/wolf_ai.js';
+        let wolfManager = null; // Will be initialized after WASM loads
+        
+        // Initialize Wolf AI WASM module
+        async function initWolfAI() {
+            try {
+                const WolfAIModule = await import('./public/wolf_ai.js');
+                const module = await WolfAIModule.default();
+                wolfManager = new module.WolfPackManager();
+                console.log('✅ Wolf AI WASM module loaded');
+                return wolfManager;
+            } catch (error) {
+                console.error('Failed to load Wolf AI WASM:', error);
                 return null;
-            }
-            
-            calculateInterceptPoint(player) {
-                // Predict where player will be based on current velocity
-                if (!player.vx || !player.vy) {
-                    return { x: player.x, y: player.y };
-                }
-                
-                const timeToIntercept = this.interceptLookahead;
-                const predictedX = player.x + player.vx * timeToIntercept;
-                const predictedY = player.y + player.vy * timeToIntercept;
-                
-                return { x: predictedX, y: predictedY };
-            }
-            
-            coordinateAttack(packMembers, player) {
-                // Assign roles to pack members
-                if (this.role === 'hunter') {
-                    // I'm the primary hunter, assign flankers
-                    let flankerCount = 0;
-                    for (let member of packMembers) {
-                        if (flankerCount === 0) {
-                            member.role = 'flanker';
-                            member.state = 'flank';
-                            flankerCount++;
-                        } else if (flankerCount === 1) {
-                            member.role = 'flanker';
-                            member.state = 'flank';
-                            flankerCount++;
-                        } else {
-                            member.role = 'hunter';
-                        }
-                    }
-                }
-                
-                this.communicationCooldown = 2; // 2 second cooldown
-            }
-            
-            alertNearbyWolves(player) {
-                for (let packMember of this.packMembers) {
-                    const dist = this.getDistance(this.wolf, packMember.wolf);
-                    if (dist < this.communicationRange && packMember.state !== 'hunt') {
-                        packMember.lastSeenPosition = { x: player.x, y: player.y };
-                        packMember.lastSeenTime = Date.now();
-                        packMember.alertLevel = Math.max(packMember.alertLevel, 1);
-                        
-                        if (dist < this.communicationRange / 2) {
-                            packMember.enterHuntState(player);
-                        } else {
-                            packMember.enterInvestigateState(packMember.lastSeenPosition);
-                        }
-                    }
-                }
-            }
-            
-            checkCoverSpots(obstacles) {
-                // Check behind obstacles where player might hide
-                this.coverSpots = [];
-                for (let obstacle of obstacles) {
-                    const dx = obstacle.x - this.lastSeenPosition.x;
-                    const dy = obstacle.y - this.lastSeenPosition.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 200) {
-                        // This is a potential hiding spot
-                        const angle = Math.atan2(dy, dx);
-                        const checkX = obstacle.x + Math.cos(angle) * (obstacle.radius + 30);
-                        const checkY = obstacle.y + Math.sin(angle) * (obstacle.radius + 30);
-                        this.coverSpots.push({ x: checkX, y: checkY });
-                    }
-                }
-            }
-            
-            updatePackAwareness(allWolves) {
-                this.packMembers = allWolves.filter(w => w !== this && w.wolf.type === 'wolf');
-            }
-            
-            estimatePlayerVelocity(player) {
-                if (!this.lastPlayerPosition) {
-                    this.lastPlayerPosition = { x: player.x, y: player.y, time: Date.now() };
-                    return { x: 0, y: 0 };
-                }
-                
-                const dt = (Date.now() - this.lastPlayerPosition.time) / 1000;
-                const vx = (player.x - this.lastPlayerPosition.x) / dt;
-                const vy = (player.y - this.lastPlayerPosition.y) / dt;
-                
-                this.lastPlayerPosition = { x: player.x, y: player.y, time: Date.now() };
-                
-                return { x: vx, y: vy };
-            }
-            
-            performAttack(player) {
-                // Attack logic
-                if (player.health) {
-                    player.health -= 10;
-                }
-            }
-            
-            generatePatrolPath() {
-                this.patrolPath = [];
-                const numPoints = 4 + Math.floor(Math.random() * 3);
-                const radius = 200 + Math.random() * 100;
-                
-                for (let i = 0; i < numPoints; i++) {
-                    const angle = (Math.PI * 2 * i) / numPoints + Math.random() * 0.5;
-                    this.patrolPath.push({
-                        x: this.wolf.x + Math.cos(angle) * radius,
-                        y: this.wolf.y + Math.sin(angle) * radius
-                    });
-                }
-            }
-            
-            cleanSoundMemory() {
-                const now = Date.now();
-                this.soundMemory = this.soundMemory.filter(s => now - s.time < 5000);
-                if (this.soundMemory.length > this.maxSoundMemory) {
-                    this.soundMemory.shift();
-                }
-            }
-            
-            getDistance(a, b) {
-                const dx = a.x - b.x;
-                const dy = a.y - b.y;
-                return Math.sqrt(dx * dx + dy * dy);
-            }
-            
-            normalizeAngle(angle) {
-                while (angle > Math.PI) angle -= Math.PI * 2;
-                while (angle < -Math.PI) angle += Math.PI * 2;
-                return angle;
-            }
-            
-            lineIntersectsCircle(x1, y1, x2, y2, cx, cy, r) {
-                const dx = x2 - x1;
-                const dy = y2 - y1;
-                const fx = x1 - cx;
-                const fy = y1 - cy;
-                
-                const a = dx * dx + dy * dy;
-                const b = 2 * (fx * dx + fy * dy);
-                const c = (fx * fx + fy * fy) - r * r;
-                
-                const discriminant = b * b - 4 * a * c;
-                if (discriminant < 0) return false;
-                
-                const t1 = (-b - Math.sqrt(discriminant)) / (2 * a);
-                const t2 = (-b + Math.sqrt(discriminant)) / (2 * a);
-                
-                return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
             }
         }
 
@@ -1704,9 +1229,11 @@
         
         // Initialize game
         function initGame() {
-            // Clear wolf AIs
-            Game.wolfAIs = [];
+            // Clear wolves
             Game.wolves = [];
+            if (wolfManager) {
+                wolfManager.clearWolves();
+            }
             
             // If WASM engine exists, use it
             if (Game.engine && Game.engine.clearEntities) {
@@ -1757,9 +1284,11 @@
         function spawnWave(waveNum) {
             const enemyCount = 5 + waveNum * 2;
             
-            // Clear existing wolf AIs
-            Game.wolfAIs = [];
+            // Clear existing wolves
             Game.wolves = [];
+            if (wolfManager) {
+                wolfManager.clearWolves();
+            }
             
             for (let i = 0; i < enemyCount; i++) {
                 const angle = (Math.PI * 2 * i) / enemyCount;
@@ -1768,24 +1297,13 @@
                 const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
                 
                 if (Math.random() > 0.7 && waveNum > 3) {
-                    // Spawn wolf with AI
+                    // Spawn wolf with WASM AI
                     const isAlpha = waveNum > 10;
-                    const wolf = {
-                        x: x,
-                        y: y,
-                        vx: 0,
-                        vy: 0,
-                        rotation: 0,
-                        health: isAlpha ? 150 : 100,
-                        type: 'wolf',
-                        isAlpha: isAlpha,
-                        isShooting: false
-                    };
                     
-                    // Create wolf AI instance
-                    const wolfAI = new WolfAI(wolf);
-                    Game.wolves.push(wolf);
-                    Game.wolfAIs.push(wolfAI);
+                    if (wolfManager) {
+                        const wolfId = wolfManager.createWolf(x, y, isAlpha);
+                        Game.wolves.push({ id: wolfId, isAlpha: isAlpha });
+                    }
                     
                     // Also create in WASM if available
                     if (Game.engine && Game.engine.createWolf) {
@@ -1905,8 +1423,12 @@
                         isShooting: false
                     };
                     
-                    Game.wolves.push(wolf1, wolf2);
-                    Game.wolfAIs.push(new WolfAI(wolf1), new WolfAI(wolf2));
+                    if (wolfManager) {
+                        const wolfId1 = wolfManager.createWolf(wolf1.x, wolf1.y, wolf1.isAlpha);
+                        const wolfId2 = wolfManager.createWolf(wolf2.x, wolf2.y, wolf2.isAlpha);
+                        Game.wolves.push({ id: wolfId1, isAlpha: wolf1.isAlpha });
+                        Game.wolves.push({ id: wolfId2, isAlpha: wolf2.isAlpha });
+                    }
                     
                     Game.engine.createWolf(Game.canvas.width / 2 - 250, Game.canvas.height / 2);
                     Game.engine.createWolf(Game.canvas.width / 2 + 250, Game.canvas.height / 2);
@@ -1953,8 +1475,10 @@
                             isShooting: false
                         };
                         
-                        Game.wolves.push(wolf);
-                        Game.wolfAIs.push(new WolfAI(wolf));
+                        if (wolfManager) {
+                            const wolfId = wolfManager.createWolf(wolf.x, wolf.y, wolf.isAlpha);
+                            Game.wolves.push({ id: wolfId, isAlpha: wolf.isAlpha });
+                        }
                         
                         Game.engine.createWolf(x, y, isAlpha); // Alpha wolves after level 10
                     }
@@ -2023,8 +1547,8 @@
             // Handle input
             handleInput();
             
-            // Update wolf AIs
-            if (Game.wolfAIs.length > 0) {
+            // Update wolf AIs using WASM
+            if (wolfManager && Game.wolves.length > 0) {
                 // Get player data
                 let playerData = null;
                 if (Game.engine && Game.engine.getPlayerState) {
@@ -2034,12 +1558,25 @@
                 }
                 
                 if (playerData) {
-                    // Get obstacles
-                    const obstacles = Game.obstacles || [];
-                    
-                    // Update each wolf AI
-                    for (let wolfAI of Game.wolfAIs) {
-                        wolfAI.update(dt / 1000, playerData, Game.wolfAIs, obstacles);
+                    // Update each wolf in WASM
+                    for (let wolf of Game.wolves) {
+                        const wolfX = wolfManager.getWolfX(wolf.id);
+                        const wolfY = wolfManager.getWolfY(wolf.id);
+                        const dist = Math.sqrt(
+                            (playerData.x - wolfX) * (playerData.x - wolfX) +
+                            (playerData.y - wolfY) * (playerData.y - wolfY)
+                        );
+                        const playerVisible = dist < 400;
+                        
+                        wolfManager.updateWolf(
+                            wolf.id,
+                            dt / 1000,
+                            playerData.x || playerData.position?.x || 0,
+                            playerData.y || playerData.position?.y || 0,
+                            playerData.vx || playerData.velocity?.x || 0,
+                            playerData.vy || playerData.velocity?.y || 0,
+                            playerVisible
+                        );
                     }
                 }
             }
@@ -2143,15 +1680,33 @@
                     renderEntity(entity);
                 });
                 
-                // Also render JavaScript wolves with AI
-                Game.wolves.forEach(wolf => {
-                    if (wolf.health > 0) {
-                        renderEntity(wolf);
-                    }
-                });
+                // Also render WASM wolves
+                if (wolfManager) {
+                    Game.wolves.forEach(wolf => {
+                        const health = wolfManager.getWolfHealth(wolf.id);
+                        if (health > 0) {
+                            const wolfEntity = {
+                                x: wolfManager.getWolfX(wolf.id),
+                                y: wolfManager.getWolfY(wolf.id),
+                                rotation: wolfManager.getWolfRotation(wolf.id),
+                                type: 'wolf',
+                                isAlpha: wolfManager.getWolfIsAlpha(wolf.id),
+                                health: health,
+                                state: wolfManager.getWolfState(wolf.id),
+                                alertLevel: wolfManager.getWolfAlertLevel(wolf.id)
+                            };
+                            renderEntity(wolfEntity);
+                        }
+                    });
+                }
                 
                 // Combine entities for minimap
-                const allEntities = [...entities, ...Game.wolves.filter(w => w.health > 0)];
+                const wasmWolves = wolfManager ? Game.wolves.map(w => ({
+                    x: wolfManager.getWolfX(w.id),
+                    y: wolfManager.getWolfY(w.id),
+                    type: 'wolf'
+                })).filter(w => wolfManager.getWolfHealth(w.id) > 0) : [];
+                const allEntities = [...entities, ...wasmWolves];
                 
                 // Render minimap
                 renderMinimap(allEntities);
@@ -2212,36 +1767,11 @@
                     break;
                     
                 case 'wolf':
-                    // Find corresponding wolf AI for state visualization
-                    let wolfAI = null;
-                    for (let ai of Game.wolfAIs) {
-                        if (Math.abs(ai.wolf.x - entity.x) < 5 && Math.abs(ai.wolf.y - entity.y) < 5) {
-                            wolfAI = ai;
-                            break;
-                        }
-                    }
-                    
-                    // Base color based on state
-                    if (wolfAI) {
-                        switch(wolfAI.state) {
-                            case 'hunt':
-                                ctx.fillStyle = '#ff0000'; // Red when hunting
-                                break;
-                            case 'flank':
-                                ctx.fillStyle = '#ff6600'; // Orange when flanking
-                                break;
-                            case 'investigate':
-                                ctx.fillStyle = '#ffaa00'; // Yellow when investigating
-                                break;
-                            case 'search':
-                                ctx.fillStyle = '#ff8800'; // Orange-yellow when searching
-                                break;
-                            case 'patrol':
-                                ctx.fillStyle = '#8888ff'; // Blue when patrolling
-                                break;
-                            default:
-                                ctx.fillStyle = entity.isAlpha ? '#ff00ff' : '#888888'; // Gray when idle
-                        }
+                    // Base color based on AI state (from WASM)
+                    if (entity.state !== undefined) {
+                        // States: 0=IDLE, 1=PATROL, 2=INVESTIGATE, 3=HUNT, 4=FLANK, 5=SEARCH
+                        const stateColors = ['#888888', '#8888ff', '#ffaa00', '#ff0000', '#ff6600', '#ff8800'];
+                        ctx.fillStyle = stateColors[entity.state] || '#ff8800';
                     } else {
                         ctx.fillStyle = entity.isAlpha ? '#ff00ff' : '#ff8800';
                     }
@@ -2258,14 +1788,14 @@
                     ctx.fill();
                     
                     // Draw vision cone when hunting or searching
-                    if (wolfAI && (wolfAI.state === 'hunt' || wolfAI.state === 'search' || wolfAI.state === 'investigate')) {
+                    if (entity.state >= 2) { // States 2+ are active states
                         ctx.save();
-                        ctx.rotate(entity.rotation || wolfAI.wolf.rotation || 0);
-                        ctx.strokeStyle = 'rgba(255, 255, 0, 0.2)';
-                        ctx.fillStyle = 'rgba(255, 255, 0, 0.05)';
+                        ctx.rotate(entity.rotation || 0);
+                        ctx.strokeStyle = entity.state === 3 ? 'rgba(255, 0, 0, 0.2)' : 'rgba(255, 255, 0, 0.2)';
+                        ctx.fillStyle = entity.state === 3 ? 'rgba(255, 0, 0, 0.05)' : 'rgba(255, 255, 0, 0.05)';
                         ctx.beginPath();
                         ctx.moveTo(0, 0);
-                        ctx.arc(0, 0, wolfAI.sightRange || 400, -Math.PI / 6, Math.PI / 6);
+                        ctx.arc(0, 0, 400, -Math.PI / 6, Math.PI / 6);
                         ctx.closePath();
                         ctx.fill();
                         ctx.stroke();
@@ -2273,10 +1803,10 @@
                     }
                     
                     // Draw alert indicator
-                    if (wolfAI && wolfAI.alertLevel > 0) {
-                        ctx.fillStyle = wolfAI.alertLevel === 2 ? '#ff0000' : '#ffff00';
+                    if (entity.alertLevel && entity.alertLevel > 0) {
+                        ctx.fillStyle = entity.alertLevel >= 2 ? '#ff0000' : '#ffff00';
                         ctx.font = '16px Arial';
-                        ctx.fillText(wolfAI.alertLevel === 2 ? '!' : '?', 0, -25);
+                        ctx.fillText(entity.alertLevel >= 2 ? '!' : '?', 0, -25);
                     }
                     break;
                     
