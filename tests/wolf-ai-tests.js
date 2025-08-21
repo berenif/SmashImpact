@@ -248,12 +248,19 @@ class WolfAI {
                 this.path = [];
                 return false;
             }
-        }
-
-        const dx = target.x - this.x;
-        const dy = target.y - this.y;
-
-        if (dist > 0) {
+            // After advancing, recalculate target and set velocity
+            const newTarget = this.path[this.currentPathIndex];
+            const newDist = this.getDistance(newTarget);
+            if (newDist > 0) {
+                const dx = newTarget.x - this.x;
+                const dy = newTarget.y - this.y;
+                this.vx = (dx / newDist) * this.speed;
+                this.vy = (dy / newDist) * this.speed;
+            }
+        } else {
+            // Set velocity towards current target
+            const dx = target.x - this.x;
+            const dy = target.y - this.y;
             this.vx = (dx / dist) * this.speed;
             this.vy = (dy / dist) * this.speed;
         }
@@ -453,12 +460,12 @@ describe('Wolf AI Behavior Tests', () => {
         });
 
         test('should follow path', () => {
-            const target = { x: 200, y: 200 };
-            wolf.findPath(target, obstacles);
-            
-            // Ensure wolf is not at the target already
+            // Set wolf position first
             wolf.x = 100;
             wolf.y = 100;
+            
+            const target = { x: 200, y: 200 };
+            wolf.findPath(target, obstacles);
             
             const following = wolf.followPath();
             expect(following).toBe(true);
