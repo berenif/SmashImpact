@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Ultimate WASM Game Engine - Enhanced Mobile Controls</title>
+    <title>Ultimate WASM Game Engine</title>
     <style>
         * {
             margin: 0;
@@ -213,7 +213,6 @@
             backdrop-filter: blur(10px);
         }
 
-        /* Enhanced Mobile Controls */
         #mobileControls {
             position: fixed;
             bottom: 0;
@@ -222,135 +221,58 @@
             height: 100%;
             pointer-events: none;
             display: none;
-            z-index: 100;
         }
 
-        /* Virtual Joystick */
-        .virtual-joystick {
+        .joystick {
             position: absolute;
-            bottom: 60px;
-            left: 60px;
-            width: 160px;
-            height: 160px;
-            pointer-events: all;
-        }
-
-        .joystick-base {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.15), rgba(0, 0, 0, 0.4));
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            bottom: 50px;
+            left: 50px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(255, 255, 255, 0.1);
+            pointer-events: all;
         }
 
         .joystick-knob {
             position: absolute;
             width: 60px;
             height: 60px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(200, 200, 200, 0.6));
-            border: 2px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.5);
             border-radius: 50%;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             transition: none;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-            pointer-events: none;
         }
 
-        .joystick-knob.active {
-            background: radial-gradient(circle, rgba(100, 200, 255, 0.9), rgba(50, 150, 255, 0.6));
-            box-shadow: 0 0 25px rgba(100, 200, 255, 0.7);
-        }
-
-        /* Action Buttons Container */
         .action-buttons {
             position: absolute;
             bottom: 50px;
             right: 50px;
+            display: flex;
+            gap: 20px;
             pointer-events: all;
         }
 
-        /* Individual Action Buttons */
         .action-btn {
-            position: absolute;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.1));
-            border: 3px solid rgba(255, 255, 255, 0.4);
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
             border-radius: 50%;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 10px;
+            font-size: 30px;
             cursor: pointer;
             user-select: none;
-            -webkit-user-select: none;
-            transition: transform 0.1s, box-shadow 0.1s;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-        }
-
-        .action-btn span.icon {
-            font-size: 24px;
-            margin-bottom: 2px;
         }
 
         .action-btn:active {
-            transform: scale(0.92);
-        }
-
-        .action-btn.pressed {
-            background: radial-gradient(circle, rgba(100, 200, 255, 0.5), rgba(50, 150, 255, 0.3));
-            border-color: rgba(100, 200, 255, 0.8);
-            box-shadow: 0 0 30px rgba(100, 200, 255, 0.7);
-        }
-
-        /* Attack Button - Primary action */
-        #attackBtn {
-            width: 85px;
-            height: 85px;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle, rgba(255, 100, 100, 0.35), rgba(255, 50, 50, 0.15));
-            border-color: rgba(255, 100, 100, 0.5);
-        }
-
-        #attackBtn:active {
-            background: radial-gradient(circle, rgba(255, 150, 150, 0.6), rgba(255, 100, 100, 0.4));
-            box-shadow: 0 0 35px rgba(255, 100, 100, 0.8);
-        }
-
-        /* Block Button */
-        #blockBtn {
-            width: 70px;
-            height: 70px;
-            right: 100px;
-            bottom: 10px;
-            background: radial-gradient(circle, rgba(100, 150, 255, 0.35), rgba(50, 100, 255, 0.15));
-            border-color: rgba(100, 150, 255, 0.5);
-        }
-
-        /* Roll/Dodge Button */
-        #rollBtn {
-            width: 70px;
-            height: 70px;
-            right: 10px;
-            bottom: 100px;
-            background: radial-gradient(circle, rgba(255, 200, 100, 0.35), rgba(255, 150, 50, 0.15));
-            border-color: rgba(255, 200, 100, 0.5);
-        }
-
-        /* Special Ability Button */
-        #specialBtn {
-            width: 65px;
-            height: 65px;
-            right: 90px;
-            bottom: 90px;
-            background: radial-gradient(circle, rgba(200, 100, 255, 0.35), rgba(150, 50, 255, 0.15));
-            border-color: rgba(200, 100, 255, 0.5);
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
         }
 
         #pauseMenu {
@@ -464,32 +386,15 @@
         </div>
     </div>
     
-    <!-- Enhanced Mobile Controls with WASM Integration -->
+    <!-- Mobile Controls -->
     <div id="mobileControls">
-        <!-- Virtual Joystick -->
-        <div class="virtual-joystick" id="virtualJoystick">
-            <div class="joystick-base"></div>
+        <div class="joystick" id="joystick">
             <div class="joystick-knob" id="joystickKnob"></div>
         </div>
-        
-        <!-- Action Buttons -->
         <div class="action-buttons">
-            <button class="action-btn" id="attackBtn" data-action="attack">
-                <span class="icon">⚔️</span>
-                ATTACK
-            </button>
-            <button class="action-btn" id="blockBtn" data-action="block">
-                <span class="icon">🛡️</span>
-                BLOCK
-            </button>
-            <button class="action-btn" id="rollBtn" data-action="roll">
-                <span class="icon">💨</span>
-                ROLL
-            </button>
-            <button class="action-btn" id="specialBtn" data-action="special">
-                <span class="icon">✨</span>
-                SPECIAL
-            </button>
+            <div class="action-btn" id="shootBtn">🔫</div>
+            <div class="action-btn" id="boostBtn">⚡</div>
+            <div class="action-btn" id="specialBtn">💥</div>
         </div>
     </div>
     
@@ -511,7 +416,6 @@
             ctx: null,
             minimap: null,
             minimapCtx: null,
-            mobileControls: null,
             running: false,
             paused: false,
             mode: null,
@@ -526,7 +430,9 @@
             },
             input: {
                 keys: {},
-                mouse: { x: 0, y: 0, down: false }
+                mouse: { x: 0, y: 0, down: false },
+                joystick: { x: 0, y: 0, active: false },
+                touch: { shoot: false, boost: false, special: false }
             },
             player: null,
             enemies: [],
@@ -571,10 +477,6 @@
                 
                 // Setup input handlers
                 setupInput();
-                
-                // Initialize mobile controls with WASM engine
-                Game.mobileControls = new MobileControlsWASM(Game.canvas, Game.engine);
-                
                 updateLoading(100, 'Ready!');
                 
                 // Show main menu
@@ -646,266 +548,6 @@
         }
         
         // Setup input handlers
-        // Mobile Controls Class with WASM Integration
-        class MobileControlsWASM {
-            constructor(canvas, wasmEngine) {
-                this.canvas = canvas;
-                this.engine = wasmEngine;
-                this.isMobile = this.detectMobile();
-                
-                // Joystick state
-                this.joystick = {
-                    active: false,
-                    touchId: null,
-                    baseX: 0,
-                    baseY: 0,
-                    inputX: 0,
-                    inputY: 0,
-                    radius: 80,
-                    deadZone: 0.15
-                };
-                
-                // Button states
-                this.buttons = new Map();
-                this.activeButtons = new Set();
-                
-                if (this.isMobile) {
-                    this.init();
-                }
-            }
-            
-            detectMobile() {
-                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                       ('ontouchstart' in window) ||
-                       (navigator.maxTouchPoints > 0);
-            }
-            
-            init() {
-                this.setupDOM();
-                this.setupEventListeners();
-                this.show();
-            }
-            
-            setupDOM() {
-                this.container = document.getElementById('mobileControls');
-                this.joystickElement = document.getElementById('virtualJoystick');
-                this.joystickKnob = document.getElementById('joystickKnob');
-                
-                if (this.joystickElement) {
-                    const rect = this.joystickElement.getBoundingClientRect();
-                    this.joystick.baseX = rect.left + rect.width / 2;
-                    this.joystick.baseY = rect.top + rect.height / 2;
-                }
-                
-                // Get action buttons
-                document.querySelectorAll('.action-btn').forEach(btn => {
-                    const action = btn.dataset.action;
-                    if (action) {
-                        this.buttons.set(action, btn);
-                    }
-                });
-            }
-            
-            setupEventListeners() {
-                // Prevent defaults
-                this.container.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
-                this.container.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
-                
-                // Joystick events
-                if (this.joystickElement) {
-                    this.joystickElement.addEventListener('touchstart', this.handleJoystickStart.bind(this), { passive: false });
-                    this.joystickElement.addEventListener('touchmove', this.handleJoystickMove.bind(this), { passive: false });
-                    this.joystickElement.addEventListener('touchend', this.handleJoystickEnd.bind(this), { passive: false });
-                    this.joystickElement.addEventListener('touchcancel', this.handleJoystickEnd.bind(this), { passive: false });
-                }
-                
-                // Button events
-                this.buttons.forEach((btn, action) => {
-                    btn.addEventListener('touchstart', (e) => this.handleButtonStart(e, action), { passive: false });
-                    btn.addEventListener('touchend', (e) => this.handleButtonEnd(e, action), { passive: false });
-                    btn.addEventListener('touchcancel', (e) => this.handleButtonEnd(e, action), { passive: false });
-                });
-                
-                // Window resize
-                window.addEventListener('resize', this.handleResize.bind(this));
-                window.addEventListener('orientationchange', this.handleResize.bind(this));
-            }
-            
-            handleJoystickStart(e) {
-                if (this.joystick.active) return;
-                
-                const touch = e.touches[0];
-                this.joystick.active = true;
-                this.joystick.touchId = touch.identifier;
-                
-                const rect = this.joystickElement.getBoundingClientRect();
-                this.joystick.baseX = rect.left + rect.width / 2;
-                this.joystick.baseY = rect.top + rect.height / 2;
-                
-                this.joystickKnob.classList.add('active');
-                this.updateJoystickPosition(touch);
-            }
-            
-            handleJoystickMove(e) {
-                if (!this.joystick.active) return;
-                
-                for (let touch of e.touches) {
-                    if (touch.identifier === this.joystick.touchId) {
-                        this.updateJoystickPosition(touch);
-                        break;
-                    }
-                }
-            }
-            
-            handleJoystickEnd(e) {
-                let stillActive = false;
-                for (let touch of e.touches) {
-                    if (touch.identifier === this.joystick.touchId) {
-                        stillActive = true;
-                        break;
-                    }
-                }
-                
-                if (!stillActive && this.joystick.active) {
-                    this.joystick.active = false;
-                    this.joystick.touchId = null;
-                    this.joystick.inputX = 0;
-                    this.joystick.inputY = 0;
-                    
-                    this.joystickKnob.style.transform = 'translate(-50%, -50%)';
-                    this.joystickKnob.classList.remove('active');
-                    
-                    // Send zero input to WASM
-                    if (this.engine && this.engine.setJoystickInput) {
-                        this.engine.setJoystickInput(0, 0);
-                    }
-                }
-            }
-            
-            updateJoystickPosition(touch) {
-                const dx = touch.clientX - this.joystick.baseX;
-                const dy = touch.clientY - this.joystick.baseY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                let normalizedX = dx / this.joystick.radius;
-                let normalizedY = dy / this.joystick.radius;
-                
-                // Clamp to unit circle
-                if (distance > this.joystick.radius) {
-                    normalizedX = (dx / distance);
-                    normalizedY = (dy / distance);
-                } else {
-                    normalizedX = dx / this.joystick.radius;
-                    normalizedY = dy / this.joystick.radius;
-                }
-                
-                // Apply dead zone
-                const magnitude = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-                if (magnitude < this.joystick.deadZone) {
-                    normalizedX = 0;
-                    normalizedY = 0;
-                } else {
-                    const adjustedMagnitude = (magnitude - this.joystick.deadZone) / (1 - this.joystick.deadZone);
-                    normalizedX = (normalizedX / magnitude) * adjustedMagnitude;
-                    normalizedY = (normalizedY / magnitude) * adjustedMagnitude;
-                }
-                
-                this.joystick.inputX = normalizedX;
-                this.joystick.inputY = normalizedY;
-                
-                // Update knob visual position
-                const knobX = normalizedX * this.joystick.radius;
-                const knobY = normalizedY * this.joystick.radius;
-                this.joystickKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
-                
-                // Send input to WASM engine
-                if (this.engine && this.engine.setJoystickInput) {
-                    this.engine.setJoystickInput(normalizedX, normalizedY);
-                }
-            }
-            
-            handleButtonStart(e, action) {
-                const btn = this.buttons.get(action);
-                if (!btn) return;
-                
-                btn.classList.add('pressed');
-                this.activeButtons.add(action);
-                
-                // Haptic feedback
-                if (window.navigator.vibrate) {
-                    window.navigator.vibrate(10);
-                }
-                
-                // Execute WASM actions
-                if (this.engine) {
-                    switch (action) {
-                        case 'attack':
-                            this.engine.playerAttack && this.engine.playerAttack();
-                            break;
-                        case 'block':
-                            this.engine.startBlock && this.engine.startBlock(1);
-                            break;
-                        case 'roll':
-                            this.engine.playerRoll && this.engine.playerRoll(this.joystick.inputX, this.joystick.inputY);
-                            break;
-                        case 'special':
-                            this.engine.playerSpecialAbility && this.engine.playerSpecialAbility();
-                            break;
-                    }
-                }
-            }
-            
-            handleButtonEnd(e, action) {
-                const btn = this.buttons.get(action);
-                if (!btn) return;
-                
-                btn.classList.remove('pressed');
-                this.activeButtons.delete(action);
-                
-                // Handle release actions
-                if (this.engine && action === 'block') {
-                    this.engine.endBlock && this.engine.endBlock(1);
-                }
-            }
-            
-            handleResize() {
-                // Recalculate joystick base position
-                if (this.joystickElement) {
-                    const rect = this.joystickElement.getBoundingClientRect();
-                    this.joystick.baseX = rect.left + rect.width / 2;
-                    this.joystick.baseY = rect.top + rect.height / 2;
-                }
-            }
-            
-            show() {
-                if (this.container) {
-                    this.container.style.display = 'block';
-                }
-            }
-            
-            hide() {
-                if (this.container) {
-                    this.container.style.display = 'none';
-                }
-            }
-            
-            getInput() {
-                return {
-                    joystick: {
-                        x: this.joystick.inputX,
-                        y: this.joystick.inputY,
-                        active: this.joystick.active
-                    },
-                    buttons: {
-                        attack: this.activeButtons.has('attack'),
-                        block: this.activeButtons.has('block'),
-                        roll: this.activeButtons.has('roll'),
-                        special: this.activeButtons.has('special')
-                    }
-                };
-            }
-        }
-        
         function setupInput() {
             // Keyboard
             window.addEventListener('keydown', (e) => {
@@ -933,9 +575,77 @@
             Game.canvas.addEventListener('mouseup', () => {
                 Game.input.mouse.down = false;
             });
-
+            
+            // Mobile controls
+            setupMobileControls();
         }
-
+        
+        // Setup mobile controls
+        function setupMobileControls() {
+            const joystick = document.getElementById('joystick');
+            const knob = document.getElementById('joystickKnob');
+            
+            let joystickTouch = null;
+            
+            joystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                joystickTouch = e.touches[0];
+                Game.input.joystick.active = true;
+            });
+            
+            joystick.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!joystickTouch) return;
+                
+                const rect = joystick.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const maxDist = rect.width / 2 - 30;
+                
+                let dx = e.touches[0].clientX - centerX;
+                let dy = e.touches[0].clientY - centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > maxDist) {
+                    dx = (dx / dist) * maxDist;
+                    dy = (dy / dist) * maxDist;
+                }
+                
+                knob.style.transform = `translate(${dx}px, ${dy}px)`;
+                Game.input.joystick.x = dx / maxDist;
+                Game.input.joystick.y = dy / maxDist;
+            });
+            
+            joystick.addEventListener('touchend', () => {
+                joystickTouch = null;
+                Game.input.joystick.active = false;
+                Game.input.joystick.x = 0;
+                Game.input.joystick.y = 0;
+                knob.style.transform = 'translate(-50%, -50%)';
+            });
+            
+            // Action buttons
+            document.getElementById('shootBtn').addEventListener('touchstart', () => {
+                Game.input.touch.shoot = true;
+            });
+            document.getElementById('shootBtn').addEventListener('touchend', () => {
+                Game.input.touch.shoot = false;
+            });
+            
+            document.getElementById('boostBtn').addEventListener('touchstart', () => {
+                Game.input.touch.boost = true;
+            });
+            document.getElementById('boostBtn').addEventListener('touchend', () => {
+                Game.input.touch.boost = false;
+            });
+            
+            document.getElementById('specialBtn').addEventListener('touchstart', () => {
+                Game.input.touch.special = true;
+            });
+            document.getElementById('specialBtn').addEventListener('touchend', () => {
+                Game.input.touch.special = false;
+            });
+        }
         
         // Start game
         Game.start = function(mode) {
@@ -948,7 +658,10 @@
             document.getElementById('mainMenu').style.display = 'none';
             document.getElementById('gameUI').style.display = 'block';
             
-            // Mobile controls are handled by MobileControlsWASM class
+            // Show mobile controls on mobile devices
+            if (isMobile()) {
+                document.getElementById('mobileControls').style.display = 'block';
+            }
             
             // Show performance stats in debug mode
             if (window.location.hash === '#debug') {
@@ -1099,8 +812,11 @@
             if (Game.input.keys['a'] || Game.input.keys['arrowleft']) dx = -1;
             if (Game.input.keys['d'] || Game.input.keys['arrowright']) dx = 1;
             
-            // Mobile joystick input (handled directly by MobileControlsWASM)
-            // The mobile controls send input directly to WASM engine via setJoystickInput
+            // Joystick input
+            if (Game.input.joystick.active) {
+                dx = Game.input.joystick.x;
+                dy = Game.input.joystick.y;
+            }
             
             // Aim
             const aimX = Game.input.mouse.x - Game.canvas.width / 2;
@@ -1109,18 +825,18 @@
             // Update player input
             Game.engine.updatePlayerInput(dx, dy, aimX, aimY);
             
-            // Shooting (mobile handled by MobileControlsWASM attack button)
-            if (Game.input.mouse.down) {
+            // Shooting
+            if (Game.input.mouse.down || Game.input.touch.shoot) {
                 Game.engine.playerShoot();
             }
             
-            // Boost (mobile handled by MobileControlsWASM)
-            if (Game.input.keys[' ']) {
+            // Boost
+            if (Game.input.keys[' '] || Game.input.touch.boost) {
                 Game.engine.playerBoost();
             }
             
-            // Special ability (mobile handled by MobileControlsWASM special button)
-            if (Game.input.keys['q']) {
+            // Special ability
+            if (Game.input.keys['q'] || Game.input.touch.special) {
                 Game.engine.playerSpecialAbility();
             }
         }
