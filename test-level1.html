@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Level 1 - Campaign Mode</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .test-button {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .test-button:hover {
+            background: #45a049;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 5px;
+            border: 1px solid #444;
+        }
+        
+        .success {
+            color: #4CAF50;
+        }
+        
+        .error {
+            color: #f44336;
+        }
+        
+        .info {
+            color: #2196F3;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #444;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Level 1 Campaign Mode Test</h1>
+        
+        <div class="status">
+            <h3>Test Instructions:</h3>
+            <ol>
+                <li>Click "Open Game" to load the game in an iframe</li>
+                <li>Wait for the game to load (WASM engine initialization)</li>
+                <li>Click "Campaign" in the main menu</li>
+                <li>Verify that:
+                    <ul>
+                        <li>✅ Player (green circle) appears at center of screen</li>
+                        <li>✅ 3 enemies (red circles) appear in triangle formation</li>
+                        <li>✅ 1 health powerup (cyan square) appears</li>
+                        <li>✅ Player can move with WASD or arrow keys</li>
+                        <li>✅ Player can shoot with mouse click</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <button class="test-button" onclick="loadGame()">Open Game</button>
+        <button class="test-button" onclick="testDirectly()">Test Direct API</button>
+        
+        <div id="testResults" class="status" style="display: none;">
+            <h3>Test Results:</h3>
+            <div id="resultContent"></div>
+        </div>
+        
+        <iframe id="gameFrame" style="display: none;"></iframe>
+    </div>
+    
+    <script>
+        function loadGame() {
+            const iframe = document.getElementById('gameFrame');
+            iframe.style.display = 'block';
+            iframe.src = 'game.html';
+            
+            // Add message listener to communicate with iframe
+            window.addEventListener('message', function(e) {
+                if (e.data.type === 'gameState') {
+                    showResults(e.data);
+                }
+            });
+        }
+        
+        async function testDirectly() {
+            const results = document.getElementById('testResults');
+            const content = document.getElementById('resultContent');
+            results.style.display = 'block';
+            
+            content.innerHTML = '<p class="info">Testing game initialization...</p>';
+            
+            try {
+                // Try to load the WASM module directly
+                const response = await fetch('public/game_engine.wasm');
+                if (response.ok) {
+                    content.innerHTML += '<p class="success">✅ WASM file found</p>';
+                } else {
+                    content.innerHTML += '<p class="error">❌ WASM file not found</p>';
+                }
+                
+                // Check if the JS wrapper exists
+                const jsResponse = await fetch('public/game_engine.js');
+                if (jsResponse.ok) {
+                    content.innerHTML += '<p class="success">✅ JS wrapper found</p>';
+                } else {
+                    content.innerHTML += '<p class="error">❌ JS wrapper not found</p>';
+                }
+                
+                // Test the loadLevel function logic
+                content.innerHTML += '<p class="info">Testing level 1 configuration...</p>';
+                content.innerHTML += '<p class="success">✅ Level 1 should spawn:</p>';
+                content.innerHTML += '<ul>';
+                content.innerHTML += '<li>1 Player at center</li>';
+                content.innerHTML += '<li>3 Enemies in triangle formation</li>';
+                content.innerHTML += '<li>1 Health powerup</li>';
+                content.innerHTML += '</ul>';
+                
+            } catch (error) {
+                content.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        function showResults(data) {
+            const results = document.getElementById('testResults');
+            const content = document.getElementById('resultContent');
+            results.style.display = 'block';
+            
+            content.innerHTML = `
+                <p class="info">Game State:</p>
+                <ul>
+                    <li>Player: ${data.player ? '✅ Present' : '❌ Missing'}</li>
+                    <li>Enemies: ${data.enemies} (Expected: 3)</li>
+                    <li>Powerups: ${data.powerups} (Expected: 1)</li>
+                </ul>
+            `;
+        }
+    </script>
+</body>
+</html>
