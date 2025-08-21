@@ -3,8 +3,7 @@ name: Test Matrix
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches: [main]
+  workflow_dispatch:  # Allow manual runs
 
 # Cancel in-progress runs for PRs
 concurrency:
