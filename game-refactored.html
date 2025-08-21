@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ultimate WASM Game Engine - Modular Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: crosshair;
+        }
+
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        .loader {
+            width: 120px;
+            height: 120px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 30px;
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .loading-progress {
+            width: 300px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .loading-bar {
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        #mainMenu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 900;
+        }
+
+        .game-title {
+            font-size: 72px;
+            font-weight: 700;
+            margin-bottom: 50px;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(45deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .menu-button {
+            padding: 15px 50px;
+            font-size: 20px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .menu-button:hover {
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #gameUI {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .health-bar, .energy-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #81C784);
+            transition: width 0.3s;
+            width: 100%;
+        }
+
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2196F3, #64B5F6);
+            transition: width 0.3s;
+            width: 100%;
+        }
+
+        .score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        #pauseMenu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            display: none;
+            z-index: 1001;
+            backdrop-filter: blur(20px);
+            pointer-events: all;
+        }
+
+        .pause-title {
+            font-size: 36px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .pause-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .pause-button {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .pause-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        #performanceStats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-line {
+            margin: 2px 0;
+        }
+
+        /* Mobile controls styles */
+        #mobileControls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+            z-index: 800;
+        }
+
+        .mobile-joystick {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            width: 150px;
+            height: 150px;
+            pointer-events: all;
+        }
+
+        .joystick-base {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .joystick-knob {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            border: 2px solid #fff;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: none;
+        }
+
+        .mobile-buttons {
+            position: absolute;
+            bottom: 50px;
+            right: 50px;
+            display: grid;
+            grid-template-columns: repeat(2, 80px);
+            grid-template-rows: repeat(2, 80px);
+            gap: 10px;
+            pointer-events: all;
+        }
+
+        .mobile-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s;
+        }
+
+        .mobile-button.pressed {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loader"></div>
+        <div class="loading-text">Loading WASM Engine</div>
+        <div class="loading-progress">
+            <div class="loading-bar" id="loadingBar"></div>
+        </div>
+    </div>
+    
+    <!-- Main Menu -->
+    <div id="mainMenu">
+        <h1 class="game-title">WASM GAME</h1>
+        <div class="menu-buttons">
+            <button class="menu-button" onclick="Game.start('survival')">Survival</button>
+            <button class="menu-button" onclick="Game.start('campaign')">Campaign</button>
+            <button class="menu-button" onclick="Game.start('sandbox')">Sandbox</button>
+            <button class="menu-button" onclick="Game.start('multiplayer')">Multiplayer</button>
+        </div>
+    </div>
+    
+    <!-- Game UI -->
+    <div id="gameUI">
+        <div class="hud">
+            <div class="hud-item">
+                <span>Health</span>
+                <div class="health-bar">
+                    <div class="health-fill" id="healthBar"></div>
+                </div>
+            </div>
+            <div class="hud-item">
+                <span>Energy</span>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energyBar"></div>
+                </div>
+            </div>
+            <div class="hud-item">
+                <span>Wave: <span id="waveNum">1</span></span>
+            </div>
+            <div class="hud-item">
+                <span>Enemies: <span id="enemyCount">0</span></span>
+            </div>
+        </div>
+        
+        <div class="score-display">
+            Score: <span id="score">0</span>
+        </div>
+        
+        <!-- Pause Menu -->
+        <div id="pauseMenu">
+            <h2 class="pause-title">PAUSED</h2>
+            <div class="pause-buttons">
+                <button class="pause-button" onclick="Game.resume()">Resume</button>
+                <button class="pause-button" onclick="Game.restart()">Restart</button>
+                <button class="pause-button" onclick="Game.showSettings()">Settings</button>
+                <button class="pause-button" onclick="Game.quit()">Quit to Menu</button>
+            </div>
+        </div>
+        
+        <!-- Performance Stats -->
+        <div id="performanceStats">
+            <div class="stat-line">FPS: <span id="fps">0</span></div>
+            <div class="stat-line">MS: <span id="ms">0</span></div>
+            <div class="stat-line">WASM: <span id="wasmMs">0</span>ms</div>
+            <div class="stat-line">Entities: <span id="entities">0</span></div>
+        </div>
+    </div>
+    
+    <!-- Mobile Controls -->
+    <div id="mobileControls">
+        <div class="mobile-joystick" id="joystick">
+            <div class="joystick-base"></div>
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+        <div class="mobile-buttons">
+            <button class="mobile-button" data-action="attack">Attack</button>
+            <button class="mobile-button" data-action="block">Block</button>
+            <button class="mobile-button" data-action="roll">Roll</button>
+            <button class="mobile-button" data-action="special">Special</button>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Import modules
+        import { gameEngine } from './public/game-engine-wrapper.js';
+        import { inputHandler } from './public/input-handler.js';
+        import { renderer } from './public/renderer.js';
+        
+        // Game state
+        window.Game = {
+            canvas: null,
+            engine: null,
+            running: false,
+            paused: false,
+            initialized: false,
+            mode: 'survival',
+            score: 0,
+            wave: 1,
+            player: null,
+            mobileControls: null,
+            stats: {
+                fps: 0,
+                frames: 0,
+                lastTime: 0,
+                fpsTime: 0,
+                wasmTime: 0,
+                entities: 0
+            }
+        };
+        
+        // Initialize canvas
+        function initCanvas() {
+            Game.canvas = document.getElementById('gameCanvas');
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+        
+        // Resize canvas
+        function resizeCanvas() {
+            Game.canvas.width = window.innerWidth;
+            Game.canvas.height = window.innerHeight;
+        }
+        
+        // Update loading progress
+        function updateLoading(progress, text) {
+            const loadingBar = document.getElementById('loadingBar');
+            const loadingText = document.querySelector('.loading-text');
+            
+            if (loadingBar) loadingBar.style.width = progress + '%';
+            if (loadingText) loadingText.textContent = text;
+        }
+        
+        // Initialize WASM and modules
+        async function initialize() {
+            try {
+                // Initialize canvas
+                initCanvas();
+                
+                updateLoading(10, 'Initializing modules...');
+                
+                // Initialize renderer
+                renderer.initialize(Game.canvas);
+                
+                updateLoading(20, 'Setting up input handlers...');
+                
+                // Initialize input handler
+                inputHandler.initialize(Game.canvas);
+                
+                // Setup input callbacks
+                setupInputCallbacks();
+                
+                updateLoading(40, 'Loading WASM engine...');
+                
+                // Initialize game engine
+                await gameEngine.initialize({
+                    width: Game.canvas.width,
+                    height: Game.canvas.height,
+                    onRuntimeInitialized: () => {
+                        console.log('✅ WASM runtime initialized');
+                    }
+                });
+                
+                Game.engine = gameEngine;
+                
+                updateLoading(80, 'Setting up mobile controls...');
+                
+                // Setup mobile controls if needed
+                if (isMobile()) {
+                    setupMobileControls();
+                }
+                
+                updateLoading(100, 'Ready!');
+                
+                // Hide loading screen and show main menu
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('loadingScreen').style.display = 'none';
+                        document.getElementById('mainMenu').style.display = 'flex';
+                    }, 500);
+                }, 500);
+                
+                Game.initialized = true;
+                
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                updateLoading(0, 'Error: ' + error.message);
+            }
+        }
+        
+        // Setup input callbacks
+        function setupInputCallbacks() {
+            // Pause on Escape
+            inputHandler.on('keydown', ({ key }) => {
+                if (key === 'escape' && Game.running) {
+                    Game.togglePause();
+                }
+            });
+        }
+        
+        // Setup mobile controls
+        function setupMobileControls() {
+            const mobileControls = document.getElementById('mobileControls');
+            const joystick = document.getElementById('joystick');
+            const joystickKnob = document.getElementById('joystickKnob');
+            const buttons = document.querySelectorAll('.mobile-button');
+            
+            let joystickActive = false;
+            let joystickTouch = null;
+            
+            // Joystick handling
+            joystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                joystickActive = true;
+                joystickTouch = e.touches[0].identifier;
+                updateJoystick(e.touches[0]);
+            });
+            
+            window.addEventListener('touchmove', (e) => {
+                for (let touch of e.touches) {
+                    if (touch.identifier === joystickTouch) {
+                        e.preventDefault();
+                        updateJoystick(touch);
+                    }
+                }
+            });
+            
+            window.addEventListener('touchend', (e) => {
+                for (let touch of e.changedTouches) {
+                    if (touch.identifier === joystickTouch) {
+                        joystickActive = false;
+                        joystickTouch = null;
+                        resetJoystick();
+                    }
+                }
+            });
+            
+            function updateJoystick(touch) {
+                const rect = joystick.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                let deltaX = touch.clientX - centerX;
+                let deltaY = touch.clientY - centerY;
+                
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const maxDistance = rect.width / 2 - 30;
+                
+                if (distance > maxDistance) {
+                    deltaX = (deltaX / distance) * maxDistance;
+                    deltaY = (deltaY / distance) * maxDistance;
+                }
+                
+                joystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+                
+                // Update input handler
+                inputHandler.setJoystickInput(deltaX / maxDistance, deltaY / maxDistance, true);
+                
+                // Update WASM engine
+                if (Game.engine) {
+                    Game.engine.setJoystickInput(deltaX / maxDistance, deltaY / maxDistance);
+                }
+            }
+            
+            function resetJoystick() {
+                joystickKnob.style.transform = 'translate(-50%, -50%)';
+                inputHandler.setJoystickInput(0, 0, false);
+                
+                if (Game.engine) {
+                    Game.engine.setJoystickInput(0, 0);
+                }
+            }
+            
+            // Button handling
+            buttons.forEach(button => {
+                const action = button.dataset.action;
+                
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    button.classList.add('pressed');
+                    inputHandler.setButtonState(action, true);
+                    handleButtonAction(action, true);
+                });
+                
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    button.classList.remove('pressed');
+                    inputHandler.setButtonState(action, false);
+                    handleButtonAction(action, false);
+                });
+            });
+            
+            function handleButtonAction(action, pressed) {
+                if (!Game.engine) return;
+                
+                switch (action) {
+                    case 'attack':
+                        if (pressed) Game.engine.playerAttack();
+                        break;
+                    case 'block':
+                        if (pressed) Game.engine.startBlock(1);
+                        else Game.engine.endBlock(1);
+                        break;
+                    case 'roll':
+                        if (pressed) {
+                            const movement = inputHandler.getMovementInput();
+                            Game.engine.playerRoll(movement.x, movement.y);
+                        }
+                        break;
+                    case 'special':
+                        if (pressed) Game.engine.playerSpecialAbility();
+                        break;
+                }
+            }
+        }
+        
+        // Start game
+        Game.start = function(mode) {
+            if (!Game.initialized) {
+                console.error('Game not initialized');
+                return;
+            }
+            
+            Game.mode = mode;
+            Game.running = true;
+            Game.paused = false;
+            Game.score = 0;
+            Game.wave = 1;
+            
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('gameUI').style.display = 'block';
+            
+            if (isMobile()) {
+                document.getElementById('mobileControls').style.display = 'block';
+            }
+            
+            // Show performance stats in debug mode
+            if (window.location.hash === '#debug') {
+                document.getElementById('performanceStats').style.display = 'block';
+            }
+            
+            initGame();
+            requestAnimationFrame(gameLoop);
+        };
+        
+        // Initialize game
+        function initGame() {
+            if (!Game.engine) {
+                console.error('Game engine not available');
+                return;
+            }
+            
+            // Clear existing entities
+            Game.engine.clearEntities();
+            
+            // Spawn initial entities based on mode
+            switch (Game.mode) {
+                case 'survival':
+                    Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                    spawnWave(1);
+                    break;
+                    
+                case 'campaign':
+                    loadLevel(1);
+                    break;
+                    
+                case 'sandbox':
+                    Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                    // Spawn some test entities
+                    for (let i = 0; i < 5; i++) {
+                        Game.engine.createPowerUp(
+                            Math.random() * Game.canvas.width,
+                            Math.random() * Game.canvas.height,
+                            Math.floor(Math.random() * 4)
+                        );
+                    }
+                    break;
+                    
+                case 'multiplayer':
+                    Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                    // Additional multiplayer setup would go here
+                    break;
+            }
+        }
+        
+        // Spawn wave
+        function spawnWave(waveNum) {
+            const enemyCount = 5 + waveNum * 2;
+            
+            for (let i = 0; i < enemyCount; i++) {
+                const angle = (Math.PI * 2 * i) / enemyCount;
+                const dist = 300 + Math.random() * 200;
+                const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                
+                if (Math.random() > 0.7 && waveNum > 3) {
+                    Game.engine.createWolf(x, y, waveNum > 10);
+                } else {
+                    Game.engine.createEnemy(x, y, 100);
+                }
+            }
+            
+            // Add obstacles
+            if (waveNum > 2) {
+                for (let i = 0; i < waveNum; i++) {
+                    Game.engine.createObstacle(
+                        Math.random() * Game.canvas.width,
+                        Math.random() * Game.canvas.height,
+                        30 + Math.random() * 20,
+                        Math.random() > 0.5
+                    );
+                }
+            }
+            
+            document.getElementById('waveNum').textContent = waveNum;
+        }
+        
+        // Load level
+        function loadLevel(levelNum) {
+            // Create player at center
+            Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+            
+            // Spawn enemies based on level
+            const enemyCount = 3 + levelNum * 2;
+            for (let i = 0; i < enemyCount; i++) {
+                const angle = (Math.PI * 2 * i) / enemyCount;
+                const dist = 300 + Math.random() * 100;
+                const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                
+                if (levelNum > 5 && Math.random() > 0.6) {
+                    Game.engine.createWolf(x, y, levelNum > 10);
+                } else {
+                    Game.engine.createEnemy(x, y, 100 + levelNum * 10);
+                }
+            }
+            
+            document.getElementById('waveNum').textContent = `Level ${levelNum}`;
+        }
+        
+        // Game loop
+        function gameLoop(timestamp) {
+            if (!Game.running) return;
+            
+            // Calculate delta time
+            const deltaTime = timestamp - Game.stats.lastTime;
+            Game.stats.lastTime = timestamp;
+            
+            // Update performance stats
+            Game.stats.frames++;
+            if (timestamp - Game.stats.fpsTime >= 1000) {
+                Game.stats.fps = Game.stats.frames;
+                Game.stats.frames = 0;
+                Game.stats.fpsTime = timestamp;
+                updateStats();
+            }
+            
+            if (!Game.paused) {
+                // Update game
+                const wasmStart = performance.now();
+                update(deltaTime);
+                Game.stats.wasmTime = performance.now() - wasmStart;
+                
+                // Render
+                render();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Update game
+        function update(dt) {
+            if (!Game.engine) return;
+            
+            // Handle input
+            handleInput();
+            
+            // Update WASM engine
+            Game.engine.update(dt / 1000);
+            
+            // Get entity count
+            const entities = Game.engine.getAllEntities();
+            Game.stats.entities = entities.length;
+            
+            // Check wave completion for survival mode
+            if (Game.mode === 'survival') {
+                const enemies = entities.filter(e => e.type === 'enemy' || e.type === 'wolf');
+                if (enemies.length === 0) {
+                    Game.wave++;
+                    spawnWave(Game.wave);
+                }
+                document.getElementById('enemyCount').textContent = enemies.length;
+            }
+            
+            // Update HUD
+            updateHUD();
+        }
+        
+        // Handle input
+        function handleInput() {
+            if (!Game.engine) return;
+            
+            // Get movement input
+            const movement = inputHandler.getMovementInput();
+            
+            // Get aim direction
+            const aim = inputHandler.getAimDirection(Game.canvas.width / 2, Game.canvas.height / 2);
+            
+            // Update player input
+            Game.engine.updatePlayerInput(movement.x, movement.y, aim.x * 100, aim.y * 100);
+            
+            // Handle actions
+            if (inputHandler.isMouseDown()) {
+                Game.engine.playerShoot();
+            }
+            
+            if (inputHandler.isKeyPressed(' ')) {
+                Game.engine.playerBoost();
+            }
+            
+            if (inputHandler.isKeyPressed('q')) {
+                Game.engine.playerSpecialAbility();
+            }
+        }
+        
+        // Render game
+        function render() {
+            const entities = Game.engine.getAllEntities();
+            const player = Game.engine.getPlayerState();
+            
+            renderer.render({
+                entities: entities,
+                player: player,
+                paused: Game.paused,
+                showMinimap: true
+            });
+        }
+        
+        // Update HUD
+        function updateHUD() {
+            const player = Game.engine.getPlayerState();
+            
+            if (player) {
+                const healthBar = document.getElementById('healthBar');
+                const energyBar = document.getElementById('energyBar');
+                
+                if (healthBar) healthBar.style.width = Math.max(0, Math.min(100, player.health)) + '%';
+                if (energyBar) energyBar.style.width = Math.max(0, Math.min(100, player.energy)) + '%';
+            }
+            
+            document.getElementById('score').textContent = Game.score || 0;
+        }
+        
+        // Update stats
+        function updateStats() {
+            document.getElementById('fps').textContent = Game.stats.fps || 0;
+            document.getElementById('ms').textContent = Game.stats.fps > 0 ? (1000 / Game.stats.fps).toFixed(1) : '0';
+            document.getElementById('wasmMs').textContent = (Game.stats.wasmTime || 0).toFixed(1);
+            document.getElementById('entities').textContent = Game.stats.entities || 0;
+        }
+        
+        // Toggle pause
+        Game.togglePause = function() {
+            Game.paused = !Game.paused;
+            document.getElementById('pauseMenu').style.display = Game.paused ? 'block' : 'none';
+        };
+        
+        // Resume game
+        Game.resume = function() {
+            Game.paused = false;
+            document.getElementById('pauseMenu').style.display = 'none';
+        };
+        
+        // Restart game
+        Game.restart = function() {
+            Game.resume();
+            initGame();
+        };
+        
+        // Quit game
+        Game.quit = function() {
+            Game.running = false;
+            Game.paused = false;
+            document.getElementById('pauseMenu').style.display = 'none';
+            document.getElementById('gameUI').style.display = 'none';
+            document.getElementById('mobileControls').style.display = 'none';
+            document.getElementById('mainMenu').style.display = 'flex';
+        };
+        
+        // Show settings
+        Game.showSettings = function() {
+            alert('Settings panel coming soon!');
+        };
+        
+        // Check if mobile
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
