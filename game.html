@@ -961,20 +961,26 @@
         
         // Initialize game
         function initGame() {
-            if (!Game.engine) return;
+            if (!Game.engine) {
+                console.error('Game engine not initialized!');
+                return;
+            }
             
             // Clear existing entities
             Game.engine.clearEntities();
             
-            // Create player
-            Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
-            
             // Spawn initial enemies based on mode
             if (Game.mode === 'survival') {
+                // Create player for survival mode
+                Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
                 spawnWave(1);
             } else if (Game.mode === 'campaign') {
+                // loadLevel will create the player
                 loadLevel(1);
             } else if (Game.mode === 'sandbox') {
+                // Create player for sandbox mode
+                Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                
                 // Sandbox mode - spawn some test entities
                 for (let i = 0; i < 5; i++) {
                     Game.engine.createPowerUp(
@@ -983,6 +989,10 @@
                         Math.floor(Math.random() * 4)
                     );
                 }
+            } else if (Game.mode === 'multiplayer') {
+                // Create player for multiplayer mode
+                Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+                // Additional multiplayer setup would go here
             }
         }
         
@@ -1024,6 +1034,130 @@
         function loadLevel(levelNum) {
             // Campaign mode level loading
             console.log(`Loading level ${levelNum}`);
+            
+            if (!Game.engine) {
+                console.error('Game engine not initialized');
+                return;
+            }
+            
+            // Clear existing entities first
+            Game.engine.clearEntities();
+            
+            // Create player at center of screen
+            Game.player = Game.engine.createPlayer(Game.canvas.width / 2, Game.canvas.height / 2);
+            
+            // Level-specific configurations
+            switch(levelNum) {
+                case 1:
+                    // Level 1: Introduction - Simple enemies
+                    // Spawn 3 basic enemies in a triangle formation
+                    Game.engine.createEnemy(Game.canvas.width / 2 - 200, Game.canvas.height / 2 - 150);
+                    Game.engine.createEnemy(Game.canvas.width / 2 + 200, Game.canvas.height / 2 - 150);
+                    Game.engine.createEnemy(Game.canvas.width / 2, Game.canvas.height / 2 + 200);
+                    
+                    // Add a health powerup
+                    Game.engine.createPowerUp(
+                        Game.canvas.width / 2 - 100,
+                        Game.canvas.height / 2 - 100,
+                        0 // Health powerup
+                    );
+                    break;
+                    
+                case 2:
+                    // Level 2: More enemies and obstacles
+                    for (let i = 0; i < 5; i++) {
+                        const angle = (Math.PI * 2 * i) / 5;
+                        const dist = 250;
+                        const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                        const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                        Game.engine.createEnemy(x, y);
+                    }
+                    
+                    // Add obstacles
+                    Game.engine.createObstacle(
+                        Game.canvas.width / 2 - 150,
+                        Game.canvas.height / 2,
+                        40,
+                        true // destructible
+                    );
+                    Game.engine.createObstacle(
+                        Game.canvas.width / 2 + 150,
+                        Game.canvas.height / 2,
+                        40,
+                        true
+                    );
+                    break;
+                    
+                case 3:
+                    // Level 3: Introduce wolves
+                    // Mix of enemies and wolves
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (Math.PI * 2 * i) / 3;
+                        const dist = 300;
+                        const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                        const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                        Game.engine.createEnemy(x, y);
+                    }
+                    
+                    // Add wolves
+                    Game.engine.createWolf(Game.canvas.width / 2 - 250, Game.canvas.height / 2);
+                    Game.engine.createWolf(Game.canvas.width / 2 + 250, Game.canvas.height / 2);
+                    
+                    // Add powerups
+                    Game.engine.createPowerUp(
+                        Game.canvas.width / 2,
+                        Game.canvas.height / 2 - 150,
+                        1 // Speed powerup
+                    );
+                    break;
+                    
+                default:
+                    // For levels beyond 3, generate procedurally
+                    const enemyCount = 3 + levelNum;
+                    const wolfCount = Math.floor(levelNum / 2);
+                    
+                    // Spawn enemies
+                    for (let i = 0; i < enemyCount; i++) {
+                        const angle = (Math.PI * 2 * i) / enemyCount;
+                        const dist = 200 + Math.random() * 150;
+                        const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                        const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                        Game.engine.createEnemy(x, y);
+                    }
+                    
+                    // Spawn wolves
+                    for (let i = 0; i < wolfCount; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 300 + Math.random() * 100;
+                        const x = Game.canvas.width / 2 + Math.cos(angle) * dist;
+                        const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
+                        Game.engine.createWolf(x, y, levelNum > 10); // Alpha wolves after level 10
+                    }
+                    
+                    // Add obstacles
+                    const obstacleCount = Math.min(levelNum, 5);
+                    for (let i = 0; i < obstacleCount; i++) {
+                        Game.engine.createObstacle(
+                            Math.random() * Game.canvas.width,
+                            Math.random() * Game.canvas.height,
+                            30 + Math.random() * 20,
+                            Math.random() > 0.5
+                        );
+                    }
+                    
+                    // Random powerups
+                    if (Math.random() > 0.5) {
+                        Game.engine.createPowerUp(
+                            Math.random() * Game.canvas.width,
+                            Math.random() * Game.canvas.height,
+                            Math.floor(Math.random() * 4)
+                        );
+                    }
+                    break;
+            }
+            
+            // Update wave display for campaign mode
+            document.getElementById('waveNum').textContent = `Level ${levelNum}`;
         }
         
         // Game loop
