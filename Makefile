@@ -10,7 +10,11 @@ EMSDK_DIR = emsdk
 EMCC = emcc
 
 # Source files
+# Default: Refactored modular version (now main)
 WASM_SOURCES = $(WASM_DIR)/game_engine.cpp
+
+# Legacy monolithic version (preserved for compatibility)
+WASM_SOURCES_MONOLITHIC = $(WASM_DIR)/game_engine_monolithic.cpp
 
 # Include directories
 INCLUDES = -I$(WASM_DIR)/include
@@ -36,12 +40,19 @@ WASM_OUTPUT = $(PUBLIC_DIR)/game_engine
 .PHONY: all
 all: build
 
-# Build WASM module
+# Build WASM module (refactored version - now default)
 .PHONY: build
 build: check-emscripten $(PUBLIC_DIR)
-	@echo "Building WASM module..."
+	@echo "Building WASM module (refactored)..."
 	$(EMCC) $(WASM_SOURCES) $(INCLUDES) $(WASM_FLAGS) -o $(WASM_OUTPUT).js
 	@echo "Build complete!"
+
+# Build legacy monolithic version
+.PHONY: build-monolithic
+build-monolithic: check-emscripten $(PUBLIC_DIR)
+	@echo "Building WASM module (monolithic/legacy)..."
+	$(EMCC) $(WASM_SOURCES_MONOLITHIC) $(INCLUDES) $(WASM_FLAGS) -o $(WASM_OUTPUT).js
+	@echo "Monolithic build complete!"
 
 # Quick build (JavaScript only)
 .PHONY: quick
@@ -52,6 +63,27 @@ quick:
 .PHONY: production
 production: build
 	@bash build-quick.sh --production
+
+# Development build with debug symbols
+.PHONY: debug
+debug: check-emscripten $(PUBLIC_DIR)
+	@echo "Building WASM module with debug symbols..."
+	$(EMCC) $(WASM_SOURCES) $(INCLUDES) \
+		-O2 -g \
+		-s WASM=1 \
+		-s ALLOW_MEMORY_GROWTH=1 \
+		-s MODULARIZE=1 \
+		-s EXPORT_NAME='GameEngineModule' \
+		--bind \
+		-std=c++17 \
+		-s ENVIRONMENT='web' \
+		-s EXPORT_ES6=1 \
+		-s ASSERTIONS=1 \
+		-s SAFE_HEAP=1 \
+		-s FILESYSTEM=0 \
+		-s NO_EXIT_RUNTIME=1 \
+		-o $(WASM_OUTPUT).js
+	@echo "Debug build complete!"
 
 # Check if Emscripten is installed
 .PHONY: check-emscripten
@@ -121,7 +153,9 @@ help:
 	@echo "WASM Game Engine Build System"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make              - Build WASM module (default)"
+	@echo "  make              - Build WASM module (refactored, default)"
+	@echo "  make build-monolithic - Build legacy monolithic WASM module"
+	@echo "  make debug        - Build with debug symbols"
 	@echo "  make quick        - Quick build (JavaScript only)"
 	@echo "  make production   - Create production build"
 	@echo "  make setup        - Setup development environment"

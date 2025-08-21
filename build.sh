@@ -57,7 +57,7 @@ build_wasm() {
     # Create output directory
     mkdir -p ../public
     
-    # Define source files
+    # Define source files (now using refactored version by default)
     SOURCES="game_engine.cpp"
     
     # Define include directories
