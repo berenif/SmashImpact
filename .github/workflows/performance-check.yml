@@ -1,0 +1,152 @@
+name: Performance Check
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      compare_with:
+        description: 'Branch or commit to compare with'
+        required: false
+        default: 'main'
+
+jobs:
+  measure-build-time:
+    runs-on: ubuntu-latest
+    outputs:
+      current_time: ${{ steps.measure.outputs.build_time }}
+      
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Measure build time
+        id: measure
+        run: |
+          # Record start time
+          START=$(date +%s%N)
+          
+          # Run build
+          npm ci --prefer-offline --no-audit
+          chmod +x build-quick.sh
+          ./build-quick.sh --check || true
+          
+          # Record end time
+          END=$(date +%s%N)
+          
+          # Calculate duration in milliseconds
+          DURATION=$(( (END - START) / 1000000 ))
+          
+          echo "Build completed in ${DURATION}ms"
+          echo "build_time=${DURATION}" >> $GITHUB_OUTPUT
+          
+          # Store metrics
+          mkdir -p metrics
+          echo "{
+            \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"build_time_ms\": ${DURATION},
+            \"commit\": \"${GITHUB_SHA}\",
+            \"branch\": \"${GITHUB_REF_NAME}\"
+          }" > metrics/build-time.json
+      
+      - name: Check bundle size
+        run: |
+          # Measure bundle sizes
+          echo "## Bundle Size Report" > metrics/bundle-size.md
+          echo "" >> metrics/bundle-size.md
+          echo "| File | Size | Gzipped |" >> metrics/bundle-size.md
+          echo "|------|------|---------|" >> metrics/bundle-size.md
+          
+          for file in public/*.js src/*.js; do
+            if [ -f "$file" ]; then
+              SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+              GZIPPED=$(gzip -c "$file" | wc -c)
+              SIZE_KB=$(echo "scale=2; $SIZE / 1024" | bc)
+              GZIPPED_KB=$(echo "scale=2; $GZIPPED / 1024" | bc)
+              echo "| $(basename $file) | ${SIZE_KB}KB | ${GZIPPED_KB}KB |" >> metrics/bundle-size.md
+            fi
+          done
+          
+          cat metrics/bundle-size.md
+      
+      - name: Analyze dependencies
+        run: |
+          # Check for outdated dependencies
+          npm outdated --json > metrics/outdated-deps.json || true
+          
+          # Check for security vulnerabilities
+          npm audit --json > metrics/security-audit.json || true
+          
+          # Count dependencies
+          PROD_DEPS=$(jq -r '.dependencies | length' package.json)
+          DEV_DEPS=$(jq -r '.devDependencies | length' package.json)
+          
+          echo "Production dependencies: $PROD_DEPS"
+          echo "Dev dependencies: $DEV_DEPS"
+      
+      - name: Memory usage analysis
+        run: |
+          # Monitor memory usage during build
+          /usr/bin/time -v npm run build:quick 2>&1 | tee metrics/memory-usage.txt || true
+          
+          # Extract peak memory
+          PEAK_MEMORY=$(grep "Maximum resident set size" metrics/memory-usage.txt | awk '{print $6}')
+          echo "Peak memory usage: ${PEAK_MEMORY}KB"
+      
+      - name: Generate performance report
+        run: |
+          cat > metrics/performance-report.md << EOF
+          # Performance Report
+          
+          **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Commit:** ${GITHUB_SHA:0:8}
+          **Branch:** ${GITHUB_REF_NAME}
+          
+          ## Build Performance
+          - **Build Time:** ${{ steps.measure.outputs.build_time }}ms
+          - **Peak Memory:** $(grep "Maximum resident set size" metrics/memory-usage.txt | awk '{print $6}')KB
+          
+          ## Recommendations
+          EOF
+          
+          # Add recommendations based on metrics
+          if [ "${{ steps.measure.outputs.build_time }}" -gt "30000" ]; then
+            echo "- ⚠️ Build time exceeds 30 seconds. Consider optimizing build process." >> metrics/performance-report.md
+          fi
+          
+          if [ -f metrics/outdated-deps.json ] && [ $(jq length metrics/outdated-deps.json) -gt 5 ]; then
+            echo "- ⚠️ Multiple outdated dependencies detected. Consider updating." >> metrics/performance-report.md
+          fi
+          
+          if [ -f metrics/security-audit.json ]; then
+            VULNS=$(jq '.metadata.vulnerabilities.total' metrics/security-audit.json)
+            if [ "$VULNS" -gt "0" ]; then
+              echo "- 🔴 Security vulnerabilities detected! Run 'npm audit fix'" >> metrics/performance-report.md
+            fi
+          fi
+      
+      - name: Upload metrics
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-metrics
+          path: metrics/
+          retention-days: 30
+      
+      - name: Update dashboard
+        run: |
+          # Create or update performance dashboard
+          cat metrics/performance-report.md >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat metrics/bundle-size.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Alert on performance regression
+        if: steps.measure.outputs.build_time > 60000
+        run: |
+          echo "::error::Build time regression detected! Current: ${{ steps.measure.outputs.build_time }}ms"
+          exit 1

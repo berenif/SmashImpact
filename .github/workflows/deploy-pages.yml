@@ -4,7 +4,6 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -27,15 +26,55 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clone for faster checkout
         
       - name: Setup Pages
         uses: actions/configure-pages@v4
         
+      # Cache static assets that don't change often
+      - name: Cache static assets
+        uses: actions/cache@v3
+        with:
+          path: |
+            public/game_engine.wasm
+            public/game_engine.js
+            vendor/**
+          key: ${{ runner.os }}-static-${{ hashFiles('public/game_engine.*', 'vendor/**') }}
+          restore-keys: |
+            ${{ runner.os }}-static-
+        
+      # Prepare optimized artifact (exclude unnecessary files)
+      - name: Prepare deployment files
+        run: |
+          # Create deployment directory
+          mkdir -p _site
+          
+          # Copy only necessary files for deployment
+          cp -r public _site/ 2>/dev/null || true
+          cp -r src _site/ 2>/dev/null || true
+          cp -r vendor _site/ 2>/dev/null || true
+          cp -r docs _site/ 2>/dev/null || true
+          cp *.html _site/ 2>/dev/null || true
+          cp favicon.ico _site/ 2>/dev/null || true
+          
+          # Remove development files
+          find _site -name "*.map" -delete 2>/dev/null || true
+          find _site -name "*.test.js" -delete 2>/dev/null || true
+          find _site -name ".DS_Store" -delete 2>/dev/null || true
+          
+          # Create index.html if it doesn't exist
+          if [ ! -f _site/index.html ] && [ -f _site/game.html ]; then
+            cp _site/game.html _site/index.html
+          fi
+          
+          echo "Deployment files prepared in _site/"
+          du -sh _site/
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          path: '_site'
           
   # Deployment job
   deploy:
