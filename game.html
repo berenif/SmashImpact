@@ -1071,18 +1071,13 @@
         // Load it using: import WolfAIModule from './public/wolf_ai.js';
         let wolfManager = null; // Will be initialized after WASM loads
         
-        // Initialize Wolf AI WASM module
+        // Initialize Wolf AI WASM module - REQUIRED, NO FALLBACK
         async function initWolfAI() {
-            try {
-                const WolfAIModule = await import('./public/wolf_ai.js');
-                const module = await WolfAIModule.default();
-                wolfManager = new module.WolfPackManager();
-                console.log('✅ Wolf AI WASM module loaded');
-                return wolfManager;
-            } catch (error) {
-                console.error('Failed to load Wolf AI WASM:', error);
-                return null;
-            }
+            const WolfAIModule = await import('./public/wolf_ai.js');
+            const module = await WolfAIModule.default();
+            wolfManager = new module.WolfPackManager();
+            console.log('✅ Wolf AI WASM module loaded');
+            return wolfManager;
         }
 
         // Orientation detection for mobile devices
@@ -1229,11 +1224,9 @@
         
         // Initialize game
         function initGame() {
-            // Clear wolves
+            // Clear wolves - WASM ONLY
             Game.wolves = [];
-            if (wolfManager) {
-                wolfManager.clearWolves();
-            }
+            wolfManager.clearWolves();
             
             // If WASM engine exists, use it
             if (Game.engine && Game.engine.clearEntities) {
@@ -1284,11 +1277,9 @@
         function spawnWave(waveNum) {
             const enemyCount = 5 + waveNum * 2;
             
-            // Clear existing wolves
+            // Clear existing wolves - WASM ONLY
             Game.wolves = [];
-            if (wolfManager) {
-                wolfManager.clearWolves();
-            }
+            wolfManager.clearWolves();
             
             for (let i = 0; i < enemyCount; i++) {
                 const angle = (Math.PI * 2 * i) / enemyCount;
@@ -1297,18 +1288,10 @@
                 const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
                 
                 if (Math.random() > 0.7 && waveNum > 3) {
-                    // Spawn wolf with WASM AI
+                    // Spawn wolf - WASM ONLY
                     const isAlpha = waveNum > 10;
-                    
-                    if (wolfManager) {
-                        const wolfId = wolfManager.createWolf(x, y, isAlpha);
-                        Game.wolves.push({ id: wolfId, isAlpha: isAlpha });
-                    }
-                    
-                    // Also create in WASM if available
-                    if (Game.engine && Game.engine.createWolf) {
-                        Game.engine.createWolf(x, y, isAlpha);
-                    }
+                    const wolfId = wolfManager.createWolf(x, y, isAlpha);
+                    Game.wolves.push({ id: wolfId, isAlpha: isAlpha });
                 } else {
                     // Spawn regular enemy
                     Game.engine.createEnemy(x, y, 100);
@@ -1400,38 +1383,11 @@
                     }
                     
                     // Add wolves with AI
-                    const wolf1 = {
-                        x: Game.canvas.width / 2 - 250,
-                        y: Game.canvas.height / 2,
-                        vx: 0,
-                        vy: 0,
-                        rotation: 0,
-                        health: 100,
-                        type: 'wolf',
-                        isAlpha: false,
-                        isShooting: false
-                    };
-                    const wolf2 = {
-                        x: Game.canvas.width / 2 + 250,
-                        y: Game.canvas.height / 2,
-                        vx: 0,
-                        vy: 0,
-                        rotation: 0,
-                        health: 100,
-                        type: 'wolf',
-                        isAlpha: false,
-                        isShooting: false
-                    };
-                    
-                    if (wolfManager) {
-                        const wolfId1 = wolfManager.createWolf(wolf1.x, wolf1.y, wolf1.isAlpha);
-                        const wolfId2 = wolfManager.createWolf(wolf2.x, wolf2.y, wolf2.isAlpha);
-                        Game.wolves.push({ id: wolfId1, isAlpha: wolf1.isAlpha });
-                        Game.wolves.push({ id: wolfId2, isAlpha: wolf2.isAlpha });
-                    }
-                    
-                    Game.engine.createWolf(Game.canvas.width / 2 - 250, Game.canvas.height / 2);
-                    Game.engine.createWolf(Game.canvas.width / 2 + 250, Game.canvas.height / 2);
+                    // Create wolves - WASM ONLY
+                    const wolfId1 = wolfManager.createWolf(Game.canvas.width / 2 - 250, Game.canvas.height / 2, false);
+                    const wolfId2 = wolfManager.createWolf(Game.canvas.width / 2 + 250, Game.canvas.height / 2, false);
+                    Game.wolves.push({ id: wolfId1, isAlpha: false });
+                    Game.wolves.push({ id: wolfId2, isAlpha: false });
                     
                     // Add powerups
                     Game.engine.createPowerUp(
@@ -1455,7 +1411,7 @@
                         Game.engine.createEnemy(x, y, 100);
                     }
                     
-                    // Spawn wolves with AI
+                    // Spawn wolves - WASM ONLY
                     for (let i = 0; i < wolfCount; i++) {
                         const angle = Math.random() * Math.PI * 2;
                         const dist = 300 + Math.random() * 100;
@@ -1463,24 +1419,8 @@
                         const y = Game.canvas.height / 2 + Math.sin(angle) * dist;
                         const isAlpha = levelNum > 10;
                         
-                        const wolf = {
-                            x: x,
-                            y: y,
-                            vx: 0,
-                            vy: 0,
-                            rotation: 0,
-                            health: isAlpha ? 150 : 100,
-                            type: 'wolf',
-                            isAlpha: isAlpha,
-                            isShooting: false
-                        };
-                        
-                        if (wolfManager) {
-                            const wolfId = wolfManager.createWolf(wolf.x, wolf.y, wolf.isAlpha);
-                            Game.wolves.push({ id: wolfId, isAlpha: wolf.isAlpha });
-                        }
-                        
-                        Game.engine.createWolf(x, y, isAlpha); // Alpha wolves after level 10
+                        const wolfId = wolfManager.createWolf(x, y, isAlpha);
+                        Game.wolves.push({ id: wolfId, isAlpha: isAlpha });
                     }
                     
                     // Add obstacles
@@ -1547,8 +1487,8 @@
             // Handle input
             handleInput();
             
-            // Update wolf AIs using WASM
-            if (wolfManager && Game.wolves.length > 0) {
+            // Update wolf AIs - WASM ONLY
+            if (Game.wolves.length > 0) {
                 // Get player data
                 let playerData = null;
                 if (Game.engine && Game.engine.getPlayerState) {
@@ -1680,9 +1620,8 @@
                     renderEntity(entity);
                 });
                 
-                // Also render WASM wolves
-                if (wolfManager) {
-                    Game.wolves.forEach(wolf => {
+                // Render WASM wolves - WASM ONLY
+                Game.wolves.forEach(wolf => {
                         const health = wolfManager.getWolfHealth(wolf.id);
                         if (health > 0) {
                             const wolfEntity = {
@@ -1698,14 +1637,13 @@
                             renderEntity(wolfEntity);
                         }
                     });
-                }
                 
-                // Combine entities for minimap
-                const wasmWolves = wolfManager ? Game.wolves.map(w => ({
+                // Combine entities for minimap - WASM wolves included
+                const wasmWolves = Game.wolves.map(w => ({
                     x: wolfManager.getWolfX(w.id),
                     y: wolfManager.getWolfY(w.id),
                     type: 'wolf'
-                })).filter(w => wolfManager.getWolfHealth(w.id) > 0) : [];
+                })).filter(w => wolfManager.getWolfHealth(w.id) > 0);
                 const allEntities = [...entities, ...wasmWolves];
                 
                 // Render minimap
