@@ -545,7 +545,7 @@
                 
                 // Load the fixed WASM module wrapper
                 const script = document.createElement('script');
-                script.src = './public/wasm-module-fix.js';
+                script.src = 'public/wasm-module-fix.js';
                 document.head.appendChild(script);
                 
                 // Wait for the script to load
@@ -970,7 +970,7 @@
             }
             
             initGame();
-            gameLoop();
+            requestAnimationFrame(gameLoop);
         };
         
         // Initialize game

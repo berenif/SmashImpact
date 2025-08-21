@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Test</title>
+</head>
+<body>
+    <h1>Game Test Page</h1>
+    <p>Test the game locally:</p>
+    <ul>
+        <li><a href="game.html">Main Game</a></li>
+        <li><a href="public/game_engine.wasm">Check WASM file</a></li>
+        <li><a href="public/wasm-module-fix.js">Check WASM Module Fix</a></li>
+    </ul>
+    
+    <h2>Console Test</h2>
+    <button onclick="testWASM()">Test WASM Loading</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testWASM() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing WASM loading...<br>';
+            
+            try {
+                // Test loading the wasm-module-fix.js
+                const script = document.createElement('script');
+                script.src = 'public/wasm-module-fix.js';
+                document.head.appendChild(script);
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                });
+                
+                resultDiv.innerHTML += '✅ wasm-module-fix.js loaded<br>';
+                
+                // Test creating the game engine
+                if (window.createFixedGameEngine) {
+                    resultDiv.innerHTML += 'Creating game engine...<br>';
+                    const wasmModule = await window.createFixedGameEngine();
+                    resultDiv.innerHTML += '✅ WASM module created<br>';
+                    
+                    if (wasmModule.GameEngine) {
+                        resultDiv.innerHTML += '✅ GameEngine class found<br>';
+                        const engine = new wasmModule.GameEngine(1920, 1080);
+                        resultDiv.innerHTML += '✅ Game engine instance created successfully!<br>';
+                    } else {
+                        resultDiv.innerHTML += '❌ GameEngine class not found<br>';
+                    }
+                } else {
+                    resultDiv.innerHTML += '❌ createFixedGameEngine function not found<br>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML += `❌ Error: ${error.message}<br>`;
+                console.error('Full error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
