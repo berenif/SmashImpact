@@ -4,251 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>SmashImpact - Sword & Shield Combat</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            touch-action: none;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        
-        canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            cursor: crosshair;
-        }
-        
-        #startScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(30, 60, 114, 0.95), rgba(42, 82, 152, 0.95));
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-        }
-        
-        #startScreen h1 {
-            font-size: 64px;
-            margin-bottom: 10px;
-            text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
-            background: linear-gradient(45deg, #ffd700, #ffed4e);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: 2px;
-        }
-        
-        #startScreen h2 {
-            font-size: 24px;
-            margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            color: #a8d8ff;
-        }
-        
-        #startScreen button {
-            padding: 20px 50px;
-            font-size: 24px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            margin: 10px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        #startScreen button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-        }
-        
-        .controls-info {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            color: white;
-            background: rgba(0,0,0,0.7);
-            padding: 20px 30px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .controls-info h3 {
-            margin-top: 0;
-            color: #ffd700;
-            font-size: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .control-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 8px 0;
-            padding: 5px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .control-key {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            padding: 5px 15px;
-            border-radius: 5px;
-            font-weight: bold;
-            min-width: 80px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-        
-        .control-action {
-            margin-left: 20px;
-            color: #a8d8ff;
-        }
-        
-        #gameUI {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 10;
-        }
-        
-        .health-bar-container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 300px;
-            height: 30px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #333;
-            border-radius: 15px;
-            overflow: hidden;
-        }
-        
-        .health-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #ff3333, #ff6666);
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px rgba(255,0,0,0.5);
-        }
-        
-        .energy-bar-container {
-            position: absolute;
-            top: 60px;
-            left: 20px;
-            width: 300px;
-            height: 20px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        .energy-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #3366ff, #66aaff);
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px rgba(0,100,255,0.5);
-        }
-        
-        .score {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            font-size: 32px;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
-            font-weight: bold;
-        }
-        
-        .ability-cooldowns {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 20px;
-        }
-        
-        .ability {
-            width: 60px;
-            height: 60px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #666;
-            border-radius: 10px;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .ability.ready {
-            border-color: #ffd700;
-            box-shadow: 0 0 10px rgba(255,215,0,0.5);
-        }
-        
-        .ability.active {
-            background: rgba(255,215,0,0.3);
-            border-color: #ffd700;
-            box-shadow: 0 0 20px rgba(255,215,0,0.8);
-        }
-        
-        .ability-key {
-            position: absolute;
-            bottom: -20px;
-            font-size: 14px;
-            color: #aaa;
-        }
-        
-        #pauseScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-            backdrop-filter: blur(5px);
-        }
-        
-        #pauseScreen h2 {
-            color: white;
-            font-size: 48px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
-        }
-    </style>
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="css/game-styles.css">
 </head>
 <body>
+    <!-- Start Screen -->
     <div id="startScreen">
         <h1>⚔️ SmashImpact ⚔️</h1>
         <h2>Sword & Shield Combat</h2>
-        <button onclick="startGame()">Start Battle</button>
+        <button id="startButton" onclick="startGame()">Start Battle</button>
+        
+        <!-- WASM Status Indicator -->
+        <div class="wasm-status loading" id="wasmStatus">
+            <span class="status-icon"></span>
+            <span id="wasmStatusText">Initializing WASM...</span>
+        </div>
+        
+        <!-- Controls Info -->
         <div class="controls-info">
             <h3>🎮 Controls</h3>
             <div class="control-row">
@@ -274,12 +47,25 @@
         </div>
     </div>
     
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loadingSpinner"></div>
+    
+    <!-- Error Message -->
+    <div class="error-message" id="errorMessage">
+        <h3>Error Loading Game</h3>
+        <p id="errorText">An error occurred while loading the game.</p>
+        <button onclick="retryGame()">Retry</button>
+    </div>
+    
+    <!-- Pause Screen -->
     <div id="pauseScreen">
         <h2>PAUSED</h2>
     </div>
     
+    <!-- Game Canvas -->
     <canvas id="gameCanvas"></canvas>
     
+    <!-- Game UI Overlay -->
     <div id="gameUI">
         <div class="health-bar-container">
             <div class="health-bar" id="healthBar"></div>
@@ -304,122 +90,303 @@
         </div>
     </div>
 
-    <!-- Load visual effects -->
-    <!-- Load WASM module -->
+    <!-- WASM Module Loader -->
     <script type="module" src="game_engine.js"></script>
+    
+    <!-- Core WASM Initialization -->
+    <script src="wasm-init.js"></script>
+    
+    <!-- WASM Support Scripts -->
     <script src="wasm-global-wrapper.js"></script>
+    
+    <!-- Visual Effects System -->
     <script src="visual-effects.js"></script>
     
-    <!-- Load mobile controls with WASM targeting -->
+    <!-- Mobile Support -->
     <script src="mobile-controls.js"></script>
     <script src="wasm-targeting-button.js"></script>
     
-    <!-- Load the enhanced game engine -->
+    <!-- Main Game Engine -->
     <script src="enhanced-combat-game.js"></script>
     
+    <!-- Game Initialization Script -->
     <script>
-        let game;
+        // Game state
+        let game = null;
+        let wasmReady = false;
         let scriptsLoaded = false;
-        let wasmModule = null;
         
-        // Initialize WASM if available
+        // UI Elements
+        const wasmStatus = document.getElementById('wasmStatus');
+        const wasmStatusText = document.getElementById('wasmStatusText');
+        const startButton = document.getElementById('startButton');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        
+        /**
+         * Update WASM status indicator
+         */
+        function updateWASMStatus(status) {
+            if (!wasmStatus) return;
+            
+            // Remove all status classes
+            wasmStatus.classList.remove('loading', 'success', 'error');
+            
+            switch(status.status) {
+                case 'checking':
+                case 'loading':
+                case 'initializing':
+                    wasmStatus.classList.add('loading');
+                    wasmStatusText.textContent = status.message;
+                    startButton.disabled = true;
+                    break;
+                    
+                case 'ready':
+                    wasmStatus.classList.add('success');
+                    wasmStatusText.textContent = `WASM Ready (${status.loadTime}ms)`;
+                    wasmReady = true;
+                    startButton.disabled = false;
+                    console.log('WASM module loaded successfully');
+                    console.log('Performance metrics:', status);
+                    break;
+                    
+                case 'error':
+                    wasmStatus.classList.add('error');
+                    wasmStatusText.textContent = 'WASM Failed - Using JavaScript';
+                    wasmReady = false;
+                    startButton.disabled = false; // Allow starting with JS fallback
+                    console.warn('WASM failed to load, using JavaScript fallback');
+                    break;
+            }
+        }
+        
+        /**
+         * Initialize WASM module
+         */
         async function initializeWASM() {
-            if (typeof createGameEngine !== 'undefined') {
-                try {
-                    console.log('Initializing WASM module...');
-                    wasmModule = await createGameEngine();
-                    console.log('WASM module loaded successfully:', wasmModule);
-                    window.wasmModule = wasmModule; // Make it globally available
-                    return true;
-                } catch (error) {
-                    console.warn('Failed to initialize WASM:', error);
-                    console.warn('Game will run without WASM acceleration');
+            try {
+                console.log('Starting WASM initialization...');
+                
+                // Check if wasmInitializer is available
+                if (typeof wasmInitializer === 'undefined') {
+                    console.warn('WASM initializer not found, game will run in JavaScript mode');
+                    updateWASMStatus({
+                        status: 'error',
+                        message: 'WASM initializer not available'
+                    });
                     return false;
                 }
-            } else {
-                console.log('WASM module not available, running in JavaScript mode');
+                
+                // Register status callback
+                wasmInitializer.onStatusChange(updateWASMStatus);
+                
+                // Initialize WASM
+                const module = await wasmInitializer.initialize();
+                
+                if (module) {
+                    wasmReady = true;
+                    return true;
+                } else {
+                    wasmReady = false;
+                    return false;
+                }
+                
+            } catch (error) {
+                console.error('WASM initialization error:', error);
+                updateWASMStatus({
+                    status: 'error',
+                    message: 'WASM initialization failed'
+                });
+                wasmReady = false;
                 return false;
             }
         }
         
-        // Wait for all scripts to load
-        window.addEventListener('load', async function() {
-            // Try to initialize WASM first
-            const wasmAvailable = await initializeWASM();
-            
-            scriptsLoaded = true;
-            console.log('All scripts loaded. Game ready to start.');
-            console.log('WASM available:', wasmAvailable);
-            
-            // Check if required game classes are available
-            if (typeof EnhancedCombatGame === 'undefined') {
-                console.error('EnhancedCombatGame class not found after page load');
+        /**
+         * Show error message
+         */
+        function showError(message) {
+            if (errorMessage && errorText) {
+                errorText.textContent = message;
+                errorMessage.style.display = 'block';
+                loadingSpinner.classList.remove('active');
             }
-            if (typeof VisualEffects === 'undefined') {
-                console.warn('VisualEffects class not found after page load');
-            }
-            if (typeof createGameEngine === 'undefined') {
-                console.warn('createGameEngine function not found - WASM features will be disabled');
-            }
-        });
+        }
         
+        /**
+         * Hide error message
+         */
+        function hideError() {
+            if (errorMessage) {
+                errorMessage.style.display = 'none';
+            }
+        }
+        
+        /**
+         * Start the game
+         */
         function startGame() {
-            // Check if scripts are loaded
-            if (!scriptsLoaded) {
-                alert('Game is still loading. Please wait a moment and try again.');
-                return;
-            }
-            
-            document.getElementById('startScreen').style.display = 'none';
-            
-            const canvas = document.getElementById('gameCanvas');
-            
-            // Check if canvas element exists
-            if (!canvas) {
-                console.error('Canvas element not found!');
-                alert('Error: Game canvas not found. Please refresh the page.');
-                return;
-            }
-            
-            // Log canvas info for debugging
-            console.log('Canvas found:', canvas);
-            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
-            
-            // Check if EnhancedCombatGame is loaded
-            if (typeof EnhancedCombatGame !== 'undefined') {
-                try {
-                    game = new EnhancedCombatGame(canvas);
-                    game.init();
-                    console.log('Game initialized successfully');
-                } catch (error) {
-                    console.error('Failed to initialize game:', error);
-                    alert('Error initializing game: ' + error.message);
-                    // Show start screen again so user can retry
-                    document.getElementById('startScreen').style.display = 'flex';
+            try {
+                // Hide error message if visible
+                hideError();
+                
+                // Check if scripts are loaded
+                if (!scriptsLoaded) {
+                    alert('Game is still loading. Please wait a moment and try again.');
+                    return;
                 }
-            } else {
-                console.error('EnhancedCombatGame not found. Make sure enhanced-combat-game.js is loaded.');
-                alert('Error: Game engine not loaded. Please refresh the page.');
-                // Show start screen again so user can retry
+                
+                // Hide start screen
+                document.getElementById('startScreen').style.display = 'none';
+                
+                // Show loading spinner
+                loadingSpinner.classList.add('active');
+                
+                // Get canvas
+                const canvas = document.getElementById('gameCanvas');
+                if (!canvas) {
+                    throw new Error('Game canvas not found');
+                }
+                
+                // Set canvas dimensions
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                
+                console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+                console.log('WASM ready:', wasmReady);
+                
+                // Check if EnhancedCombatGame is available
+                if (typeof EnhancedCombatGame === 'undefined') {
+                    throw new Error('Game engine not loaded');
+                }
+                
+                // Create game instance
+                game = new EnhancedCombatGame(canvas);
+                
+                // Pass WASM module if available
+                if (wasmReady && wasmInitializer && wasmInitializer.isReady()) {
+                    game.wasmModule = wasmInitializer.getModule();
+                    console.log('Game initialized with WASM acceleration');
+                } else {
+                    console.log('Game initialized with JavaScript engine');
+                }
+                
+                // Initialize game
+                game.init();
+                
+                // Hide loading spinner
+                loadingSpinner.classList.remove('active');
+                
+                console.log('Game started successfully');
+                
+            } catch (error) {
+                console.error('Failed to start game:', error);
+                showError(`Failed to start game: ${error.message}`);
+                
+                // Show start screen again
                 document.getElementById('startScreen').style.display = 'flex';
             }
         }
         
-        // Handle window resize
-        window.addEventListener('resize', () => {
+        /**
+         * Retry game after error
+         */
+        function retryGame() {
+            hideError();
+            location.reload();
+        }
+        
+        /**
+         * Handle window resize
+         */
+        function handleResize() {
             if (game && game.resizeCanvas) {
                 game.resizeCanvas();
             }
+        }
+        
+        /**
+         * Initialize when page loads
+         */
+        window.addEventListener('load', async function() {
+            console.log('Page loaded, initializing...');
+            
+            // Start WASM initialization (non-blocking)
+            initializeWASM().then(success => {
+                console.log('WASM initialization completed:', success ? 'Success' : 'Failed');
+            });
+            
+            // Check if all required scripts are loaded
+            const checkScripts = () => {
+                const required = [
+                    typeof EnhancedCombatGame !== 'undefined',
+                    typeof VisualEffects !== 'undefined'
+                ];
+                
+                return required.every(check => check);
+            };
+            
+            // Wait for scripts with timeout
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds timeout
+            
+            const scriptChecker = setInterval(() => {
+                attempts++;
+                
+                if (checkScripts()) {
+                    clearInterval(scriptChecker);
+                    scriptsLoaded = true;
+                    console.log('All scripts loaded successfully');
+                    
+                    // Enable start button if not waiting for WASM
+                    if (!wasmReady && startButton) {
+                        startButton.disabled = false;
+                    }
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(scriptChecker);
+                    console.error('Timeout waiting for scripts to load');
+                    showError('Game scripts failed to load. Please refresh the page.');
+                }
+            }, 100);
         });
         
-        // Prevent scrolling
+        // Event listeners
+        window.addEventListener('resize', handleResize);
+        
+        // Prevent scrolling on mobile
         document.addEventListener('touchmove', function(e) {
             e.preventDefault();
-        }, { passive: false, capture: false });
+        }, { passive: false });
         
         // Prevent context menu
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
+        });
+        
+        // Handle visibility change (pause when tab is hidden)
+        document.addEventListener('visibilitychange', function() {
+            if (game) {
+                if (document.hidden) {
+                    if (game.pause) game.pause();
+                } else {
+                    if (game.resume) game.resume();
+                }
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // ESC to pause/unpause
+            if (e.key === 'Escape' && game) {
+                if (game.isPaused) {
+                    game.resume && game.resume();
+                    document.getElementById('pauseScreen').style.display = 'none';
+                } else {
+                    game.pause && game.pause();
+                    document.getElementById('pauseScreen').style.display = 'flex';
+                }
+            }
         });
     </script>
 </body>

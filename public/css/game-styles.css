@@ -1,0 +1,385 @@
+/* SmashImpact Game Styles */
+
+/* Base Styles */
+body {
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Canvas */
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: crosshair;
+}
+
+/* Start Screen */
+#startScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(30, 60, 114, 0.95), rgba(42, 82, 152, 0.95));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+}
+
+#startScreen h1 {
+    font-size: 64px;
+    margin-bottom: 10px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
+    background: linear-gradient(45deg, #ffd700, #ffed4e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+}
+
+#startScreen h2 {
+    font-size: 24px;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    color: #a8d8ff;
+}
+
+#startScreen button {
+    padding: 20px 50px;
+    font-size: 24px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    margin: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#startScreen button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+/* Controls Info */
+.controls-info {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: white;
+    background: rgba(0,0,0,0.7);
+    padding: 20px 30px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.controls-info h3 {
+    margin-top: 0;
+    color: #ffd700;
+    font-size: 20px;
+    margin-bottom: 15px;
+}
+
+.control-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.control-key {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    padding: 5px 15px;
+    border-radius: 5px;
+    font-weight: bold;
+    min-width: 80px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.control-action {
+    margin-left: 20px;
+    color: #a8d8ff;
+}
+
+/* Game UI */
+#gameUI {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Health Bar */
+.health-bar-container {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 300px;
+    height: 30px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #333;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.health-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #ff3333, #ff6666);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(255,0,0,0.5);
+}
+
+/* Energy Bar */
+.energy-bar-container {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    width: 300px;
+    height: 20px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #333;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.energy-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3366ff, #66aaff);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(0,100,255,0.5);
+}
+
+/* Score Display */
+.score {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 32px;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+    font-weight: bold;
+}
+
+/* Ability Cooldowns */
+.ability-cooldowns {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+}
+
+.ability {
+    width: 60px;
+    height: 60px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #666;
+    border-radius: 10px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.ability.ready {
+    border-color: #ffd700;
+    box-shadow: 0 0 10px rgba(255,215,0,0.5);
+}
+
+.ability.active {
+    background: rgba(255,215,0,0.3);
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255,215,0,0.8);
+}
+
+.ability-key {
+    position: absolute;
+    bottom: -20px;
+    font-size: 14px;
+    color: #aaa;
+}
+
+/* Pause Screen */
+#pauseScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    backdrop-filter: blur(5px);
+}
+
+#pauseScreen h2 {
+    color: white;
+    font-size: 48px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+}
+
+/* WASM Status Indicator */
+.wasm-status {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 20px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 20px;
+    color: white;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.wasm-status.loading {
+    border: 1px solid #ffa500;
+    color: #ffa500;
+}
+
+.wasm-status.success {
+    border: 1px solid #00ff00;
+    color: #00ff00;
+}
+
+.wasm-status.error {
+    border: 1px solid #ff0000;
+    color: #ff0000;
+}
+
+.wasm-status .status-icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1001;
+    display: none;
+}
+
+.loading-spinner.active {
+    display: block;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Error Message */
+.error-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255,0,0,0.1);
+    border: 2px solid #ff0000;
+    border-radius: 10px;
+    padding: 20px 30px;
+    color: white;
+    text-align: center;
+    z-index: 1002;
+    display: none;
+}
+
+.error-message h3 {
+    color: #ff6666;
+    margin-top: 0;
+}
+
+.error-message button {
+    padding: 10px 20px;
+    background: #ff6666;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.error-message button:hover {
+    background: #ff4444;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #startScreen h1 {
+        font-size: 48px;
+    }
+    
+    #startScreen h2 {
+        font-size: 18px;
+    }
+    
+    #startScreen button {
+        padding: 15px 40px;
+        font-size: 20px;
+    }
+    
+    .controls-info {
+        width: 90%;
+        padding: 15px 20px;
+    }
+    
+    .health-bar-container,
+    .energy-bar-container {
+        width: 250px;
+    }
+    
+    .score {
+        font-size: 24px;
+    }
+}
