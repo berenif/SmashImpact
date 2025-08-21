@@ -65,7 +65,7 @@ async function loadGameEngine() {
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { loadGameEngine };
+} else if (typeof window !== 'undefined') {
+    // Also make available globally
+    window.loadGameEngine = loadGameEngine;
 }
-
-// Also make available globally
-window.loadGameEngine = loadGameEngine;

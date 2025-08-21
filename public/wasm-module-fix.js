@@ -66,7 +66,7 @@ function createFallbackGameEngine() {
 // Export for use
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = createFixedGameEngine;
+} else if (typeof window !== 'undefined') {
+    // Make available globally only in browser environment
+    window.createFixedGameEngine = createFixedGameEngine;
 }
-
-// Make available globally
-window.createFixedGameEngine = createFixedGameEngine;
