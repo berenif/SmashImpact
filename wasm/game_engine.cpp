@@ -184,6 +184,8 @@ public:
     float rollCooldown;
     float rollStartTime;
     float rollEndTime;
+    Vector2 rollStartPosition;  // Add this to track starting position
+    float rollDistanceTraveled = 0;  // Add this to track distance traveled
     
     // Player facing direction
     float facing;
@@ -197,7 +199,8 @@ public:
           swordActive(false), swordAngle(0), swordCooldown(0), 
           swordAnimationTime(0), lastAttackTime(0),
           rolling(false), rollDirection(0, 0), rollCooldown(0),
-          rollStartTime(0), rollEndTime(0), facing(0) {}
+          rollStartTime(0), rollEndTime(0), rollStartPosition(x, y), 
+          rollDistanceTraveled(0), facing(0) {}
     
     void applyInput(float dx, float dy, float deltaTime) {
         Vector2 input(dx, dy);
@@ -224,11 +227,31 @@ public:
         if (rolling) {
             float currentTime = emscripten_get_now();
             if (currentTime < rollEndTime) {
-                // Apply roll movement
-                velocity = rollDirection * (Config::PLAYER_MAX_SPEED * Config::ROLL_SPEED_MULTIPLIER);
-                invulnerable = true;
+                // Calculate how far we've traveled
+                Vector2 currentPos(position.x, position.y);
+                float distanceFromStart = (currentPos - rollStartPosition).magnitude();
+                
+                // Check if we've reached the maximum roll distance
+                if (distanceFromStart < Config::ROLL_DISTANCE) {
+                    // Apply roll movement, but scale it based on remaining distance
+                    float remainingDistance = Config::ROLL_DISTANCE - distanceFromStart;
+                    float rollSpeed = Config::PLAYER_MAX_SPEED * Config::ROLL_SPEED_MULTIPLIER;
+                    
+                    // If we're close to the max distance, slow down to avoid overshooting
+                    if (remainingDistance < rollSpeed * deltaTime) {
+                        velocity = rollDirection * (remainingDistance / deltaTime);
+                    } else {
+                        velocity = rollDirection * rollSpeed;
+                    }
+                    invulnerable = true;
+                } else {
+                    // We've reached max distance, end the roll early
+                    rolling = false;
+                    invulnerable = false;
+                    velocity *= 0.5f; // Reduce speed after roll
+                }
             } else {
-                // End roll
+                // End roll due to time limit
                 rolling = false;
                 invulnerable = false;
                 velocity *= 0.5f; // Reduce speed after roll
@@ -337,6 +360,8 @@ public:
         rollCooldown = Config::ROLL_COOLDOWN;
         rollStartTime = emscripten_get_now();
         rollEndTime = rollStartTime + Config::ROLL_DURATION;
+        rollStartPosition = Vector2(position.x, position.y);  // Store starting position
+        rollDistanceTraveled = 0;  // Reset distance counter
         energy -= Config::ROLL_ENERGY_COST;
         invulnerable = true;
         
