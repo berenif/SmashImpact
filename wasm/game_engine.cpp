@@ -1365,6 +1365,47 @@ public:
 
 // Bindings for JavaScript
 EMSCRIPTEN_BINDINGS(game_engine) {
+    // Export Vector2 as Vec2
+    emscripten::class_<Vector2>("Vec2")
+        .constructor<>()
+        .constructor<float, float>()
+        .property("x", &Vector2::x)
+        .property("y", &Vector2::y)
+        .function("magnitude", &Vector2::magnitude)
+        .function("magnitudeSquared", &Vector2::magnitudeSquared)
+        .function("normalized", &Vector2::normalized)
+        .function("dot", &Vector2::dot);
+    
+    // Export Entity as GameObject
+    emscripten::class_<Entity>("GameObject")
+        .property("id", &Entity::id)
+        .property("type", &Entity::type)
+        .property("position", &Entity::position)
+        .property("velocity", &Entity::velocity)
+        .property("radius", &Entity::radius)
+        .property("health", &Entity::health)
+        .property("maxHealth", &Entity::maxHealth)
+        .property("active", &Entity::active)
+        .function("update", &Entity::update)
+        .function("isColliding", &Entity::isColliding)
+        .function("distanceTo", &Entity::distanceTo);
+    
+    // Export SpatialHashGrid as CollisionSystem (simplified)
+    emscripten::class_<SpatialHashGrid>("CollisionSystem")
+        .constructor<>()
+        .function("clear", &SpatialHashGrid::clear)
+        .function("insert", &SpatialHashGrid::insert, emscripten::allow_raw_pointers())
+        .function("getNearby", &SpatialHashGrid::getNearby, emscripten::allow_raw_pointers());
+    
+    // Export EntityType enum
+    emscripten::enum_<EntityType>("EntityType")
+        .value("PLAYER", EntityType::PLAYER)
+        .value("ENEMY", EntityType::ENEMY)
+        .value("WOLF", EntityType::WOLF)
+        .value("PROJECTILE", EntityType::PROJECTILE)
+        .value("POWERUP", EntityType::POWERUP)
+        .value("OBSTACLE", EntityType::OBSTACLE);
+    
     emscripten::class_<GameEngine>("GameEngine")
         .constructor<float, float>()
         .function("createPlayer", &GameEngine::createPlayer)
