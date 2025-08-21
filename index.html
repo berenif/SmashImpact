@@ -2,14 +2,335 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=public/menu.html">
-    <title>SmashImpact - Redirecting...</title>
-    <script>
-        window.location.href = "public/menu.html";
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WASM Game Engine</title>
+    <link rel="stylesheet" href="/src/game/styles.css">
+    <style>
+        /* Additional styles for loading screen */
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .loading-container {
+            text-align: center;
+            max-width: 400px;
+            padding: 20px;
+        }
+        
+        .loading-title {
+            font-size: 2em;
+            color: #00ff88;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .loading-bar-container {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        #loadingBar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00ccff);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.7);
+        }
+        
+        .loading-text {
+            color: #00ccff;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .error-message {
+            color: #ff6b6b;
+            padding: 20px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #00ff88, #00ccff);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
 </head>
 <body>
-    <p>Redirecting to SmashImpact...</p>
-    <p>If you are not redirected, <a href="public/menu.html">click here</a>.</p>
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loading-container">
+            <h1 class="loading-title">WASM Game Engine</h1>
+            <div class="loading-bar-container">
+                <div id="loadingBar"></div>
+            </div>
+            <div class="loading-text">Initializing WebAssembly...</div>
+        </div>
+    </div>
+    
+    <!-- Game Container -->
+    <div id="gameContainer" style="display: none;">
+        <!-- Main Game Canvas -->
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- Minimap Canvas -->
+        <canvas id="minimapCanvas"></canvas>
+        
+        <!-- UI Overlay -->
+        <div id="uiOverlay">
+            <!-- Health Bar -->
+            <div class="health-container">
+                <div class="health-bar">
+                    <div id="healthFill" class="health-fill"></div>
+                </div>
+                <span id="healthText" class="health-text">100/100</span>
+            </div>
+            
+            <!-- Energy Bar -->
+            <div class="energy-container">
+                <div class="energy-bar">
+                    <div id="energyFill" class="energy-fill"></div>
+                </div>
+                <span id="energyText" class="energy-text">100/100</span>
+            </div>
+            
+            <!-- Score Display -->
+            <div id="scoreDisplay" class="score-display">
+                Score: <span id="scoreValue">0</span>
+            </div>
+            
+            <!-- Wave Display -->
+            <div id="waveDisplay" class="wave-display">
+                Wave: <span id="waveValue">1</span>
+            </div>
+            
+            <!-- FPS Counter -->
+            <div id="fpsCounter" class="fps-counter">
+                FPS: <span id="fpsValue">0</span>
+            </div>
+        </div>
+        
+        <!-- Mobile Controls (hidden by default) -->
+        <div id="mobileControls" style="display: none;">
+            <!-- Virtual Joystick -->
+            <div id="joystickContainer" class="joystick-container">
+                <div id="joystickBase" class="joystick-base">
+                    <div id="joystickHandle" class="joystick-handle"></div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="attackBtn" class="action-btn attack-btn">⚔️</button>
+                <button id="blockBtn" class="action-btn block-btn">🛡️</button>
+                <button id="rollBtn" class="action-btn roll-btn">💨</button>
+                <button id="targetBtn" class="action-btn target-btn">🎯</button>
+            </div>
+        </div>
+        
+        <!-- Pause Menu -->
+        <div id="pauseMenu" class="pause-menu" style="display: none;">
+            <div class="pause-content">
+                <h2>Game Paused</h2>
+                <button id="resumeBtn" class="menu-btn">Resume</button>
+                <button id="restartBtn" class="menu-btn">Restart</button>
+                <button id="settingsBtn" class="menu-btn">Settings</button>
+                <button id="quitBtn" class="menu-btn">Quit</button>
+            </div>
+        </div>
+        
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="game-over-screen" style="display: none;">
+            <div class="game-over-content">
+                <h1>Game Over</h1>
+                <p>Final Score: <span id="finalScore">0</span></p>
+                <p>Waves Survived: <span id="finalWave">0</span></p>
+                <button id="retryBtn" class="menu-btn">Try Again</button>
+                <button id="mainMenuBtn" class="menu-btn">Main Menu</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Game Script -->
+    <script type="module">
+        import { Game } from './src/game/game-core.js';
+        
+        // Global game instance
+        let game = null;
+        
+        // Initialize the game
+        async function initGame() {
+            try {
+                console.log('Starting game initialization...');
+                
+                // Create game instance
+                game = new Game();
+                
+                // Initialize the game
+                const success = await game.initialize('gameCanvas', 'minimapCanvas');
+                
+                if (success) {
+                    console.log('✅ Game initialized successfully');
+                    
+                    // Hide loading screen
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    
+                    // Show game container
+                    document.getElementById('gameContainer').style.display = 'block';
+                    
+                    // Start the game
+                    game.start();
+                    
+                    // Setup UI event listeners
+                    setupUIListeners();
+                    
+                } else {
+                    throw new Error('Game initialization failed');
+                }
+                
+            } catch (error) {
+                console.error('Failed to initialize game:', error);
+                showError(error.message);
+            }
+        }
+        
+        // Setup UI event listeners
+        function setupUIListeners() {
+            // Pause/Resume
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    togglePause();
+                }
+            });
+            
+            // Pause menu buttons
+            const resumeBtn = document.getElementById('resumeBtn');
+            if (resumeBtn) {
+                resumeBtn.addEventListener('click', () => {
+                    togglePause();
+                });
+            }
+            
+            const restartBtn = document.getElementById('restartBtn');
+            if (restartBtn) {
+                restartBtn.addEventListener('click', () => {
+                    restartGame();
+                });
+            }
+            
+            // Game over buttons
+            const retryBtn = document.getElementById('retryBtn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    restartGame();
+                });
+            }
+        }
+        
+        // Toggle pause state
+        function togglePause() {
+            if (!game) return;
+            
+            const pauseMenu = document.getElementById('pauseMenu');
+            if (game.isPaused) {
+                game.resume();
+                pauseMenu.style.display = 'none';
+            } else {
+                game.pause();
+                pauseMenu.style.display = 'flex';
+            }
+        }
+        
+        // Restart the game
+        async function restartGame() {
+            if (game) {
+                game.cleanup();
+            }
+            
+            // Hide menus
+            document.getElementById('pauseMenu').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // Reinitialize
+            await initGame();
+        }
+        
+        // Show error message
+        function showError(message) {
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.innerHTML = `
+                    <div class="error-message">
+                        <h2>Failed to Load Game</h2>
+                        <p>${message}</p>
+                        <button class="btn" onclick="location.reload()">Retry</button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (game) {
+                if (document.hidden) {
+                    game.pause();
+                } else {
+                    // Don't auto-resume, let user decide
+                }
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (game && game.renderer) {
+                game.renderer.handleResize();
+            }
+        });
+        
+        // Prevent context menu on game canvas
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.tagName === 'CANVAS') {
+                e.preventDefault();
+            }
+        });
+        
+        // Start the game when the page loads
+        window.addEventListener('load', initGame);
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (game) {
+                game.cleanup();
+            }
+        });
+    </script>
 </body>
 </html>

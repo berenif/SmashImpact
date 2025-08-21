@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple WASM Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 20px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.1);
+        }
+        .error {
+            color: #f00;
+            border-color: #f00;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        .success {
+            color: #0f0;
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.2);
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple WASM Module Test</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'status') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `<pre>${new Date().toISOString()}: ${message}</pre>`;
+            output.appendChild(div);
+            console.log(message);
+        }
+        
+        async function testDirectImport() {
+            log('Testing direct import of Emscripten module...');
+            
+            try {
+                // Import the Emscripten-generated module directly
+                const moduleFactory = (await import('./public/game_engine.js')).default;
+                log('✅ Module factory imported', 'success');
+                
+                // Create an instance with proper configuration
+                log('Creating module instance...');
+                const wasmModule = await moduleFactory({
+                    print: (text) => log(`[Module]: ${text}`),
+                    printErr: (text) => log(`[Module Error]: ${text}`, 'error'),
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            const wasmPath = './public/game_engine.wasm';
+                            log(`Locating WASM file: ${path} -> ${wasmPath}`);
+                            return wasmPath;
+                        }
+                        return path;
+                    },
+                    onRuntimeInitialized: () => {
+                        log('✅ Runtime initialized!', 'success');
+                    }
+                });
+                
+                log('✅ Module instance created', 'success');
+                
+                // Check what's available in the module
+                log('Checking module exports...');
+                const exports = Object.keys(wasmModule).filter(key => typeof wasmModule[key] === 'function');
+                log(`Found ${exports.length} function exports: ${exports.join(', ')}`);
+                
+                // Try to create a GameEngine instance
+                if (wasmModule.GameEngine) {
+                    log('✅ GameEngine class found!', 'success');
+                    
+                    const engine = new wasmModule.GameEngine(1920, 1080);
+                    log('✅ GameEngine instance created', 'success');
+                    
+                    // Test basic operations
+                    const playerId = engine.createPlayer(100, 100);
+                    log(`Created player with ID: ${playerId}`, 'success');
+                    
+                    const enemyId = engine.createEnemy(200, 200, 2.5);
+                    log(`Created enemy with ID: ${enemyId}`, 'success');
+                    
+                    const count = engine.getEntityCount();
+                    log(`Entity count: ${count}`, 'success');
+                    
+                    // Update the engine
+                    const result = engine.update(0.016); // 16ms frame time
+                    log(`Update result: ${result}`, 'success');
+                    
+                    // Clean up
+                    engine.delete();
+                    log('✅ Engine cleaned up', 'success');
+                    
+                    log('✅✅✅ ALL TESTS PASSED! ✅✅✅', 'success');
+                } else {
+                    log('❌ GameEngine class not found in module', 'error');
+                    log('Available properties: ' + Object.keys(wasmModule).join(', '));
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log(`Stack trace:\n${error.stack}`, 'error');
+            }
+        }
+        
+        // Run the test
+        testDirectImport();
+    </script>
+</body>
+</html>
