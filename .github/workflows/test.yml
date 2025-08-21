@@ -44,15 +44,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        npm run test:ci || true
-        # Ensure coverage files exist even if tests fail
-        mkdir -p coverage
-        if [ ! -f coverage/coverage-final.json ] || [ ! -s coverage/coverage-final.json ]; then
-          echo '{}' > coverage/coverage-final.json
-        fi
-        if [ ! -f coverage/lcov.info ]; then
-          touch coverage/lcov.info
-        fi
+        npm run test:ci
       env:
         NODE_ENV: test
         CI: true
