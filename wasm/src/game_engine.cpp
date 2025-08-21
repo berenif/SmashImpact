@@ -99,7 +99,8 @@ void GameEngine::updatePlayerInput(float dx, float dy, float aimX, float aimY) {
     
     // Normalize input
     Vector2 input(dx, dy);
-    if (input.magnitude() > 1) {
+    float mag = input.magnitude();
+    if (mag > 1.0f && mag > 0.0f) {
         input = input.normalized();
     }
     
@@ -113,7 +114,8 @@ void GameEngine::updatePlayerInput(float dx, float dy, float aimX, float aimY) {
     
     // Limit speed
     float maxSpeed = player->getSpeed();
-    if (player->velocity.magnitude() > maxSpeed) {
+    float velocityMag = player->velocity.magnitude();
+    if (velocityMag > maxSpeed && velocityMag > 0.0f) {
         player->velocity = player->velocity.normalized() * maxSpeed;
     }
     
@@ -127,7 +129,13 @@ void GameEngine::playerShoot(float aimX, float aimY) {
     if (!player || !player->active || !player->canShoot()) return;
     
     Vector2 direction(aimX - player->position.x, aimY - player->position.y);
-    direction = direction.normalized();
+    float dirMag = direction.magnitude();
+    if (dirMag > 0.0f) {
+        direction = direction.normalized();
+    } else {
+        // Default to shooting right if no direction
+        direction = Vector2(1.0f, 0.0f);
+    }
     
     float damage = Config::PROJECTILE_DAMAGE * player->getDamageMultiplier();
     
@@ -196,12 +204,19 @@ void GameEngine::performAttack(int playerId, float angle) {
                         entity->takeDamage(Config::SWORD_DAMAGE * player->getDamageMultiplier());
                         
                         // Knockback
-                        Vector2 knockback = toEnemy.normalized() * Config::SWORD_KNOCKBACK;
-                        entity->velocity += knockback;
-                        
-                        // Visual effect
-                        visualEffects.createHitEffect(entity->position, false);
-                        visualEffects.createBloodSplatter(entity->position, knockback.normalized());
+                        Vector2 knockback = toEnemy;
+                        float knockbackMag = knockback.magnitude();
+                        if (knockbackMag > 0.0f) {
+                            knockback = knockback.normalized() * Config::SWORD_KNOCKBACK;
+                            entity->velocity += knockback;
+                            
+                            // Visual effect
+                            visualEffects.createHitEffect(entity->position, false);
+                            visualEffects.createBloodSplatter(entity->position, knockback.normalized());
+                        } else {
+                            // Just apply visual effect without knockback
+                            visualEffects.createHitEffect(entity->position, false);
+                        }
                         
                         // Score for kill
                         if (!entity->active) {
@@ -223,7 +238,13 @@ void GameEngine::performRoll(int playerId, float dirX, float dirY) {
         Vector2 direction(dirX, dirY);
         if (direction.magnitude() < 0.1f) {
             // If no direction provided, roll in movement direction
-            direction = player->velocity.normalized();
+            float velMag = player->velocity.magnitude();
+            if (velMag > 0.0f) {
+                direction = player->velocity.normalized();
+            } else {
+                // Default to rolling right if no velocity
+                direction = Vector2(1.0f, 0.0f);
+            }
         }
         player->startRoll(direction);
         
@@ -529,6 +550,13 @@ void GameEngine::updateEntityTargets() {
 }
 
 void GameEngine::cleanupInactiveEntities() {
+    // Check if player needs to be nullified before removing entities
+    for (const auto& entity : entities) {
+        if (entity && entity.get() == player && !entity->active) {
+            player = nullptr;
+        }
+    }
+    
     entities.erase(
         std::remove_if(entities.begin(), entities.end(),
             [](const std::unique_ptr<Entity>& e) {
