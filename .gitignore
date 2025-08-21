@@ -24,3 +24,7 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
+
+# Game assets
+public/assets/*.png
+
