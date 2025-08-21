@@ -450,14 +450,13 @@ class MobileControls {
             }
         });
         
-        // Create targeting button if TargetingButton is available
-        if (window.TargetingButton && this.game && this.game.gameEngine) {
-            this.targetButton = new window.TargetingButton(this.canvas, this.game.gameEngine, {
-                x: this.canvas.width - 50,
-                y: this.canvas.height - 280,
-                radius: 40,
-                label: 'TARGET'
-            });
+        // Create WASM targeting button if available
+        if (window.WASMTargetingButton && this.game && this.game.gameEngine) {
+            this.targetButton = new window.WASMTargetingButton(this.canvas, this.game.gameEngine);
+            // Set initial position
+            if (this.game.gameEngine.setTargetButtonPosition) {
+                this.game.gameEngine.setTargetButtonPosition(this.canvas.width - 50, this.canvas.height - 280);
+            }
         }
         
         // Register controls with game

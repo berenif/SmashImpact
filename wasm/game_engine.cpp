@@ -549,6 +549,19 @@ private:
     bool targetLockEnabled;
     float targetingDisabledUntil;
     
+    // Targeting button state
+    struct TargetingButton {
+        float x, y, radius;
+        bool active;
+        bool visible;
+        float touchStartTime;
+        float disabledUntil;
+        int touchId;
+        
+        TargetingButton() : x(0), y(0), radius(40), active(false), visible(true),
+                           touchStartTime(0), disabledUntil(0), touchId(-1) {}
+    } targetButton;
+    
     // Performance metrics
     float physicsTime;
     float collisionTime;
@@ -558,7 +571,13 @@ public:
     GameEngine(float width, float height)
         : player(nullptr), nextEntityId(1), worldWidth(width), worldHeight(height),
           currentTarget(nullptr), targetLockEnabled(true), targetingDisabledUntil(0),
-          physicsTime(0), collisionTime(0), collisionChecks(0) {}
+          physicsTime(0), collisionTime(0), collisionChecks(0) {
+        // Initialize targeting button position (top-right for mobile)
+        targetButton.x = width - 50;
+        targetButton.y = height - 280;
+        targetButton.radius = 40;
+        targetButton.visible = true;
+    }
     
     int createPlayer(float x, float y) {
         auto playerEntity = std::make_unique<Player>(nextEntityId++, x, y);
@@ -1152,7 +1171,77 @@ public:
         return targetLockEnabled;
     }
     
-    // Handle targeting button press
+    // Handle targeting button touch start
+    void onTargetButtonTouchStart(float x, float y, int touchId) {
+        // Check if touch is within button bounds
+        float dx = x - targetButton.x;
+        float dy = y - targetButton.y;
+        float distance = std::sqrt(dx * dx + dy * dy);
+        
+        if (distance <= targetButton.radius && !targetButton.active) {
+            targetButton.active = true;
+            targetButton.touchId = touchId;
+            targetButton.touchStartTime = emscripten_get_now();
+        }
+    }
+    
+    // Handle targeting button touch end
+    void onTargetButtonTouchEnd(int touchId) {
+        if (targetButton.active && targetButton.touchId == touchId) {
+            float pressDuration = emscripten_get_now() - targetButton.touchStartTime;
+            
+            // Check if button is not disabled
+            if (emscripten_get_now() >= targetButton.disabledUntil) {
+                if (pressDuration < 500) {
+                    // Quick press - switch to next target
+                    switchToNextTarget();
+                } else {
+                    // Long press - disable targeting for 2 seconds
+                    disableTargeting(2.0f);
+                    targetButton.disabledUntil = emscripten_get_now() + 2000;
+                }
+            }
+            
+            targetButton.active = false;
+            targetButton.touchId = -1;
+        }
+    }
+    
+    // Update targeting button position (for resize)
+    void setTargetButtonPosition(float x, float y) {
+        targetButton.x = x;
+        targetButton.y = y;
+    }
+    
+    // Set targeting button visibility
+    void setTargetButtonVisible(bool visible) {
+        targetButton.visible = visible;
+    }
+    
+    // Get targeting button state for rendering
+    emscripten::val getTargetButtonState() {
+        emscripten::val state = emscripten::val::object();
+        state.set("x", targetButton.x);
+        state.set("y", targetButton.y);
+        state.set("radius", targetButton.radius);
+        state.set("active", targetButton.active);
+        state.set("visible", targetButton.visible);
+        state.set("disabled", emscripten_get_now() < targetButton.disabledUntil);
+        state.set("hasTarget", currentTarget != nullptr && currentTarget->active);
+        state.set("targetingEnabled", targetLockEnabled);
+        
+        // Calculate remaining disable time
+        if (emscripten_get_now() < targetButton.disabledUntil) {
+            float remainingTime = (targetButton.disabledUntil - emscripten_get_now()) / 1000.0f;
+            state.set("disableTimeRemaining", remainingTime);
+        } else {
+            state.set("disableTimeRemaining", 0.0f);
+        }
+        
+        return state;
+    }
+    
+    // Handle targeting button press (legacy method for compatibility)
     // pressDuration in milliseconds
     // Quick press (<500ms): switch target
     // Long press (>=500ms): disable targeting for 2 seconds
@@ -1227,5 +1316,10 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("disableTargeting", &GameEngine::disableTargeting)
         .function("getCurrentTargetId", &GameEngine::getCurrentTargetId)
         .function("isTargetingEnabled", &GameEngine::isTargetingEnabled)
-        .function("handleTargetingButton", &GameEngine::handleTargetingButton);
+        .function("handleTargetingButton", &GameEngine::handleTargetingButton)
+        .function("onTargetButtonTouchStart", &GameEngine::onTargetButtonTouchStart)
+        .function("onTargetButtonTouchEnd", &GameEngine::onTargetButtonTouchEnd)
+        .function("setTargetButtonPosition", &GameEngine::setTargetButtonPosition)
+        .function("setTargetButtonVisible", &GameEngine::setTargetButtonVisible)
+        .function("getTargetButtonState", &GameEngine::getTargetButtonState);
 }
