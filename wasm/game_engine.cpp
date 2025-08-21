@@ -618,6 +618,9 @@ public:
     void update(float deltaTime) {
         auto startTime = emscripten_get_now();
         
+        // Update targeting system
+        updateTargeting(deltaTime);
+        
         // Update all entities
         for (auto& entity : entities) {
             if (entity->active) {
@@ -1149,6 +1152,20 @@ public:
         return targetLockEnabled;
     }
     
+    // Handle targeting button press
+    // pressDuration in milliseconds
+    // Quick press (<500ms): switch target
+    // Long press (>=500ms): disable targeting for 2 seconds
+    void handleTargetingButton(float pressDuration) {
+        if (pressDuration < 500) {
+            // Quick press - switch to next target
+            switchToNextTarget();
+        } else {
+            // Long press - disable targeting for 2 seconds
+            disableTargeting(2.0f);
+        }
+    }
+    
     // Player shoot projectile
     void playerShoot(float aimX, float aimY) {
         if (!player || !player->active) return;
@@ -1204,5 +1221,11 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("startBlock", &GameEngine::startBlock)
         .function("endBlock", &GameEngine::endBlock)
         .function("isBlocking", &GameEngine::isBlocking)
-        .function("isPerfectParryWindow", &GameEngine::isPerfectParryWindow);
+        .function("isPerfectParryWindow", &GameEngine::isPerfectParryWindow)
+        .function("switchToNextTarget", &GameEngine::switchToNextTarget)
+        .function("enableTargeting", &GameEngine::enableTargeting)
+        .function("disableTargeting", &GameEngine::disableTargeting)
+        .function("getCurrentTargetId", &GameEngine::getCurrentTargetId)
+        .function("isTargetingEnabled", &GameEngine::isTargetingEnabled)
+        .function("handleTargetingButton", &GameEngine::handleTargetingButton);
 }

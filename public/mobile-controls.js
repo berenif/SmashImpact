@@ -450,6 +450,16 @@ class MobileControls {
             }
         });
         
+        // Create targeting button if TargetingButton is available
+        if (window.TargetingButton && this.game && this.game.gameEngine) {
+            this.targetButton = new window.TargetingButton(this.canvas, this.game.gameEngine, {
+                x: this.canvas.width - 50,
+                y: this.canvas.height - 280,
+                radius: 40,
+                label: 'TARGET'
+            });
+        }
+        
         // Register controls with game
         if (this.game) {
             this.game.setJoystick(this.joystick);
@@ -458,12 +468,18 @@ class MobileControls {
             this.game.setButton('roll', this.rollButton);
             this.game.setButton('boost', this.boostButton);
             this.game.setButton('shoot', this.shootButton);
+            if (this.targetButton) {
+                this.game.setButton('target', this.targetButton);
+            }
         }
         
         // Handle resize
         window.addEventListener('resize', () => this.handleResize());
         
         this.controls = [this.joystick, this.attackButton, this.blockButton, this.rollButton, this.boostButton, this.shootButton];
+        if (this.targetButton) {
+            this.controls.push(this.targetButton);
+        }
     }
     
     handleResize() {
@@ -482,6 +498,9 @@ class MobileControls {
         }
         if (this.shootButton) {
             this.shootButton.updatePosition(this.canvas.width - 100, this.canvas.height - 200);
+        }
+        if (this.targetButton) {
+            this.targetButton.updatePosition(this.canvas.width - 50, this.canvas.height - 280);
         }
     }
     
