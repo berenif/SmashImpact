@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ultimate WASM Game Engine</title>
+    
+    <!-- External CSS Files -->
+    <link rel="stylesheet" href="public/css/main.css">
+    <link rel="stylesheet" href="public/css/ui.css">
+    <link rel="stylesheet" href="public/css/mobile.css">
+</head>
+<body>
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loader"></div>
+        <div class="loading-text">Loading WASM Engine</div>
+        <div class="loading-progress">
+            <div class="loading-bar" id="loadingBar"></div>
+        </div>
+    </div>
+    
+    <!-- Main Menu -->
+    <div id="mainMenu">
+        <h1 class="game-title">WASM GAME</h1>
+        <div class="menu-buttons">
+            <button class="menu-button" onclick="Game.start('survival')">Survival</button>
+            <button class="menu-button" onclick="Game.start('campaign')">Campaign</button>
+            <button class="menu-button" onclick="Game.start('sandbox')">Sandbox</button>
+            <button class="menu-button" onclick="Game.start('multiplayer')">Multiplayer</button>
+        </div>
+    </div>
+    
+    <!-- Game UI -->
+    <div id="gameUI">
+        <div class="hud">
+            <div class="hud-item">
+                <span>Health</span>
+                <div class="health-bar">
+                    <div class="health-fill" id="healthBar"></div>
+                </div>
+            </div>
+            <div class="hud-item">
+                <span>Energy</span>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energyBar"></div>
+                </div>
+            </div>
+            <div class="hud-item">
+                <span>Wave: <span id="waveNum">1</span></span>
+            </div>
+            <div class="hud-item">
+                <span>Enemies: <span id="enemyCount">0</span></span>
+            </div>
+        </div>
+        
+        <div class="score-display">
+            Score: <span id="score">0</span>
+        </div>
+        
+        <!-- Pause Menu -->
+        <div id="pauseMenu">
+            <h2 class="pause-title">PAUSED</h2>
+            <div class="pause-buttons">
+                <button class="pause-button" onclick="Game.resume()">Resume</button>
+                <button class="pause-button" onclick="Game.restart()">Restart</button>
+                <button class="pause-button" onclick="Game.showSettings()">Settings</button>
+                <button class="pause-button" onclick="Game.quit()">Quit to Menu</button>
+            </div>
+        </div>
+        
+        <!-- Performance Stats -->
+        <div id="performanceStats">
+            <div class="stat-line">FPS: <span id="fps">0</span></div>
+            <div class="stat-line">MS: <span id="ms">0</span></div>
+            <div class="stat-line">WASM: <span id="wasmMs">0</span>ms</div>
+            <div class="stat-line">Entities: <span id="entities">0</span></div>
+        </div>
+    </div>
+    
+    <!-- Mobile Controls -->
+    <div id="mobileControls">
+        <div class="mobile-joystick" id="joystick">
+            <div class="joystick-base"></div>
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+        <div class="mobile-buttons">
+            <button class="mobile-button" data-action="attack">Attack</button>
+            <button class="mobile-button" data-action="block">Block</button>
+            <button class="mobile-button" data-action="roll">Roll</button>
+            <button class="mobile-button" data-action="special">Special</button>
+        </div>
+    </div>
+    
+    <!-- External JavaScript Module -->
+    <script type="module" src="public/js/game.js"></script>
+</body>
+</html>

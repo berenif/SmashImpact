@@ -1,0 +1,255 @@
+/**
+ * Mobile Controls Stylesheet
+ * Styles for touch controls and mobile-specific UI
+ */
+
+/* Mobile Controls Container */
+#mobileControls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: none;
+    z-index: 800;
+}
+
+/* Joystick */
+.mobile-joystick {
+    position: absolute;
+    bottom: 50px;
+    left: 50px;
+    width: 150px;
+    height: 150px;
+    pointer-events: all;
+}
+
+.joystick-base {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(5px);
+    box-shadow: 
+        inset 0 0 20px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.joystick-knob {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.3));
+    border: 2px solid #fff;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: none;
+    box-shadow: 
+        0 0 15px rgba(255, 255, 255, 0.5),
+        0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile Action Buttons */
+.mobile-buttons {
+    position: absolute;
+    bottom: 50px;
+    right: 50px;
+    display: grid;
+    grid-template-columns: repeat(2, 80px);
+    grid-template-rows: repeat(2, 80px);
+    gap: 10px;
+    pointer-events: all;
+}
+
+.mobile-button {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.1s;
+    text-transform: uppercase;
+    backdrop-filter: blur(5px);
+    box-shadow: 
+        inset 0 0 15px rgba(0, 0, 0, 0.2),
+        0 0 15px rgba(255, 255, 255, 0.1);
+}
+
+.mobile-button:active,
+.mobile-button.pressed {
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(0.95);
+    box-shadow: 
+        inset 0 0 20px rgba(0, 0, 0, 0.4),
+        0 0 25px rgba(255, 255, 255, 0.3);
+}
+
+/* Button specific colors */
+.mobile-button[data-action="attack"] {
+    border-color: rgba(244, 67, 54, 0.6);
+    background: rgba(244, 67, 54, 0.2);
+}
+
+.mobile-button[data-action="attack"]:active,
+.mobile-button[data-action="attack"].pressed {
+    background: rgba(244, 67, 54, 0.4);
+    box-shadow: 0 0 25px rgba(244, 67, 54, 0.5);
+}
+
+.mobile-button[data-action="block"] {
+    border-color: rgba(33, 150, 243, 0.6);
+    background: rgba(33, 150, 243, 0.2);
+}
+
+.mobile-button[data-action="block"]:active,
+.mobile-button[data-action="block"].pressed {
+    background: rgba(33, 150, 243, 0.4);
+    box-shadow: 0 0 25px rgba(33, 150, 243, 0.5);
+}
+
+.mobile-button[data-action="roll"] {
+    border-color: rgba(76, 175, 80, 0.6);
+    background: rgba(76, 175, 80, 0.2);
+}
+
+.mobile-button[data-action="roll"]:active,
+.mobile-button[data-action="roll"].pressed {
+    background: rgba(76, 175, 80, 0.4);
+    box-shadow: 0 0 25px rgba(76, 175, 80, 0.5);
+}
+
+.mobile-button[data-action="special"] {
+    border-color: rgba(255, 193, 7, 0.6);
+    background: rgba(255, 193, 7, 0.2);
+}
+
+.mobile-button[data-action="special"]:active,
+.mobile-button[data-action="special"].pressed {
+    background: rgba(255, 193, 7, 0.4);
+    box-shadow: 0 0 25px rgba(255, 193, 7, 0.5);
+}
+
+/* Landscape orientation adjustments */
+@media (orientation: landscape) and (max-height: 600px) {
+    .mobile-joystick {
+        bottom: 30px;
+        left: 30px;
+        width: 120px;
+        height: 120px;
+    }
+    
+    .joystick-knob {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .mobile-buttons {
+        bottom: 30px;
+        right: 30px;
+        grid-template-columns: repeat(2, 70px);
+        grid-template-rows: repeat(2, 70px);
+        gap: 8px;
+    }
+    
+    .mobile-button {
+        width: 70px;
+        height: 70px;
+        font-size: 12px;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .mobile-joystick {
+        bottom: 70px;
+        left: 70px;
+        width: 180px;
+        height: 180px;
+    }
+    
+    .joystick-knob {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .mobile-buttons {
+        bottom: 70px;
+        right: 70px;
+        grid-template-columns: repeat(2, 90px);
+        grid-template-rows: repeat(2, 90px);
+        gap: 15px;
+    }
+    
+    .mobile-button {
+        width: 90px;
+        height: 90px;
+        font-size: 16px;
+    }
+}
+
+/* Small phone adjustments */
+@media (max-width: 380px) {
+    .mobile-joystick {
+        bottom: 40px;
+        left: 30px;
+        width: 120px;
+        height: 120px;
+    }
+    
+    .joystick-knob {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .mobile-buttons {
+        bottom: 40px;
+        right: 30px;
+        grid-template-columns: repeat(2, 65px);
+        grid-template-rows: repeat(2, 65px);
+        gap: 8px;
+    }
+    
+    .mobile-button {
+        width: 65px;
+        height: 65px;
+        font-size: 11px;
+        border-width: 2px;
+    }
+}
+
+/* Touch feedback animations */
+@keyframes touchPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 20px rgba(255, 255, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    }
+}
+
+.mobile-button:active {
+    animation: touchPulse 0.3s;
+}
+
+/* Hide mobile controls on desktop */
+@media (min-width: 1025px) and (pointer: fine) {
+    #mobileControls {
+        display: none !important;
+    }
+}
