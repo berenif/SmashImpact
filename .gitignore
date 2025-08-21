@@ -9,6 +9,8 @@ node_modules/
 *.wasm
 *.wasm.map
 *.js.map
+# Allow compiled WASM modules in public/
+!public/*.wasm
 
 # IDE files
 .vscode/
