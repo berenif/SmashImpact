@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Sprite Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #2a2a2a;
+            color: #fff;
+        }
+        canvas {
+            border: 2px solid #444;
+            margin: 10px;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .preview {
+            display: inline-block;
+            margin: 10px;
+        }
+        h3 {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Player Sprite Sheet Generator</h1>
+    <p>This tool generates a player sprite sheet with multiple animations.</p>
+    
+    <div>
+        <h3>Source Canvas (Individual Frames)</h3>
+        <canvas id="sourceCanvas"></canvas>
+    </div>
+    
+    <div>
+        <h3>Generated Sprite Sheet</h3>
+        <canvas id="spriteSheet"></canvas>
+    </div>
+    
+    <div>
+        <button onclick="generateSpriteSheet()">Generate Sprite Sheet</button>
+        <button onclick="downloadSpriteSheet()">Download as PNG</button>
+    </div>
+    
+    <div>
+        <h3>Animation Preview</h3>
+        <canvas id="preview" width="64" height="64"></canvas>
+        <br>
+        <select id="animationSelect" onchange="previewAnimation()">
+            <option value="idle">Idle</option>
+            <option value="walk">Walk</option>
+            <option value="run">Run</option>
+            <option value="attack">Attack</option>
+        </select>
+    </div>
+
+    <script>
+        // Pixel art data for the player character
+        // Based on the brown-haired character with red shirt
+        const pixelData = {
+            idle: [
+                // Frame 1 - Idle position 1
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ....#..#....
+                ...##..##...
+                `,
+                // Frame 2 - Idle position 2 (slight movement)
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ....#..#....
+                ...##..##...
+                `,
+                // Frame 3 - Idle breathing
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                .##.####.##.
+                ....####....
+                ....#..#....
+                ...##..##...
+                `,
+                // Frame 4 - Idle breathing return
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ....#..#....
+                ...##..##...
+                `
+            ],
+            walk: [
+                // Walking frames
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ...##..#....
+                ..##....##..
+                `,
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ....#..#....
+                ....##.##...
+                `,
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ....#..##...
+                ..##....##..
+                `,
+                `
+                ....####....
+                ...######...
+                ..########..
+                ..###..###..
+                ..########..
+                ...######...
+                ..########..
+                .##########.
+                ##..####..##
+                ....####....
+                ....#..#....
+                ...##..##...
+                `
+            ]
+        };
+
+        // Color palette
+        const colors = {
+            '.': null, // transparent
+            '#': '#8B4513', // brown hair
+            '@': '#FFD4A3', // skin
+            '*': '#B22222', // red shirt
+            '=': '#4B4B4B', // dark gray (scarf/belt)
+            '+': '#654321', // dark brown (boots/pants)
+        };
+
+        // Convert simple representation to detailed pixel art
+        function convertToDetailedPixels(frame) {
+            // This is a simplified version - in reality, you'd have more detailed pixel data
+            const detailed = frame.replace(/\./g, '.')
+                .replace(/#/g, '#'); // Hair remains brown
+            
+            // Add more detail by replacing certain patterns
+            const lines = detailed.trim().split('\n').map(line => line.trim());
+            
+            // Add skin tone for face area (rows 3-5)
+            for (let i = 3; i <= 5 && i < lines.length; i++) {
+                lines[i] = lines[i].replace(/###(..)###/, '@@@$1@@@');
+            }
+            
+            // Add red shirt (rows 6-9)
+            for (let i = 6; i <= 9 && i < lines.length; i++) {
+                lines[i] = lines[i].replace(/#/g, '*');
+            }
+            
+            // Add pants/boots (rows 10-11)
+            for (let i = 10; i <= 11 && i < lines.length; i++) {
+                lines[i] = lines[i].replace(/#/g, '+');
+            }
+            
+            // Add scarf detail (row 5-6)
+            if (lines[5]) {
+                lines[5] = lines[5].replace(/\*\*\*\*\*\*/, '===***===');
+            }
+            
+            return lines;
+        }
+
+        function drawPixelArt(ctx, pixelLines, x, y, pixelSize = 2) {
+            pixelLines.forEach((line, row) => {
+                for (let col = 0; col < line.length; col++) {
+                    const char = line[col];
+                    const color = colors[char];
+                    if (color) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(
+                            x + col * pixelSize,
+                            y + row * pixelSize,
+                            pixelSize,
+                            pixelSize
+                        );
+                    }
+                }
+            });
+        }
+
+        function generateSpriteSheet() {
+            const canvas = document.getElementById('spriteSheet');
+            const ctx = canvas.getContext('2d');
+            
+            const frameWidth = 32;
+            const frameHeight = 32;
+            const cols = 8;
+            const rows = 4; // 4 directions
+            
+            canvas.width = frameWidth * cols;
+            canvas.height = frameHeight * rows;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Generate frames for each direction and animation
+            let frameIndex = 0;
+            
+            // For each direction (down, left, right, up)
+            for (let dir = 0; dir < 4; dir++) {
+                // Idle frames (4 frames)
+                for (let i = 0; i < 4; i++) {
+                    const frame = pixelData.idle[i % pixelData.idle.length];
+                    const pixels = convertToDetailedPixels(frame);
+                    
+                    const x = (frameIndex % cols) * frameWidth;
+                    const y = Math.floor(frameIndex / cols) * frameHeight;
+                    
+                    // Apply direction transformation
+                    ctx.save();
+                    ctx.translate(x + frameWidth/2, y + frameHeight/2);
+                    
+                    if (dir === 1) { // Left - flip horizontally
+                        ctx.scale(-1, 1);
+                    } else if (dir === 3) { // Up - rotate slightly
+                        // Keep same for now
+                    }
+                    
+                    drawPixelArt(ctx, pixels, -frameWidth/2 + 8, -frameHeight/2 + 8, 2);
+                    ctx.restore();
+                    
+                    frameIndex++;
+                }
+                
+                // Walk frames (4 frames)
+                for (let i = 0; i < 4; i++) {
+                    const frame = pixelData.walk[i % pixelData.walk.length];
+                    const pixels = convertToDetailedPixels(frame);
+                    
+                    const x = (frameIndex % cols) * frameWidth;
+                    const y = Math.floor(frameIndex / cols) * frameHeight;
+                    
+                    ctx.save();
+                    ctx.translate(x + frameWidth/2, y + frameHeight/2);
+                    
+                    if (dir === 1) { // Left
+                        ctx.scale(-1, 1);
+                    }
+                    
+                    drawPixelArt(ctx, pixels, -frameWidth/2 + 8, -frameHeight/2 + 8, 2);
+                    ctx.restore();
+                    
+                    frameIndex++;
+                    
+                    if (frameIndex >= cols * rows) break;
+                }
+                
+                if (frameIndex >= cols * rows) break;
+            }
+            
+            // Also draw on source canvas for visualization
+            const sourceCanvas = document.getElementById('sourceCanvas');
+            const sourceCtx = sourceCanvas.getContext('2d');
+            sourceCanvas.width = canvas.width;
+            sourceCanvas.height = canvas.height;
+            sourceCtx.drawImage(canvas, 0, 0);
+        }
+
+        function downloadSpriteSheet() {
+            const canvas = document.getElementById('spriteSheet');
+            const link = document.createElement('a');
+            link.download = 'player-sprites.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        let animationFrame = 0;
+        let animationTimer = null;
+
+        function previewAnimation() {
+            const canvas = document.getElementById('preview');
+            const ctx = canvas.getContext('2d');
+            const select = document.getElementById('animationSelect');
+            const animation = select.value;
+            
+            // Clear previous timer
+            if (animationTimer) {
+                clearInterval(animationTimer);
+            }
+            
+            const frames = animation === 'idle' ? pixelData.idle : pixelData.walk;
+            animationFrame = 0;
+            
+            animationTimer = setInterval(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.imageSmoothingEnabled = false;
+                
+                const frame = frames[animationFrame % frames.length];
+                const pixels = convertToDetailedPixels(frame);
+                drawPixelArt(ctx, pixels, 16, 16, 3);
+                
+                animationFrame++;
+            }, 150);
+        }
+
+        // Generate on load
+        window.onload = () => {
+            generateSpriteSheet();
+            previewAnimation();
+        };
+    </script>
+</body>
+</html>

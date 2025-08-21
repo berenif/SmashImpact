@@ -1,0 +1,50 @@
+{
+  "name": "player",
+  "spriteSheet": "player-sprites.png",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "animations": {
+    "idle": {
+      "frames": [0, 1, 2, 3],
+      "frameDuration": 200,
+      "loop": true
+    },
+    "walk": {
+      "frames": [4, 5, 6, 7],
+      "frameDuration": 100,
+      "loop": true
+    },
+    "run": {
+      "frames": [8, 9, 10, 11],
+      "frameDuration": 75,
+      "loop": true
+    },
+    "attack": {
+      "frames": [12, 13, 14, 15],
+      "frameDuration": 50,
+      "loop": false
+    },
+    "block": {
+      "frames": [16],
+      "frameDuration": 100,
+      "loop": false
+    },
+    "hurt": {
+      "frames": [17, 18],
+      "frameDuration": 100,
+      "loop": false
+    },
+    "death": {
+      "frames": [19, 20, 21],
+      "frameDuration": 150,
+      "loop": false
+    }
+  },
+  "directions": {
+    "down": 0,
+    "left": 1,
+    "right": 2,
+    "up": 3
+  },
+  "scale": 2
+}

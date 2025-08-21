@@ -127,31 +127,51 @@ export class Renderer {
     renderPlayer(player) {
         const ctx = this.ctx;
         
-        // Body
-        ctx.fillStyle = '#4CAF50';
-        ctx.strokeStyle = '#81C784';
-        ctx.lineWidth = 2;
-        
-        ctx.beginPath();
-        ctx.arc(0, 0, player.radius || 20, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Direction indicator
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(20, 0);
-        ctx.stroke();
-        
-        // Shield if blocking
-        if (player.isBlocking) {
-            ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
-            ctx.lineWidth = 4;
+        // Check if player has a sprite
+        if (player.sprite) {
+            // Render using sprite
+            player.sprite.draw(ctx, 0, 0, {
+                scale: player.scale || 1,
+                rotation: player.rotation || 0,
+                opacity: player.opacity !== undefined ? player.opacity : 1
+            });
+            
+            // Shield effect if blocking (rendered over sprite)
+            if (player.isBlocking) {
+                ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(0, 0, (player.radius || 20) + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        } else {
+            // Fallback to geometric rendering
+            // Body
+            ctx.fillStyle = '#4CAF50';
+            ctx.strokeStyle = '#81C784';
+            ctx.lineWidth = 2;
+            
             ctx.beginPath();
-            ctx.arc(0, 0, (player.radius || 20) + 10, 0, Math.PI * 2);
+            ctx.arc(0, 0, player.radius || 20, 0, Math.PI * 2);
+            ctx.fill();
             ctx.stroke();
+            
+            // Direction indicator
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(20, 0);
+            ctx.stroke();
+            
+            // Shield if blocking
+            if (player.isBlocking) {
+                ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(0, 0, (player.radius || 20) + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
         }
     }
     
