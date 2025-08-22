@@ -54,19 +54,21 @@ jobs:
         run: |
           cd emsdk
           source ./emsdk_env.sh
-          echo "EMSDK=$EMSDK" >> $GITHUB_ENV
-          echo "EM_CONFIG=$EM_CONFIG" >> $GITHUB_ENV
-          echo "EMSDK_NODE=$EMSDK_NODE" >> $GITHUB_ENV
-          echo "$EMSDK" >> $GITHUB_PATH
-          echo "$EMSDK/upstream/emscripten" >> $GITHUB_PATH
+          echo "EMSDK=$PWD" >> $GITHUB_ENV
+          echo "EM_CONFIG=$PWD/.emscripten" >> $GITHUB_ENV
+          echo "EMSDK_NODE=$PWD/node/$(ls node)/bin/node" >> $GITHUB_ENV
+          echo "$PWD" >> $GITHUB_PATH
+          echo "$PWD/upstream/emscripten" >> $GITHUB_PATH
       
       - name: Verify Emscripten installation
         run: |
+          source ./emsdk/emsdk_env.sh
           emcc --version
           em++ --version
       
       - name: Build Wolf AI WASM module
         run: |
+          source ./emsdk/emsdk_env.sh
           echo "Building Wolf AI WASM module..."
           
           # Create wasm output directory
@@ -89,6 +91,7 @@ jobs:
       
       - name: Build additional WASM modules
         run: |
+          source ./emsdk/emsdk_env.sh
           # Check if there are other C++ files to compile
           for cpp_file in src/*.cpp; do
             if [ -f "$cpp_file" ]; then
@@ -156,40 +159,4 @@ jobs:
           echo "- **Runner:** ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh wasm/*.wasm wasm/*.js 2>/dev/null | awk '{print $9 ": " $5}' >> $GITHUB_STEP_SUMMARY || echo "No WASM files found" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ WASM compilation completed successfully!" >> $GITHUB_STEP_SUMMARY
-
-  # Deploy WASM to GitHub Pages (optional, only on main branch)
-  deploy-wasm:
-    needs: build-wasm
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Download WASM artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-build-${{ github.sha }}
-          path: wasm
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      
-      - name: Upload to Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          echo "\`\`
