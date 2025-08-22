@@ -15,7 +15,104 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Vector2 class
+// Vec2 class (matching game engine interface)
+class Vec2 {
+public:
+    float x, y;
+    
+    Vec2() : x(0), y(0) {}
+    Vec2(float x, float y) : x(x), y(y) {}
+    
+    float magnitude() const {
+        return std::sqrt(x * x + y * y);
+    }
+    
+    float magnitudeSquared() const {
+        return x * x + y * y;
+    }
+    
+    Vec2 normalized() const {
+        float mag = magnitude();
+        if (mag > 0) {
+            return Vec2(x / mag, y / mag);
+        }
+        return Vec2(0, 0);
+    }
+    
+    float dot(const Vec2& other) const {
+        return x * other.x + y * other.y;
+    }
+};
+
+// GameObject class (simplified version matching expected interface)
+class GameObject {
+public:
+    int id;
+    int type;
+    Vec2 position;
+    Vec2 velocity;
+    float radius;
+    float health;
+    float maxHealth;
+    bool active;
+    
+    GameObject() : id(0), type(0), radius(10.0f), health(100.0f), maxHealth(100.0f), active(true) {}
+    
+    void update(float deltaTime) {
+        position.x += velocity.x * deltaTime;
+        position.y += velocity.y * deltaTime;
+    }
+    
+    bool isColliding(const GameObject& other) const {
+        float dx = position.x - other.position.x;
+        float dy = position.y - other.position.y;
+        float distSq = dx * dx + dy * dy;
+        float radiusSum = radius + other.radius;
+        return distSq < (radiusSum * radiusSum);
+    }
+    
+    float distanceTo(const GameObject& other) const {
+        float dx = position.x - other.position.x;
+        float dy = position.y - other.position.y;
+        return std::sqrt(dx * dx + dy * dy);
+    }
+};
+
+// CollisionSystem class (simplified version)
+class CollisionSystem {
+private:
+    std::vector<GameObject*> objects;
+    
+public:
+    CollisionSystem() {}
+    
+    void clear() {
+        objects.clear();
+    }
+    
+    void insert(GameObject* obj) {
+        if (obj) {
+            objects.push_back(obj);
+        }
+    }
+    
+    std::vector<GameObject*> getNearby(GameObject* obj, float range) {
+        std::vector<GameObject*> nearby;
+        if (!obj) return nearby;
+        
+        for (auto* other : objects) {
+            if (other && other != obj) {
+                float dist = obj->distanceTo(*other);
+                if (dist <= range) {
+                    nearby.push_back(other);
+                }
+            }
+        }
+        return nearby;
+    }
+};
+
+// Vector2 class (internal for Wolf AI)
 struct Vector2 {
     float x, y;
     
@@ -568,6 +665,40 @@ public:
 EMSCRIPTEN_BINDINGS(wolf_ai_module) {
     using namespace emscripten;
     
+    // Export Vec2 class
+    class_<Vec2>("Vec2")
+        .constructor<>()
+        .constructor<float, float>()
+        .property("x", &Vec2::x)
+        .property("y", &Vec2::y)
+        .function("magnitude", &Vec2::magnitude)
+        .function("magnitudeSquared", &Vec2::magnitudeSquared)
+        .function("normalized", &Vec2::normalized)
+        .function("dot", &Vec2::dot);
+    
+    // Export GameObject class
+    class_<GameObject>("GameObject")
+        .constructor<>()
+        .property("id", &GameObject::id)
+        .property("type", &GameObject::type)
+        .property("position", &GameObject::position)
+        .property("velocity", &GameObject::velocity)
+        .property("radius", &GameObject::radius)
+        .property("health", &GameObject::health)
+        .property("maxHealth", &GameObject::maxHealth)
+        .property("active", &GameObject::active)
+        .function("update", &GameObject::update)
+        .function("isColliding", &GameObject::isColliding)
+        .function("distanceTo", &GameObject::distanceTo);
+    
+    // Export CollisionSystem class
+    class_<CollisionSystem>("CollisionSystem")
+        .constructor<>()
+        .function("clear", &CollisionSystem::clear)
+        .function("insert", &CollisionSystem::insert, allow_raw_pointers())
+        .function("getNearby", &CollisionSystem::getNearby, allow_raw_pointers());
+    
+    // Export WolfPackManager class
     class_<WolfPackManager>("WolfPackManager")
         .constructor()
         .function("createWolf", &WolfPackManager::createWolf)
