@@ -33,7 +33,7 @@ public:
     
     Vec2 normalized() const {
         float mag = magnitude();
-        if (mag > 0) {
+        if (mag > 0.0001f) {  // Use epsilon for safer comparison
             return Vec2(x / mag, y / mag);
         }
         return Vec2(0, 0);
@@ -137,7 +137,7 @@ struct Vector2 {
     
     Vector2 normalized() const {
         float mag = magnitude();
-        if (mag > 0) {
+        if (mag > 0.0001f) {  // Use epsilon for safer comparison
             return Vector2(x / mag, y / mag);
         }
         return Vector2(0, 0);
@@ -231,7 +231,7 @@ public:
           currentSpeed(0),
           packRole(0),
           communicationCooldown(0),
-          patrolIndex(0),
+          patrolIndex(0),  // Ensure patrolIndex is initialized
           searchPattern(0),
           searchTimer(0),
           attackRange(50.0f),
@@ -562,7 +562,7 @@ public:
     }
     
     void updateWolf(int id, float deltaTime, float playerX, float playerY, float playerVX, float playerVY, bool playerVisible) {
-        if (id >= 0 && id < wolves.size() && wolves[id]) {
+        if (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) {
             wolves[id]->update(deltaTime, playerX, playerY, playerVX, playerVY, playerVisible);
             
             // Coordinate pack behavior
@@ -573,7 +573,7 @@ public:
     }
     
     void coordinatePack(int hunterId, float targetX, float targetY) {
-        if (hunterId < 0 || hunterId >= wolves.size()) return;
+        if (hunterId < 0 || hunterId >= static_cast<int>(wolves.size())) return;
         
         auto& hunter = wolves[hunterId];
         float hunterDist = std::sqrt(
@@ -583,7 +583,7 @@ public:
         
         int flankerCount = 0;
         
-        for (int i = 0; i < wolves.size(); i++) {
+        for (int i = 0; i < static_cast<int>(wolves.size()); i++) {
             if (i == hunterId || !wolves[i] || !wolves[i]->getActive()) continue;
             
             auto& wolf = wolves[i];
@@ -607,47 +607,47 @@ public:
     
     // Getters for JavaScript
     float getWolfX(int id) { 
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getX() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getX() : 0;
     }
     
     float getWolfY(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getY() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getY() : 0;
     }
     
     float getWolfVX(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getVX() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getVX() : 0;
     }
     
     float getWolfVY(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getVY() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getVY() : 0;
     }
     
     float getWolfRotation(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getRotation() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getRotation() : 0;
     }
     
     float getWolfHealth(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getHealth() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getHealth() : 0;
     }
     
     int getWolfState(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getState() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getState() : 0;
     }
     
     float getWolfAlertLevel(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getAlertLevel() : 0;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getAlertLevel() : 0;
     }
     
     bool getWolfIsAlpha(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getIsAlpha() : false;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getIsAlpha() : false;
     }
     
     bool getWolfActive(int id) {
-        return (id >= 0 && id < wolves.size() && wolves[id]) ? wolves[id]->getActive() : false;
+        return (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) ? wolves[id]->getActive() : false;
     }
     
     void damageWolf(int id, float damage) {
-        if (id >= 0 && id < wolves.size() && wolves[id]) {
+        if (id >= 0 && id < static_cast<int>(wolves.size()) && wolves[id]) {
             wolves[id]->takeDamage(damage);
         }
     }
