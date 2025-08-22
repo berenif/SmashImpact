@@ -78,13 +78,13 @@ jobs:
           em++ wolf_ai_wasm.cpp \
             -O3 \
             -s WASM=1 \
-            -s EXPORTED_FUNCTIONS='["_malloc","_free","_initGame","_updateGame","_handleInput","_getPlayerX","_getPlayerY","_getPlayerHealth","_getEnemyCount","_getEnemyX","_getEnemyY","_getEnemyHealth","_getProjectileCount","_getProjectileX","_getProjectileY","_isGameOver","_getScore","_resetGame","_setDifficulty"]' \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s MODULARIZE=1 \
             -s EXPORT_NAME='WolfAIModule' \
             -s ENVIRONMENT='web,worker' \
             -s SINGLE_FILE=0 \
+            -lembind \
             --bind \
             -o wasm/wolf_ai.js
           
