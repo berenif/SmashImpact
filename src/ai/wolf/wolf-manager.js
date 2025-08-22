@@ -363,7 +363,7 @@ export class WolfManager {
             waveNumber: options.waveNumber || 1
         });
         
-        if (wolves && wolves && wolves && wolves.length > 0) {
+        if (wolves && wolves.length > 0) {
             const packId = this.packCoordinator.createPack(wolves);
             
             // Set pack target if provided
@@ -403,7 +403,7 @@ export class WolfManager {
         } else {
             // Individual wolves howl
             const wolves = this.getLivingWolves();
-            if (wolves && wolves && wolves && wolves.length > 0) {
+            if (wolves && wolves.length > 0) {
                 const wolf = wolves[Math.floor(Math.random() * wolves.length)];
                 wolf.performHowl();
             }

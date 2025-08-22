@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf Error Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #0f0;
+        }
+        .error {
+            color: #f00;
+            background: rgba(255,0,0,0.1);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #f00;
+        }
+        .success {
+            color: #0f0;
+            background: rgba(0,255,0,0.1);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #0f0;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Wolf Module Error Detection</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.innerHTML = `<pre>${message}</pre>`;
+            output.appendChild(div);
+        }
+        
+        // Catch all errors
+        window.addEventListener('error', (e) => {
+            log(`Global Error: ${e.message}\nFile: ${e.filename}\nLine: ${e.lineno}:${e.colno}`, true);
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            log(`Unhandled Promise Rejection: ${e.reason}`, true);
+        });
+        
+        try {
+            log('Starting module import test...');
+            
+            // Test 1: Import wolf-integration-modular
+            const integrationModule = await import('../src/ai/wolf-integration-modular.js');
+            log('✓ wolf-integration-modular.js loaded');
+            log('  Exports: ' + Object.keys(integrationModule).join(', '));
+            
+            // Test 2: Create game state
+            const gameState = {
+                canvas: document.createElement('canvas'),
+                ctx: document.createElement('canvas').getContext('2d'),
+                debug: true,
+                paused: false,
+                waveNumber: 1,
+                mapWidth: 800,
+                mapHeight: 600,
+                gridWidth: 25,
+                gridHeight: 20,
+                obstacles: [],
+                players: [{x: 400, y: 300, health: 100, maxHealth: 100}],
+                enemies: [],
+                wolves: [],
+                particles: []
+            };
+            log('✓ Game state created');
+            
+            // Test 3: Create WolfAIIntegration instance
+            const WolfAIIntegration = integrationModule.WolfAIIntegration;
+            const wolfIntegration = new WolfAIIntegration(gameState);
+            log('✓ WolfAIIntegration instance created');
+            
+            // Test 4: Initialize
+            const success = wolfIntegration.initialize();
+            if (success) {
+                log('✓ WolfAIIntegration initialized successfully');
+            } else {
+                log('✗ WolfAIIntegration initialization failed', true);
+            }
+            
+            // Test 5: Check wolf manager
+            if (wolfIntegration.wolfManager) {
+                log('✓ Wolf manager exists');
+                log('  Methods: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(wolfIntegration.wolfManager)).filter(m => typeof wolfIntegration.wolfManager[m] === 'function').slice(0, 10).join(', ') + '...');
+            } else {
+                log('✗ Wolf manager not created', true);
+            }
+            
+            // Test 6: Try spawning a wolf pack
+            if (wolfIntegration.wolfManager) {
+                try {
+                    const packId = wolfIntegration.wolfManager.spawnPack(
+                        {x: 200, y: 200},
+                        3,
+                        {difficulty: 1, target: gameState.players[0]}
+                    );
+                    if (packId) {
+                        log('✓ Wolf pack spawned: ' + packId);
+                    } else {
+                        log('✗ Failed to spawn wolf pack', true);
+                    }
+                } catch (e) {
+                    log('✗ Error spawning wolf pack: ' + e.message, true);
+                    log('  Stack: ' + e.stack, true);
+                }
+            }
+            
+            // Test 7: Check wolves array
+            const wolves = wolfIntegration.wolfManager?.getLivingWolves();
+            if (wolves) {
+                log('✓ Living wolves: ' + wolves.length);
+            }
+            
+            // Test 8: Try updating
+            try {
+                wolfIntegration.updateWolves(16);
+                log('✓ Update wolves successful');
+            } catch (e) {
+                log('✗ Error updating wolves: ' + e.message, true);
+                log('  Stack: ' + e.stack, true);
+            }
+            
+            // Test 9: Try rendering
+            try {
+                const testCanvas = document.createElement('canvas');
+                testCanvas.width = 800;
+                testCanvas.height = 600;
+                const testCtx = testCanvas.getContext('2d');
+                
+                if (wolfIntegration.wolfManager) {
+                    wolfIntegration.wolfManager.render(testCtx);
+                    log('✓ Render successful');
+                }
+            } catch (e) {
+                log('✗ Error rendering: ' + e.message, true);
+                log('  Stack: ' + e.stack, true);
+            }
+            
+            log('\n=== All tests completed ===');
+            
+        } catch (error) {
+            log('Fatal Error: ' + error.message, true);
+            log('Stack: ' + error.stack, true);
+        }
+    </script>
+</body>
+</html>

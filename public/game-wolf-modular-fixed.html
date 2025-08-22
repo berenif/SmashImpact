@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmashImpact - Wolf AI (Modular)</title>
+    <title>SmashImpact - Wolf AI (Modular - Fixed)</title>
     <style>
         body {
             margin: 0;
@@ -134,6 +134,27 @@
             border-radius: 5px;
             margin: 10px 0;
         }
+        
+        #errorLog {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            max-width: 400px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid red;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 11px;
+            color: red;
+            display: none;
+        }
+        
+        #errorLog.hasErrors {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -143,18 +164,18 @@
         <div id="controls">
             <div class="control-section">
                 <h3>🐺 Wolf AI Controls</h3>
-                <button onclick="spawnWolfPack()">Spawn Wolf Pack</button>
-                <button onclick="triggerHowl()">Trigger Howl</button>
-                <button onclick="increaseAggression()">Increase Aggression</button>
-                <button onclick="clearWolves()">Clear All Wolves</button>
+                <button id="spawnPackBtn">Spawn Wolf Pack</button>
+                <button id="howlBtn">Trigger Howl</button>
+                <button id="aggressionBtn">Increase Aggression</button>
+                <button id="clearBtn">Clear All Wolves</button>
             </div>
             
             <div class="control-section">
                 <h3>🎮 Game Controls</h3>
-                <button onclick="startWave()">Start Wave</button>
-                <button onclick="toggleDebug()">Toggle Debug</button>
-                <button onclick="togglePause()">Pause/Resume</button>
-                <button onclick="resetGame()">Reset Game</button>
+                <button id="waveBtn">Start Wave</button>
+                <button id="debugBtn">Toggle Debug</button>
+                <button id="pauseBtn">Pause/Resume</button>
+                <button id="resetBtn">Reset Game</button>
             </div>
             
             <div id="stats">
@@ -189,19 +210,44 @@
         <div id="debugState">State: -</div>
         <div id="debugPerformance">Update: 0ms</div>
     </div>
+    
+    <div id="errorLog"></div>
 
     <!-- Load Wolf AI Modules -->
     <script type="module">
-        // Error handling
+        // Error logging
+        const errorLog = document.getElementById('errorLog');
+        const errors = [];
+        
+        function logError(message, error) {
+            console.error(message, error);
+            errors.push(`${new Date().toISOString().substr(11, 8)}: ${message} - ${error?.message || error}`);
+            if (errors.length > 10) errors.shift();
+            errorLog.innerHTML = '<strong>Errors:</strong><br>' + errors.join('<br>');
+            errorLog.classList.add('hasErrors');
+        }
+        
+        // Global error handlers
         window.addEventListener('error', (e) => {
-            console.error('Runtime error:', e.error || e.message);
+            logError('Runtime Error', e.error || e.message);
         });
         
         window.addEventListener('unhandledrejection', (e) => {
-            console.error('Unhandled promise rejection:', e.reason);
+            logError('Promise Rejection', e.reason);
         });
         
-        import { WolfAIIntegration } from '../src/ai/wolf-integration-modular.js';
+        // Import with error handling
+        let WolfAIIntegration;
+        try {
+            const module = await import('../src/ai/wolf-integration-modular.js');
+            WolfAIIntegration = module.WolfAIIntegration;
+            console.log('Wolf AI module loaded successfully');
+        } catch (error) {
+            logError('Failed to load Wolf AI module', error);
+            document.getElementById('loadingMessage').textContent = 'Failed to load Wolf AI module';
+            document.getElementById('errorMessage').style.display = 'block';
+            document.getElementById('errorMessage').textContent = error.message;
+        }
         
         // Game state
         const gameState = {
@@ -228,6 +274,17 @@
         // Wolf AI Integration
         let wolfIntegration = null;
         
+        // Keyboard input
+        const keys = {};
+        
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
         // Initialize game
         async function initGame() {
             try {
@@ -249,23 +306,31 @@
                 // Generate some obstacles
                 generateObstacles();
                 
-                // Initialize Wolf AI
-                wolfIntegration = new WolfAIIntegration(gameState);
-                const success = wolfIntegration.initialize();
-                
-                if (!success) {
-                    throw new Error('Failed to initialize Wolf AI');
+                // Initialize Wolf AI if module loaded
+                if (WolfAIIntegration) {
+                    wolfIntegration = new WolfAIIntegration(gameState);
+                    const success = wolfIntegration.initialize();
+                    
+                    if (!success) {
+                        throw new Error('Failed to initialize Wolf AI');
+                    }
+                    console.log('Wolf AI initialized successfully');
+                } else {
+                    throw new Error('Wolf AI module not available');
                 }
                 
                 // Hide loading message
                 document.getElementById('loadingMessage').style.display = 'none';
+                
+                // Setup button handlers
+                setupButtonHandlers();
                 
                 // Start game loop
                 requestAnimationFrame(gameLoop);
                 
                 console.log('Game initialized successfully');
             } catch (error) {
-                console.error('Failed to initialize game:', error);
+                logError('Failed to initialize game', error);
                 showError('Failed to initialize game: ' + error.message);
             }
         }
@@ -284,6 +349,104 @@
             }
         }
         
+        // Setup button handlers
+        function setupButtonHandlers() {
+            document.getElementById('spawnPackBtn').addEventListener('click', () => {
+                try {
+                    if (!wolfIntegration) return;
+                    
+                    const player = gameState.players[0];
+                    const position = player ? 
+                        { x: player.x + 100, y: player.y } : 
+                        { x: 400, y: 300 };
+                    
+                    const packId = wolfIntegration.wolfManager.spawnPack(position, 3, {
+                        difficulty: 1,
+                        target: player
+                    });
+                    
+                    console.log('Spawned wolf pack:', packId);
+                } catch (error) {
+                    logError('Failed to spawn wolf pack', error);
+                }
+            });
+            
+            document.getElementById('howlBtn').addEventListener('click', () => {
+                try {
+                    if (!wolfIntegration) return;
+                    wolfIntegration.wolfManager.triggerCoordinatedHowl();
+                } catch (error) {
+                    logError('Failed to trigger howl', error);
+                }
+            });
+            
+            document.getElementById('aggressionBtn').addEventListener('click', () => {
+                try {
+                    if (!wolfIntegration) return;
+                    wolfIntegration.wolfManager.increaseAggression(0.2);
+                } catch (error) {
+                    logError('Failed to increase aggression', error);
+                }
+            });
+            
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                try {
+                    if (!wolfIntegration) return;
+                    wolfIntegration.wolfManager.clearAllWolves();
+                } catch (error) {
+                    logError('Failed to clear wolves', error);
+                }
+            });
+            
+            document.getElementById('waveBtn').addEventListener('click', () => {
+                try {
+                    gameState.waveNumber++;
+                    if (wolfIntegration) {
+                        wolfIntegration.spawnWolvesForWave(gameState.waveNumber);
+                    }
+                } catch (error) {
+                    logError('Failed to start wave', error);
+                }
+            });
+            
+            document.getElementById('debugBtn').addEventListener('click', () => {
+                gameState.debug = !gameState.debug;
+                document.getElementById('debugPanel').classList.toggle('active');
+            });
+            
+            document.getElementById('pauseBtn').addEventListener('click', () => {
+                gameState.paused = !gameState.paused;
+            });
+            
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                try {
+                    // Reset player
+                    gameState.players[0] = {
+                        x: 400,
+                        y: 300,
+                        vx: 0,
+                        vy: 0,
+                        health: 100,
+                        maxHealth: 100,
+                        damage: 10
+                    };
+                    
+                    // Clear wolves
+                    if (wolfIntegration) {
+                        wolfIntegration.wolfManager.clearAllWolves();
+                    }
+                    
+                    // Reset wave
+                    gameState.waveNumber = 1;
+                    
+                    // Clear particles
+                    gameState.particles = [];
+                } catch (error) {
+                    logError('Failed to reset game', error);
+                }
+            });
+        }
+        
         // Game loop
         function gameLoop(timestamp) {
             if (gameState.paused) {
@@ -297,14 +460,18 @@
             // Update FPS
             updateFPS(timestamp);
             
-            // Update game
-            update(deltaTime);
-            
-            // Render game
-            render();
-            
-            // Update UI
-            updateUI();
+            try {
+                // Update game
+                update(deltaTime);
+                
+                // Render game
+                render();
+                
+                // Update UI
+                updateUI();
+            } catch (error) {
+                logError('Game loop error', error);
+            }
             
             requestAnimationFrame(gameLoop);
         }
@@ -321,7 +488,7 @@
                 try {
                     wolfIntegration.updateWolves(deltaTime);
                 } catch (error) {
-                    console.error('Wolf update error:', error);
+                    logError('Wolf update error', error);
                 }
             }
             
@@ -347,12 +514,12 @@
             // Simple keyboard controls
             const speed = 5;
             
-            if (keys.ArrowUp || keys.w) player.vy = -speed;
-            else if (keys.ArrowDown || keys.s) player.vy = speed;
+            if (keys.ArrowUp || keys.w || keys.W) player.vy = -speed;
+            else if (keys.ArrowDown || keys.s || keys.S) player.vy = speed;
             else player.vy = 0;
             
-            if (keys.ArrowLeft || keys.a) player.vx = -speed;
-            else if (keys.ArrowRight || keys.d) player.vx = speed;
+            if (keys.ArrowLeft || keys.a || keys.A) player.vx = -speed;
+            else if (keys.ArrowRight || keys.d || keys.D) player.vx = speed;
             else player.vx = 0;
             
             // Update position
@@ -414,10 +581,10 @@
             
             // Draw particles
             for (const particle of gameState.particles) {
-                ctx.fillStyle = particle.color;
+                ctx.fillStyle = particle.color || 'white';
                 ctx.globalAlpha = particle.life / 1000;
                 ctx.beginPath();
-                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.arc(particle.x, particle.y, particle.size || 2, 0, Math.PI * 2);
                 ctx.fill();
             }
             ctx.globalAlpha = 1;
@@ -456,7 +623,7 @@
                 try {
                     wolfIntegration.wolfManager.render(ctx);
                 } catch (error) {
-                    console.error('Wolf render error:', error);
+                    logError('Wolf render error', error);
                 }
             }
         }
@@ -512,7 +679,7 @@
                     }
                 }
             } catch (error) {
-                console.error('UI update error:', error);
+                logError('UI update error', error);
             }
         }
         
@@ -535,119 +702,19 @@
             document.getElementById('loadingMessage').style.display = 'none';
         }
         
-        // Keyboard input
-        const keys = {};
-        
-        document.addEventListener('keydown', (e) => {
-            keys[e.key] = true;
-        });
-        
-        document.addEventListener('keyup', (e) => {
-            keys[e.key] = false;
-        });
-        
-        // Control functions
-        window.spawnWolfPack = function() {
-            try {
-                if (!wolfIntegration || !wolfIntegration.wolfManager) {
-                    console.warn('Wolf integration not ready');
-                    return;
-                }
-                
-                const player = gameState.players[0];
-                const position = player ? 
-                    { x: player.x + 100, y: player.y } : 
-                    { x: 400, y: 300 };
-                
-                const packId = wolfIntegration.wolfManager.spawnPack(position, 3, {
-                    difficulty: 1,
-                    target: player
-                });
-                console.log('Spawned wolf pack:', packId);
-            } catch (error) {
-                console.error('Failed to spawn wolf pack:', error);
-                showError('Failed to spawn wolf pack: ' + error.message);
-            }
-        };
-        
-        window.triggerHowl = function() {
-            try {
-                if (!wolfIntegration || !wolfIntegration.wolfManager) return;
-                wolfIntegration.wolfManager.triggerCoordinatedHowl();
-            } catch (error) {
-                console.error('Failed to trigger howl:', error);
-            }
-        };
-        
-        window.increaseAggression = function() {
-            try {
-                if (!wolfIntegration || !wolfIntegration.wolfManager) return;
-                wolfIntegration.wolfManager.increaseAggression(0.2);
-            } catch (error) {
-                console.error('Failed to increase aggression:', error);
-            }
-        };
-        
-        window.clearWolves = function() {
-            try {
-                if (!wolfIntegration || !wolfIntegration.wolfManager) return;
-                wolfIntegration.wolfManager.clearAllWolves();
-            } catch (error) {
-                console.error('Failed to clear wolves:', error);
-            }
-        };
-        
-        window.startWave = function() {
-            try {
-                gameState.waveNumber++;
-                
-                if (wolfIntegration) {
-                    wolfIntegration.spawnWolvesForWave(gameState.waveNumber);
-                }
-            } catch (error) {
-                console.error('Failed to start wave:', error);
-            }
-        };
-        
-        window.toggleDebug = function() {
-            gameState.debug = !gameState.debug;
-            document.getElementById('debugPanel').classList.toggle('active');
-        };
-        
-        window.togglePause = function() {
-            gameState.paused = !gameState.paused;
-        };
-        
-        window.resetGame = function() {
-            try {
-                // Reset player
-                gameState.players[0] = {
-                    x: 400,
-                    y: 300,
-                    vx: 0,
-                    vy: 0,
-                    health: 100,
-                    maxHealth: 100,
-                    damage: 10
-                };
-                
-                // Clear wolves
-                if (wolfIntegration && wolfIntegration.wolfManager) {
-                    wolfIntegration.wolfManager.clearAllWolves();
-                }
-                
-                // Reset wave
-                gameState.waveNumber = 1;
-                
-                // Clear particles
-                gameState.particles = [];
-            } catch (error) {
-                console.error('Failed to reset game:', error);
-            }
-        };
-        
         // Initialize game when page loads
-        window.addEventListener('load', initGame);
+        if (WolfAIIntegration) {
+            window.addEventListener('load', initGame);
+        } else {
+            // Wait for module to load
+            setTimeout(() => {
+                if (WolfAIIntegration) {
+                    initGame();
+                } else {
+                    showError('Wolf AI module failed to load');
+                }
+            }, 1000);
+        }
     </script>
 </body>
 </html>
