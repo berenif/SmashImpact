@@ -236,7 +236,9 @@ export class WolfStateMachine {
                 this.context?.playHurtAnimation?.();
             },
             onExit: () => {
-                this.context?.wasHurt = false;
+                if (this.context) {
+                    this.context.wasHurt = false;
+                }
             }
         });
 
@@ -245,7 +247,9 @@ export class WolfStateMachine {
                 this.context?.playStunnedAnimation?.();
             },
             onExit: () => {
-                this.context?.isStunned = false;
+                if (this.context) {
+                    this.context.isStunned = false;
+                }
             }
         });
 
