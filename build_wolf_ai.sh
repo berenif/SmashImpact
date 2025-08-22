@@ -15,7 +15,7 @@ mkdir -p public
 
 # Compile the Wolf AI module
 echo "Compiling wolf_ai_wasm.cpp..."
-emcc wolf_ai_wasm.cpp \
+em++ wolf_ai_wasm.cpp \
     -O3 \
     -s WASM=1 \
     -s MODULARIZE=1 \
@@ -25,6 +25,7 @@ emcc wolf_ai_wasm.cpp \
     -s ENVIRONMENT='web' \
     -s NO_EXIT_RUNTIME=1 \
     -s ASSERTIONS=1 \
+    -lembind \
     --bind \
     -o public/wolf_ai.js
 
