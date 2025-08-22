@@ -25,7 +25,6 @@ emcc wolf_ai_wasm.cpp \
     -s ENVIRONMENT='web' \
     -s NO_EXIT_RUNTIME=1 \
     -s ASSERTIONS=1 \
-    -lembind \
     --bind \
     -o public/wolf_ai.js
 
