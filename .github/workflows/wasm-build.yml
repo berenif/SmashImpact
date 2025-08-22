@@ -74,7 +74,7 @@ jobs:
           # Create wasm output directory
           mkdir -p wasm
           
-          # Compile the main WASM module
+          # Compile the main WASM module with embind support
           em++ wolf_ai_wasm.cpp \
             -O3 \
             -s WASM=1 \
@@ -85,6 +85,7 @@ jobs:
             -s EXPORT_NAME='WolfAIModule' \
             -s ENVIRONMENT='web,worker' \
             -s SINGLE_FILE=0 \
+            --bind \
             -o wasm/wolf_ai.js
           
           echo "WASM build completed successfully!"
