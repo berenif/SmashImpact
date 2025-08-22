@@ -23,6 +23,9 @@ emcc wolf_ai_wasm.cpp \
     -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s ENVIRONMENT='web' \
+    -s NO_EXIT_RUNTIME=1 \
+    -s ASSERTIONS=1 \
+    -lembind \
     --bind \
     -o public/wolf_ai.js
 

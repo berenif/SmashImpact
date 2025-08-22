@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wolf AI WASM Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Wolf AI WASM Module Test</h1>
+    <div id="output"></div>
+    
+    <script src="public/wolf_ai.js"></script>
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(msg, className = '') {
+            const div = document.createElement('div');
+            div.className = className;
+            div.textContent = msg;
+            output.appendChild(div);
+            console.log(msg);
+        }
+        
+        log('Loading Wolf AI Module...', 'info');
+        
+        WolfAIModule().then(Module => {
+            log('✅ Module loaded successfully!', 'success');
+            
+            // Check for expected exports
+            const expectedExports = ['Vec2', 'GameObject', 'CollisionSystem', 'WolfPackManager'];
+            const foundExports = [];
+            const missingExports = [];
+            
+            for (const exportName of expectedExports) {
+                if (typeof Module[exportName] === 'function') {
+                    foundExports.push(exportName);
+                    log(`✅ ${exportName} found`, 'success');
+                    
+                    // Try to create an instance
+                    try {
+                        let instance;
+                        switch(exportName) {
+                            case 'Vec2':
+                                instance = new Module.Vec2(10, 20);
+                                log(`  → Vec2 instance created: (${instance.x}, ${instance.y})`, 'info');
+                                break;
+                            case 'GameObject':
+                                instance = new Module.GameObject();
+                                log(`  → GameObject instance created`, 'info');
+                                break;
+                            case 'CollisionSystem':
+                                instance = new Module.CollisionSystem();
+                                log(`  → CollisionSystem instance created`, 'info');
+                                break;
+                            case 'WolfPackManager':
+                                instance = new Module.WolfPackManager();
+                                log(`  → WolfPackManager instance created`, 'info');
+                                break;
+                        }
+                    } catch (e) {
+                        log(`  ⚠️ Error creating instance: ${e.message}`, 'error');
+                    }
+                } else {
+                    missingExports.push(exportName);
+                    log(`❌ ${exportName} not found`, 'error');
+                }
+            }
+            
+            log('', '');
+            log('=== Summary ===', 'info');
+            log(`Found: ${foundExports.length}/${expectedExports.length} exports`, 'info');
+            
+            if (missingExports.length === 0) {
+                log('✅ All expected exports are present!', 'success');
+            } else {
+                log(`Missing exports: ${missingExports.join(', ')}`, 'error');
+            }
+            
+            // Also list all available exports
+            log('', '');
+            log('=== All Module Properties ===', 'info');
+            const moduleKeys = Object.keys(Module).filter(key => typeof Module[key] === 'function');
+            log(`Total functions: ${moduleKeys.length}`, 'info');
+            
+            // Show first 20 function names
+            moduleKeys.slice(0, 20).forEach(key => {
+                log(`  - ${key}`, 'info');
+            });
+            
+            if (moduleKeys.length > 20) {
+                log(`  ... and ${moduleKeys.length - 20} more`, 'info');
+            }
+            
+        }).catch(error => {
+            log(`❌ Error loading module: ${error.message}`, 'error');
+            console.error(error);
+        });
+    </script>
+</body>
+</html>
