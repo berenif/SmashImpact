@@ -98,7 +98,7 @@ struct Vector2 {
     
     Vector2 normalized() const {
         float mag = magnitude();
-        if (mag > 0) {
+        if (mag > 0.0001f) {  // Use epsilon for safer comparison
             return Vector2(x / mag, y / mag);
         }
         return Vector2(0, 0);
