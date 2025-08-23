@@ -100,8 +100,8 @@ void WolfAI::handlePatrolState(float dt, bool canSeePlayer, const SoundMemory* h
     // Follow patrol path
     if (!patrolPath.empty()) {
         const Vector2& target = patrolPath[patrolIndex];
-        float dx = target.x - wolf->x()();
-        float dy = target.y - wolf->y()();
+        float dx = target.x - wolf->x();
+        float dy = target.y - wolf->y();
         float dist = std::sqrt(dx * dx + dy * dy);
         
         if (dist < 30.0f) {
@@ -359,10 +359,10 @@ void WolfAI::moveTowards(const Vector2& target, float speed, float dt) {
     
     if (dist > 0.01f) {
         float moveSpeed = speed * dt;
-        wolf->x() += (dx / dist) * moveSpeed;
-        wolf->y() += (dy / dist) * moveSpeed;
-        wolf->vx = (dx / dist) * speed;
-        wolf->vy = (dy / dist) * speed;
+        wolf->position.x += (dx / dist) * moveSpeed;
+        wolf->position.y += (dy / dist) * moveSpeed;
+        wolf->velocity.x = (dx / dist) * speed;
+        wolf->velocity.y = (dy / dist) * speed;
         wolf->setRotation(std::atan2(dy, dx));
     }
 }
