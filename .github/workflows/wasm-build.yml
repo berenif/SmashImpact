@@ -160,4 +160,4 @@ jobs:
           echo "- **Runner:** ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`
+          ls -lh wasm/*.wasm wasm/*.js 2>/dev/null | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY || echo "- No WASM files generated" >> $GITHUB_STEP_SUMMARY
