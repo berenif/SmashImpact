@@ -36,21 +36,31 @@ jobs:
         echo "Building RPG game WASM module..."
         emcc rpg_game.c -o rpg_game.js \
           -s WASM=1 \
-          -s EXPORTED_FUNCTIONS='["_init_game", "_player_move", "_use_item", "_get_render_data", "_get_player_stats", "_get_inventory", "_get_message", "_enter_dungeon", "_malloc", "_free"]' \
+          -s EXPORTED_FUNCTIONS='["_init_game", "_player_move", "_use_item", "_get_render_data", "_get_player_stats", "_get_inventory", "_get_message", "_enter_dungeon", "_random_range", "_malloc", "_free"]' \
           -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap", "UTF8ToString"]' \
           -s MODULARIZE=1 \
           -s EXPORT_NAME='createRPGModule' \
           -s ALLOW_MEMORY_GROWTH=1 \
           -O2
         
+        echo "Building Snake game WASM module..."
+        emcc snake.c -o snake.js \
+          -s WASM=1 \
+          -s EXPORTED_FUNCTIONS='["_init_game", "_update_game", "_set_direction", "_get_grid_state", "_get_score", "_is_game_over", "_get_grid_width", "_get_grid_height", "_malloc", "_free"]' \
+          -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
+          -s MODULARIZE=1 \
+          -s EXPORT_NAME='createSnakeModule' \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -O2
+        
         echo "Build complete!"
-        ls -la rpg_game.*
+        ls -la rpg_game.* snake.*
         
     - name: Commit and push if changed
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add rpg_game.js rpg_game.wasm
+        git add rpg_game.js rpg_game.wasm snake.js snake.wasm
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update WASM build [skip ci]" && git push)
         
   deploy:

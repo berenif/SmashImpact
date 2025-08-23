@@ -45,3 +45,22 @@ test-results/
 # OS files
 Thumbs.db
 desktop.ini
+
+# Compiled output
+*.o
+*.a
+*.so
+*.dll
+*.exe
+*.out
+*.app
+*.min.js
+
+# WebAssembly files (but allow specific game files)
+*.wasm
+!rpg_game.wasm
+!snake.wasm
+
+# Generated files
+public/game_engine.js
+public/game_engine.wasm
