@@ -129,6 +129,7 @@
       this.enemies = [];
       this.particles = [];
       this.projectiles = [];
+      this.obstacles = [];  // Add obstacles array
       
       // Visual effects
       this.vfx = null;
@@ -161,6 +162,9 @@
       
       // Initialize player with sword and shield
       this.initPlayer();
+      
+      // Initialize obstacles
+      this.initObstacles();
       
       // Initialize camera position to center on player
       this.updateCamera();
@@ -229,6 +233,166 @@
         lastMovementX: 0,
         lastMovementY: 0
       };
+    }
+    
+    initObstacles() {
+      // Clear existing obstacles
+      this.obstacles = [];
+      
+      // Check if WASM module is available and has enhanced obstacle generation
+      if (this.wasmModule && this.wasmModule.generateEnhancedObstacles) {
+        // Use WASM enhanced obstacle generation
+        this.wasmModule.clearEntities();
+        this.wasmModule.createPlayer(this.player.x, this.player.y);
+        this.wasmModule.generateEnhancedObstacles(15, true); // Generate 15 obstacles with playability check
+        
+        // Get obstacle data from WASM
+        const entityData = this.wasmModule.getEntityPositions();
+        // Parse WASM entity data to extract obstacles
+        // This would need proper implementation based on WASM interface
+        console.log('Using WASM obstacle generation');
+      } else {
+        // Fallback to JavaScript obstacle generation
+        this.generateObstaclesJS(15);
+      }
+    }
+    
+    generateObstaclesJS(count) {
+      const ObstacleShape = {
+        CIRCLE: 0,
+        SQUARE: 1,
+        RECTANGLE: 2
+      };
+      
+      // Grid for tracking obstacle density
+      const gridSize = 150;
+      const gridWidth = Math.ceil(this.world.width / gridSize);
+      const gridHeight = Math.ceil(this.world.height / gridSize);
+      const obstacleGrid = Array(gridHeight).fill().map(() => Array(gridWidth).fill(0));
+      
+      // Safe zone around player spawn
+      const playerSpawnX = this.world.width / 2;
+      const playerSpawnY = this.world.height / 2;
+      const safeRadius = 200;
+      
+      let obstaclesCreated = 0;
+      let attempts = 0;
+      const maxAttempts = count * 3;
+      
+      while (obstaclesCreated < count && attempts < maxAttempts) {
+        attempts++;
+        
+        // Decide on clustering
+        const createCluster = Math.random() < 0.4; // 40% chance of clustering
+        
+        // Generate base position
+        const baseX = 100 + Math.random() * (this.world.width - 200);
+        const baseY = 100 + Math.random() * (this.world.height - 200);
+        
+        // Check if too close to player spawn
+        const distFromSpawn = Math.sqrt(
+          Math.pow(baseX - playerSpawnX, 2) + 
+          Math.pow(baseY - playerSpawnY, 2)
+        );
+        if (distFromSpawn < safeRadius) continue;
+        
+        // Check grid density
+        const gridX = Math.floor(baseX / gridSize);
+        const gridY = Math.floor(baseY / gridSize);
+        if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
+          if (obstacleGrid[gridY][gridX] >= 2) continue; // Too dense
+        }
+        
+        if (createCluster) {
+          // Create a cluster of 2-4 obstacles
+          const clusterSize = 2 + Math.floor(Math.random() * 3);
+          
+          for (let j = 0; j < clusterSize && obstaclesCreated < count; j++) {
+            const angle = (j * 2 * Math.PI) / clusterSize + Math.random() * 0.3;
+            const distance = 30 + Math.random() * 60;
+            const x = baseX + Math.cos(angle) * distance;
+            const y = baseY + Math.sin(angle) * distance;
+            
+            // Keep within world bounds
+            if (x < 50 || x > this.world.width - 50 || 
+                y < 50 || y > this.world.height - 50) continue;
+            
+            const shapeType = Math.floor(Math.random() * 3);
+            const destructible = Math.random() < 0.25; // 25% chance
+            
+            let obstacle = {
+              x: x,
+              y: y,
+              shape: shapeType,
+              destructible: destructible,
+              health: destructible ? 50 : Infinity,
+              maxHealth: destructible ? 50 : Infinity,
+              color: null // Will be set based on shape
+            };
+            
+            if (shapeType === ObstacleShape.CIRCLE) {
+              obstacle.radius = 25 + Math.random() * 25;
+              obstacle.color = destructible ? '#2980b9' : '#3498db';
+            } else if (shapeType === ObstacleShape.SQUARE) {
+              obstacle.size = 40 + Math.random() * 40;
+              obstacle.rotation = Math.floor(Math.random() * 4) * Math.PI / 4;
+              obstacle.color = destructible ? '#c0392b' : '#e74c3c';
+            } else {
+              obstacle.width = 40 + Math.random() * 60;
+              obstacle.height = 30 + Math.random() * 40;
+              obstacle.rotation = Math.random() * Math.PI * 2;
+              obstacle.color = destructible ? '#e67e22' : '#f39c12';
+            }
+            
+            this.obstacles.push(obstacle);
+            obstaclesCreated++;
+            
+            // Update grid
+            const gx = Math.floor(x / gridSize);
+            const gy = Math.floor(y / gridSize);
+            if (gx >= 0 && gx < gridWidth && gy >= 0 && gy < gridHeight) {
+              obstacleGrid[gy][gx]++;
+            }
+          }
+        } else {
+          // Single obstacle
+          const shapeType = Math.floor(Math.random() * 3);
+          const destructible = Math.random() < 0.3; // 30% chance
+          
+          let obstacle = {
+            x: baseX,
+            y: baseY,
+            shape: shapeType,
+            destructible: destructible,
+            health: destructible ? 50 : Infinity,
+            maxHealth: destructible ? 50 : Infinity,
+            color: null
+          };
+          
+          if (shapeType === ObstacleShape.CIRCLE) {
+            obstacle.radius = 30 + Math.random() * 30;
+            obstacle.color = destructible ? '#2980b9' : '#3498db';
+          } else if (shapeType === ObstacleShape.SQUARE) {
+            obstacle.size = 45 + Math.random() * 45;
+            obstacle.rotation = Math.floor(Math.random() * 8) * Math.PI / 4;
+            obstacle.color = destructible ? '#c0392b' : '#e74c3c';
+          } else {
+            obstacle.width = 50 + Math.random() * 70;
+            obstacle.height = 40 + Math.random() * 40;
+            obstacle.rotation = Math.random() * Math.PI * 2;
+            obstacle.color = destructible ? '#e67e22' : '#f39c12';
+          }
+          
+          this.obstacles.push(obstacle);
+          obstaclesCreated++;
+          
+          if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
+            obstacleGrid[gridY][gridX]++;
+          }
+        }
+      }
+      
+      console.log(`Generated ${this.obstacles.length} obstacles`);
     }
     
     setupEventListeners() {
@@ -1001,6 +1165,14 @@
     }
     
     checkCollisions() {
+      // Check player-obstacle collisions
+      this.checkObstacleCollisions(this.player);
+      
+      // Check enemy-obstacle collisions
+      for (const enemy of this.enemies) {
+        this.checkObstacleCollisions(enemy);
+      }
+      
       // Check enemy collisions with player
       for (const enemy of this.enemies) {
         const dx = this.player.x - enemy.x;
@@ -1050,6 +1222,137 @@
           enemy.vy = -(dy / dist) * 5;
         }
       }
+    }
+    
+    checkObstacleCollisions(entity) {
+      const ObstacleShape = { CIRCLE: 0, SQUARE: 1, RECTANGLE: 2 };
+      
+      for (const obstacle of this.obstacles) {
+        let collision = false;
+        let pushX = 0, pushY = 0;
+        
+        if (obstacle.shape === ObstacleShape.CIRCLE) {
+          // Circle-circle collision
+          const dx = entity.x - obstacle.x;
+          const dy = entity.y - obstacle.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = entity.radius + obstacle.radius;
+          
+          if (dist < minDist && dist > 0) {
+            collision = true;
+            // Calculate push direction
+            const overlap = minDist - dist;
+            pushX = (dx / dist) * overlap;
+            pushY = (dy / dist) * overlap;
+          }
+        } else if (obstacle.shape === ObstacleShape.SQUARE) {
+          // Circle-square collision (treat as circle-rectangle)
+          collision = this.checkCircleRectCollision(
+            entity, 
+            obstacle.x, 
+            obstacle.y, 
+            obstacle.size, 
+            obstacle.size, 
+            obstacle.rotation || 0
+          );
+          if (collision) {
+            // Simple push away from center
+            const dx = entity.x - obstacle.x;
+            const dy = entity.y - obstacle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0) {
+              pushX = (dx / dist) * 2;
+              pushY = (dy / dist) * 2;
+            }
+          }
+        } else {
+          // Circle-rectangle collision
+          collision = this.checkCircleRectCollision(
+            entity, 
+            obstacle.x, 
+            obstacle.y, 
+            obstacle.width, 
+            obstacle.height, 
+            obstacle.rotation || 0
+          );
+          if (collision) {
+            // Simple push away from center
+            const dx = entity.x - obstacle.x;
+            const dy = entity.y - obstacle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0) {
+              pushX = (dx / dist) * 2;
+              pushY = (dy / dist) * 2;
+            }
+          }
+        }
+        
+        if (collision) {
+          // Push entity away from obstacle
+          entity.x += pushX;
+          entity.y += pushY;
+          
+          // Stop velocity in collision direction
+          if (entity.vx * pushX > 0) entity.vx = 0;
+          if (entity.vy * pushY > 0) entity.vy = 0;
+          
+          // Damage destructible obstacles if hit by sword
+          if (entity === this.player && this.player.swordActive && obstacle.destructible) {
+            obstacle.health -= 25;
+            if (obstacle.health <= 0) {
+              // Remove destroyed obstacle
+              const index = this.obstacles.indexOf(obstacle);
+              if (index > -1) {
+                this.obstacles.splice(index, 1);
+                // Create destruction effect
+                this.createDestructionEffect(obstacle.x, obstacle.y);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    checkCircleRectCollision(circle, rectX, rectY, rectWidth, rectHeight, rotation) {
+      // Transform circle position to rectangle's local space
+      const cos = Math.cos(-rotation);
+      const sin = Math.sin(-rotation);
+      const localX = (circle.x - rectX) * cos - (circle.y - rectY) * sin;
+      const localY = (circle.x - rectX) * sin + (circle.y - rectY) * cos;
+      
+      // Find closest point on rectangle to circle center
+      const halfWidth = rectWidth / 2;
+      const halfHeight = rectHeight / 2;
+      const closestX = Math.max(-halfWidth, Math.min(halfWidth, localX));
+      const closestY = Math.max(-halfHeight, Math.min(halfHeight, localY));
+      
+      // Check if closest point is within circle
+      const distX = localX - closestX;
+      const distY = localY - closestY;
+      const distSq = distX * distX + distY * distY;
+      
+      return distSq < circle.radius * circle.radius;
+    }
+    
+    createDestructionEffect(x, y) {
+      // Create particle explosion
+      for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI * 2 * i) / 10;
+        const speed = 2 + Math.random() * 3;
+        this.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 3 + Math.random() * 3,
+          color: '#ff9900',
+          lifetime: 30 + Math.random() * 20,
+          type: 'debris'
+        });
+      }
+      
+      // Screen shake
+      this.startScreenShake(5, 200);
     }
     
     takeDamage(damage) {
@@ -1360,6 +1663,9 @@
       // Render particles (behind everything)
       this.renderParticles();
       
+      // Render obstacles
+      this.renderObstacles();
+      
       // Render enemies
       this.renderEnemies();
       
@@ -1480,6 +1786,38 @@
           Math.PI * 2
         );
         ctx.fill();
+      }
+      
+      // Draw obstacles on minimap
+      for (const obstacle of this.obstacles) {
+        ctx.fillStyle = obstacle.destructible ? 'rgba(255, 150, 0, 0.6)' : 'rgba(100, 100, 100, 0.6)';
+        
+        if (obstacle.shape === 0) { // Circle
+          ctx.beginPath();
+          ctx.arc(
+            minimapX + obstacle.x * scale,
+            minimapY + obstacle.y * scale,
+            obstacle.radius * scale,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        } else if (obstacle.shape === 1) { // Square
+          ctx.save();
+          ctx.translate(minimapX + obstacle.x * scale, minimapY + obstacle.y * scale);
+          ctx.rotate(obstacle.rotation || 0);
+          const size = obstacle.size * scale;
+          ctx.fillRect(-size/2, -size/2, size, size);
+          ctx.restore();
+        } else { // Rectangle
+          ctx.save();
+          ctx.translate(minimapX + obstacle.x * scale, minimapY + obstacle.y * scale);
+          ctx.rotate(obstacle.rotation || 0);
+          const width = obstacle.width * scale;
+          const height = obstacle.height * scale;
+          ctx.fillRect(-width/2, -height/2, width, height);
+          ctx.restore();
+        }
       }
     }
     
@@ -1692,6 +2030,117 @@
         this.ctx.fill();
       }
       this.ctx.globalAlpha = 1;
+    }
+    
+    renderObstacles() {
+      const ObstacleShape = { CIRCLE: 0, SQUARE: 1, RECTANGLE: 2 };
+      
+      for (const obstacle of this.obstacles) {
+        // Calculate screen position
+        const screenPos = this.worldToScreen(obstacle.x, obstacle.y);
+        
+        // Skip if off-screen
+        const maxSize = Math.max(
+          obstacle.radius || 0, 
+          obstacle.size || 0, 
+          obstacle.width || 0, 
+          obstacle.height || 0
+        );
+        if (!this.isOnScreen(obstacle.x, obstacle.y, maxSize)) continue;
+        
+        const ctx = this.ctx;
+        ctx.save();
+        
+        // Draw shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        if (obstacle.shape === ObstacleShape.CIRCLE) {
+          ctx.beginPath();
+          ctx.ellipse(screenPos.x + 2, screenPos.y + 5, obstacle.radius * 0.9, obstacle.radius * 0.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (obstacle.shape === ObstacleShape.SQUARE) {
+          ctx.save();
+          ctx.translate(screenPos.x + 2, screenPos.y + 5);
+          ctx.rotate(obstacle.rotation || 0);
+          ctx.fillRect(-obstacle.size/2 * 0.9, -obstacle.size/2 * 0.5, obstacle.size * 0.9, obstacle.size * 0.5);
+          ctx.restore();
+        } else {
+          ctx.save();
+          ctx.translate(screenPos.x + 2, screenPos.y + 5);
+          ctx.rotate(obstacle.rotation || 0);
+          ctx.fillRect(-obstacle.width/2 * 0.9, -obstacle.height/2 * 0.5, obstacle.width * 0.9, obstacle.height * 0.5);
+          ctx.restore();
+        }
+        
+        // Draw obstacle
+        ctx.translate(screenPos.x, screenPos.y);
+        
+        // Apply rotation for non-circles
+        if (obstacle.shape !== ObstacleShape.CIRCLE && obstacle.rotation) {
+          ctx.rotate(obstacle.rotation);
+        }
+        
+        // Set fill style
+        ctx.fillStyle = obstacle.color;
+        ctx.shadowColor = obstacle.color;
+        ctx.shadowBlur = 5;
+        
+        // Draw based on shape
+        if (obstacle.shape === ObstacleShape.CIRCLE) {
+          ctx.beginPath();
+          ctx.arc(0, 0, obstacle.radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Add destructible indicator
+          if (obstacle.destructible) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        } else if (obstacle.shape === ObstacleShape.SQUARE) {
+          ctx.fillRect(-obstacle.size/2, -obstacle.size/2, obstacle.size, obstacle.size);
+          
+          if (obstacle.destructible) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(-obstacle.size/2, -obstacle.size/2, obstacle.size, obstacle.size);
+            ctx.setLineDash([]);
+          }
+        } else {
+          ctx.fillRect(-obstacle.width/2, -obstacle.height/2, obstacle.width, obstacle.height);
+          
+          if (obstacle.destructible) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(-obstacle.width/2, -obstacle.height/2, obstacle.width, obstacle.height);
+            ctx.setLineDash([]);
+          }
+        }
+        
+        ctx.restore();
+        
+        // Draw health bar for destructible obstacles
+        if (obstacle.destructible && obstacle.health < obstacle.maxHealth) {
+          ctx.save();
+          const barWidth = maxSize * 1.5;
+          const barHeight = 4;
+          const barY = screenPos.y - maxSize - 10;
+          
+          // Background
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(screenPos.x - barWidth/2, barY, barWidth, barHeight);
+          
+          // Health
+          ctx.fillStyle = '#ff4444';
+          const healthPercent = obstacle.health / obstacle.maxHealth;
+          ctx.fillRect(screenPos.x - barWidth/2, barY, barWidth * healthPercent, barHeight);
+          
+          ctx.restore();
+        }
+      }
     }
     
     // Game Loop
