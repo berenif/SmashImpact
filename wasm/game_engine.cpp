@@ -643,6 +643,7 @@ private:
     Entity* currentTarget;
     bool targetLockEnabled;
     float targetingDisabledUntil;
+    bool autoDisabledDueToDistance;
     
     // Targeting button state
     struct TargetingButton {
@@ -669,6 +670,7 @@ public:
           worldWidth(width * Config::WORLD_SCALE), worldHeight(height * Config::WORLD_SCALE),
           camera(width, height),
           currentTarget(nullptr), targetLockEnabled(true), targetingDisabledUntil(0),
+          autoDisabledDueToDistance(false),
           physicsTime(0), collisionTime(0), collisionChecks(0) {
         // Initialize targeting button position (top-right for mobile)
         targetButton.x = width - 50;
@@ -1296,6 +1298,7 @@ public:
     void enableTargeting() {
         targetLockEnabled = true;
         targetingDisabledUntil = 0;
+        autoDisabledDueToDistance = false;
     }
     
     void disableTargeting(float duration) {
@@ -1312,6 +1315,13 @@ public:
             }
         }
         
+        // Check for auto-disable due to distance
+        if (!targetLockEnabled && autoDisabledDueToDistance) {
+            // Keep targeting disabled until manually reactivated
+            currentTarget = nullptr;
+            return;
+        }
+        
         if (!targetLockEnabled) {
             currentTarget = nullptr;
             return;
@@ -1324,7 +1334,11 @@ public:
             } else {
                 float dist = player->distanceTo(*currentTarget);
                 if (dist > Config::MAX_TARGET_DISTANCE) {
-                    currentTarget = findClosestEnemy();
+                    // Auto-disable targeting when too far from enemy
+                    targetLockEnabled = false;
+                    autoDisabledDueToDistance = true;
+                    currentTarget = nullptr;
+                    return;
                 }
             }
         } else {
@@ -1348,7 +1362,11 @@ public:
     }
     
     bool isTargetingEnabled() {
-        return targetLockEnabled;
+        return targetLockEnabled && !autoDisabledDueToDistance;
+    }
+    
+    bool isAutoDisabledDueToDistance() {
+        return autoDisabledDueToDistance;
     }
     
     // Handle targeting button touch start
@@ -1369,6 +1387,16 @@ public:
     void onTargetButtonTouchEnd(int touchId) {
         if (targetButton.active && targetButton.touchId == touchId) {
             float pressDuration = emscripten_get_now() - targetButton.touchStartTime;
+            
+            // If auto-disabled due to distance, reactivate on any press
+            if (autoDisabledDueToDistance) {
+                enableTargeting();
+                // Try to acquire a new target
+                currentTarget = findClosestEnemy();
+                targetButton.active = false;
+                targetButton.touchId = -1;
+                return;
+            }
             
             // Check if button is not disabled
             if (emscripten_get_now() >= targetButton.disabledUntil) {
@@ -1409,6 +1437,7 @@ public:
         state.set("disabled", emscripten_get_now() < targetButton.disabledUntil);
         state.set("hasTarget", currentTarget != nullptr && currentTarget->active);
         state.set("targetingEnabled", targetLockEnabled);
+        state.set("autoDisabled", autoDisabledDueToDistance);
         
         // Calculate remaining disable time
         if (emscripten_get_now() < targetButton.disabledUntil) {
@@ -1423,9 +1452,17 @@ public:
     
     // Handle targeting button press (legacy method for compatibility)
     // pressDuration in milliseconds
-    // Quick press (<500ms): switch target
+    // Quick press (<500ms): switch target or reactivate if auto-disabled
     // Long press (>=500ms): disable targeting for 2 seconds
     void handleTargetingButton(float pressDuration) {
+        // If auto-disabled due to distance, reactivate on any press
+        if (autoDisabledDueToDistance) {
+            enableTargeting();
+            // Try to acquire a new target
+            currentTarget = findClosestEnemy();
+            return;
+        }
+        
         if (pressDuration < 500) {
             // Quick press - switch to next target
             switchToNextTarget();
@@ -1602,6 +1639,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("disableTargeting", &GameEngine::disableTargeting)
         .function("getCurrentTargetId", &GameEngine::getCurrentTargetId)
         .function("isTargetingEnabled", &GameEngine::isTargetingEnabled)
+        .function("isAutoDisabledDueToDistance", &GameEngine::isAutoDisabledDueToDistance)
         .function("handleTargetingButton", &GameEngine::handleTargetingButton)
         .function("onTargetButtonTouchStart", &GameEngine::onTargetButtonTouchStart)
         .function("onTargetButtonTouchEnd", &GameEngine::onTargetButtonTouchEnd)
