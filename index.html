@@ -452,8 +452,10 @@
                     wasmModule.ccall('get_render_data', null, ['number'], [buffer]);
                     
                     const data = [];
+                    // Access HEAP32 through the module instance
+                    const HEAP32 = new Int32Array(wasmModule.HEAPU8.buffer, 0, wasmModule.HEAPU8.length >> 2);
                     for (let i = 0; i < bufferSize; i++) {
-                        data.push(wasmModule.HEAP32[buffer / 4 + i]);
+                        data.push(HEAP32[buffer / 4 + i]);
                     }
                     
                     wasmModule._free(buffer);
@@ -737,8 +739,10 @@
             getPlayerStats(statsBuffer);
             
             const stats = [];
+            // Access HEAP32 through the module instance
+            const HEAP32 = new Int32Array(wasmModule.HEAPU8.buffer, 0, wasmModule.HEAPU8.length >> 2);
             for (let i = 0; i < 12; i++) {
-                stats.push(wasmModule.HEAP32[statsBuffer / 4 + i]);
+                stats.push(HEAP32[statsBuffer / 4 + i]);
             }
             wasmModule._free(statsBuffer);
             
@@ -766,11 +770,13 @@
             getInventory(invBuffer);
             
             const inventory = [];
+            // Access HEAP32 through the module instance
+            const HEAP32_inv = new Int32Array(wasmModule.HEAPU8.buffer, 0, wasmModule.HEAPU8.length >> 2);
             for (let i = 0; i < 20; i++) {
                 inventory.push({
-                    type: wasmModule.HEAP32[invBuffer / 4 + i * 3],
-                    quantity: wasmModule.HEAP32[invBuffer / 4 + i * 3 + 1],
-                    power: wasmModule.HEAP32[invBuffer / 4 + i * 3 + 2]
+                    type: HEAP32_inv[invBuffer / 4 + i * 3],
+                    quantity: HEAP32_inv[invBuffer / 4 + i * 3 + 1],
+                    power: HEAP32_inv[invBuffer / 4 + i * 3 + 2]
                 });
             }
             wasmModule._free(invBuffer);
