@@ -58,6 +58,12 @@ jobs:
           cp *.html _site/ 2>/dev/null || true
           cp favicon.ico _site/ 2>/dev/null || true
           
+          # Copy WASM game files
+          cp rpg_game.wasm _site/ 2>/dev/null || true
+          cp rpg_game.js _site/ 2>/dev/null || true
+          cp snake.wasm _site/ 2>/dev/null || true
+          cp snake.js _site/ 2>/dev/null || true
+          
           # Remove development files
           find _site -name "*.map" -delete 2>/dev/null || true
           find _site -name "*.test.js" -delete 2>/dev/null || true
