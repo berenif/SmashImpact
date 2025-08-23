@@ -1,44 +1,37 @@
 version: '3.8'
 
 services:
-  wasm-builder:
-    build:
-      context: .
-      dockerfile: Dockerfile.wasm
-    container_name: wasm-game-builder
-    volumes:
-      - ./wasm:/app/wasm
-      - ./public:/app/public
-      - ./scripts:/app/scripts
-      - ./tests:/app/tests
-      - ./.build-cache:/app/.build-cache
-    environment:
-      - BUILD_MODE=${BUILD_MODE:-release}
-    command: ["/app/scripts/wasm-build-helper.sh", "build", "${BUILD_MODE:-release}"]
-    
-  wasm-watcher:
-    build:
-      context: .
-      dockerfile: Dockerfile.wasm
-    container_name: wasm-game-watcher
-    volumes:
-      - ./wasm:/app/wasm
-      - ./public:/app/public
-      - ./scripts:/app/scripts
-      - ./tests:/app/tests
-      - ./.build-cache:/app/.build-cache
-    environment:
-      - BUILD_MODE=${BUILD_MODE:-release}
-    command: ["/app/scripts/wasm-build-helper.sh", "watch", "${BUILD_MODE:-release}"]
-    
-  wasm-dev-server:
+  # Development server
+  dev-server:
     image: node:18-alpine
-    container_name: wasm-game-server
     working_dir: /app
     volumes:
-      - ./:/app
+      - .:/app
     ports:
       - "8080:8080"
     command: npx http-server -p 8080 -c-1
-    depends_on:
-      - wasm-builder
+    environment:
+      - NODE_ENV=development
+    networks:
+      - game-network
+
+  # WASM builder service
+  wasm-builder:
+    image: emscripten/emsdk:latest
+    working_dir: /app
+    volumes:
+      - ./wasm:/app/wasm
+      - ./public:/app/public
+    command: >
+      emcc /app/wasm/game_engine.cpp
+      -I/app/wasm/include
+      -O3 -s WASM=1 -s MODULARIZE=1
+      -s EXPORT_NAME='GameEngine'
+      -s ALLOW_MEMORY_GROWTH=1
+      -o /app/public/game_engine.js
+    networks:
+      - game-network
+
+networks:
+  game-network:
+    driver: bridge

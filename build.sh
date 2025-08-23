@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Build script for WASM Game Engine
-# This script handles Emscripten installation and WASM compilation
+# WASM Game Engine Build Script
+# Handles both local and Docker builds
 
-set -e  # Exit on error
+set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -11,253 +11,193 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}WASM Game Engine Build Script${NC}"
-echo -e "${GREEN}========================================${NC}"
+# Configuration
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WASM_DIR="$PROJECT_ROOT/wasm"
+PUBLIC_DIR="$PROJECT_ROOT/public"
+BUILD_DIR="$WASM_DIR/build"
+EMSDK_DIR="$PROJECT_ROOT/emsdk"
 
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+# Build options
+BUILD_METHOD=""
+SETUP_ONLY=false
+PRODUCTION=false
 
-# Function to install Emscripten
-install_emscripten() {
-    echo -e "${YELLOW}Installing Emscripten SDK...${NC}"
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --docker) BUILD_METHOD="docker" ;;
+        --setup) SETUP_ONLY=true ;;
+        --production) PRODUCTION=true ;;
+        --help) 
+            echo "Usage: $0 [options]"
+            echo "Options:"
+            echo "  --docker      Build using Docker"
+            echo "  --setup       Setup environment only"
+            echo "  --production  Production build with optimizations"
+            echo "  --help        Show this help message"
+            exit 0
+            ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Function to setup Emscripten
+setup_emscripten() {
+    echo -e "${YELLOW}Setting up Emscripten SDK...${NC}"
     
-    # Check if emsdk directory exists
-    if [ ! -d "emsdk" ]; then
-        echo "Cloning Emscripten SDK..."
-        git clone https://github.com/emscripten-core/emsdk.git
+    if [ ! -d "$EMSDK_DIR" ]; then
+        git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
     fi
     
-    cd emsdk
-    
-    # Fetch the latest version
-    echo "Fetching latest Emscripten..."
+    cd "$EMSDK_DIR"
     ./emsdk install latest
-    
-    # Activate the latest version
-    echo "Activating Emscripten..."
     ./emsdk activate latest
-    
-    # Source the environment
     source ./emsdk_env.sh
+    cd "$PROJECT_ROOT"
     
-    cd ..
-    
-    echo -e "${GREEN}Emscripten installed successfully!${NC}"
+    echo -e "${GREEN}Emscripten setup complete!${NC}"
 }
 
-# Function to build the WASM module
+# Function to build WASM module
 build_wasm() {
     echo -e "${YELLOW}Building WASM module...${NC}"
     
-    cd wasm
+    # Ensure build directory exists
+    mkdir -p "$BUILD_DIR"
     
-    # Create output directory
-    mkdir -p ../public
+    # Source files
+    SOURCES="$WASM_DIR/game_engine.cpp"
     
-    # Define source files (now using refactored version by default)
-    SOURCES="game_engine.cpp"
+    # Include directories
+    INCLUDES="-I$WASM_DIR/include"
     
-    # Define include directories
-    INCLUDES="-I./include"
+    # Compiler flags
+    FLAGS="-O3 -s WASM=1 -s MODULARIZE=1 -s EXPORT_NAME='GameEngine'"
+    FLAGS="$FLAGS -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=512MB"
+    FLAGS="$FLAGS -s EXPORTED_FUNCTIONS='[\"_malloc\",\"_free\"]'"
+    FLAGS="$FLAGS -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"getValue\",\"setValue\"]'"
     
-    # Define compilation flags
-    FLAGS="-O3 \
-           -s WASM=1 \
-           -s ALLOW_MEMORY_GROWTH=1 \
-           -s MODULARIZE=1 \
-           -s EXPORT_NAME='GameEngineModule' \
-           --bind \
-           -std=c++17 \
-           -s ENVIRONMENT='web' \
-           -s EXPORT_ES6=1 \
-           -s MALLOC=emmalloc \
-           -s FILESYSTEM=0 \
-           -s NO_EXIT_RUNTIME=1 \
-           -s ASSERTIONS=0 \
-           -s SAFE_HEAP=0"
+    if [ "$PRODUCTION" = true ]; then
+        FLAGS="$FLAGS -s ASSERTIONS=0 --closure 1"
+    else
+        FLAGS="$FLAGS -s ASSERTIONS=1"
+    fi
     
-    # Output file
-    OUTPUT="../public/game_engine"
+    # Output files
+    OUTPUT="$PUBLIC_DIR/game_engine"
     
-    # Compile
     echo "Compiling WASM module..."
-    emcc $SOURCES $INCLUDES $FLAGS -o $OUTPUT.js
+    emcc $SOURCES $INCLUDES $FLAGS -o "$OUTPUT.js"
     
-    if [ $? -eq 0 ]; then
+    if [ -f "$OUTPUT.js" ] && [ -f "$OUTPUT.wasm" ]; then
         echo -e "${GREEN}WASM build successful!${NC}"
-        echo "Output files:"
-        ls -lh ../public/game_engine.*
+        echo "Generated files:"
+        echo "  - $OUTPUT.js"
+        echo "  - $OUTPUT.wasm"
     else
         echo -e "${RED}WASM build failed!${NC}"
         exit 1
     fi
-    
-    cd ..
 }
 
-# Function to build with Docker (alternative method)
+# Function to build with Docker
 build_with_docker() {
     echo -e "${YELLOW}Building with Docker...${NC}"
     
-    # Check if Docker is installed
-    if ! command_exists docker; then
-        echo -e "${RED}Docker is not installed. Please install Docker first.${NC}"
-        exit 1
-    fi
-    
-    # Create a Dockerfile for Emscripten build
-    cat > Dockerfile.emscripten << 'EOF'
+    # Create Dockerfile if it doesn't exist
+    cat > "$PROJECT_ROOT/Dockerfile.build" << 'EOF'
 FROM emscripten/emsdk:latest
 
 WORKDIR /app
 
-# Copy source files
-COPY wasm/ ./wasm/
-COPY public/ ./public/
+COPY wasm /app/wasm
+COPY public /app/public
 
-# Build the WASM module
-WORKDIR /app/wasm
-
-RUN emcc game_engine.cpp \
-    -I./include \
-    -O3 \
-    -s WASM=1 \
+RUN mkdir -p /app/public && \
+    emcc /app/wasm/game_engine.cpp \
+    -I/app/wasm/include \
+    -O3 -s WASM=1 -s MODULARIZE=1 \
+    -s EXPORT_NAME='GameEngine' \
     -s ALLOW_MEMORY_GROWTH=1 \
-    -s MODULARIZE=1 \
-    -s EXPORT_NAME='GameEngineModule' \
-    --bind \
-    -std=c++17 \
-    -s ENVIRONMENT='web' \
-    -s EXPORT_ES6=1 \
-    -s MALLOC=emmalloc \
-    -s FILESYSTEM=0 \
-    -s NO_EXIT_RUNTIME=1 \
-    -o ../public/game_engine.js
+    -s MAXIMUM_MEMORY=512MB \
+    -s EXPORTED_FUNCTIONS='["_malloc","_free"]' \
+    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue"]' \
+    -o /app/public/game_engine.js
 
-WORKDIR /app
+CMD ["echo", "Build complete"]
 EOF
 
     # Build Docker image
-    echo "Building Docker image..."
-    docker build -f Dockerfile.emscripten -t wasm-game-builder .
+    docker build -f Dockerfile.build -t wasm-game-engine-builder .
     
-    # Run container to build WASM
-    echo "Running build in Docker container..."
-    docker run --rm -v "$(pwd)/public:/app/public" wasm-game-builder
+    # Run build in container
+    docker run --rm -v "$PROJECT_ROOT/public:/app/public" wasm-game-engine-builder
     
     # Clean up
-    rm Dockerfile.emscripten
+    rm -f Dockerfile.build
     
-    echo -e "${GREEN}Docker build completed!${NC}"
+    echo -e "${GREEN}Docker build complete!${NC}"
 }
 
-# Function to setup development environment
-setup_dev_environment() {
-    echo -e "${YELLOW}Setting up development environment...${NC}"
+# Function to verify build
+verify_build() {
+    echo -e "${YELLOW}Verifying build...${NC}"
     
-    # Install Node.js dependencies if package.json exists
-    if [ -f "package.json" ]; then
-        echo "Installing Node.js dependencies..."
-        npm install
+    if [ ! -f "$PUBLIC_DIR/game_engine.js" ] || [ ! -f "$PUBLIC_DIR/game_engine.wasm" ]; then
+        echo -e "${RED}Build verification failed: Missing output files${NC}"
+        return 1
     fi
     
-    # Create necessary directories
-    mkdir -p public
-    mkdir -p wasm/build
+    # Check file sizes
+    JS_SIZE=$(stat -c%s "$PUBLIC_DIR/game_engine.js" 2>/dev/null || stat -f%z "$PUBLIC_DIR/game_engine.js" 2>/dev/null)
+    WASM_SIZE=$(stat -c%s "$PUBLIC_DIR/game_engine.wasm" 2>/dev/null || stat -f%z "$PUBLIC_DIR/game_engine.wasm" 2>/dev/null)
     
-    echo -e "${GREEN}Development environment ready!${NC}"
+    echo "Build artifacts:"
+    echo "  game_engine.js: $(( JS_SIZE / 1024 )) KB"
+    echo "  game_engine.wasm: $(( WASM_SIZE / 1024 )) KB"
+    
+    echo -e "${GREEN}Build verification passed!${NC}"
 }
 
-# Function to run tests
-run_tests() {
-    echo -e "${YELLOW}Running tests...${NC}"
-    
-    if [ -f "tests/test-game.js" ]; then
-        node tests/test-game.js
-    fi
-    
-    if [ -f "tests/wolf-ai-tests.js" ]; then
-        node tests/wolf-ai-tests.js
-    fi
-}
-
-# Main build process
+# Main execution
 main() {
-    # Parse command line arguments
-    BUILD_METHOD="emscripten"
-    RUN_TESTS=false
-    SETUP_ENV=false
+    echo -e "${GREEN}=== WASM Game Engine Build ===${NC}"
+    echo "Project root: $PROJECT_ROOT"
     
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --docker)
-                BUILD_METHOD="docker"
-                shift
-                ;;
-            --test)
-                RUN_TESTS=true
-                shift
-                ;;
-            --setup)
-                SETUP_ENV=true
-                shift
-                ;;
-            --help)
-                echo "Usage: $0 [options]"
-                echo "Options:"
-                echo "  --docker    Build using Docker instead of local Emscripten"
-                echo "  --test      Run tests after building"
-                echo "  --setup     Setup development environment"
-                echo "  --help      Show this help message"
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}Unknown option: $1${NC}"
-                echo "Use --help for usage information"
-                exit 1
-                ;;
-        esac
-    done
-    
-    # Setup environment if requested
-    if [ "$SETUP_ENV" = true ]; then
-        setup_dev_environment
+    # Setup only mode
+    if [ "$SETUP_ONLY" = true ]; then
+        setup_emscripten
+        exit 0
     fi
     
-    # Build based on selected method
+    # Ensure public directory exists
+    mkdir -p "$PUBLIC_DIR"
+    
+    # Build based on method
     if [ "$BUILD_METHOD" = "docker" ]; then
         build_with_docker
     else
-        # Check if emcc is available
-        if ! command_exists emcc; then
-            echo -e "${YELLOW}Emscripten not found. Installing...${NC}"
-            install_emscripten
-            
-            # Source the environment again
-            if [ -f "emsdk/emsdk_env.sh" ]; then
-                source emsdk/emsdk_env.sh
-            else
-                echo -e "${RED}Failed to setup Emscripten environment${NC}"
-                exit 1
-            fi
+        # Check if Emscripten is available
+        if ! command -v emcc &> /dev/null; then
+            echo -e "${YELLOW}Emscripten not found. Setting up...${NC}"
+            setup_emscripten
         fi
         
-        # Build WASM
+        # Source Emscripten environment if available
+        if [ -f "$EMSDK_DIR/emsdk_env.sh" ]; then
+            source "$EMSDK_DIR/emsdk_env.sh"
+        fi
+        
         build_wasm
     fi
     
-    # Run tests if requested
-    if [ "$RUN_TESTS" = true ]; then
-        run_tests
-    fi
+    # Verify the build
+    verify_build
     
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}Build completed successfully!${NC}"
-    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}=== Build Complete ===${NC}"
 }
 
 # Run main function
-main "$@"
+main

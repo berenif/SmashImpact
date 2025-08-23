@@ -1,22 +1,22 @@
 {
   "name": "wasm-game-engine",
   "version": "1.0.0",
-  "description": "Ultimate WASM Game Engine with advanced AI and physics",
-  "main": "game.html",
+  "description": "High-performance WebAssembly game engine with advanced AI",
+  "main": "index.html",
+  "type": "module",
   "scripts": {
     "build": "./build.sh",
     "build:docker": "./build.sh --docker",
     "build:quick": "./build-quick.sh",
     "build:production": "./build-quick.sh --production",
     "serve": "./build-quick.sh --serve",
+    "dev": "npm run build:quick && npm run serve",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "test:wolf": "jest wolf-ai-tests",
-    "test:game": "jest test-game",
-    "check": "./build-quick.sh --check",
-    "dev": "npm run build:quick && npm run serve",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix",
+    "format": "prettier --write \"src/**/*.{js,json,css,md}\"",
     "clean": "rm -rf dist node_modules emsdk public/game_engine.js public/game_engine.wasm coverage test-results",
     "setup": "./build.sh --setup"
   },
@@ -33,17 +33,15 @@
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.28.3",
-    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.6",
-    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
     "@babel/preset-env": "^7.28.3",
-    "@jest/globals": "^30.0.5",
     "babel-jest": "^30.0.5",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
     "http-server": "^14.1.1",
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
-    "jest-html-reporter": "^4.3.0",
-    "jest-junit": "^16.0.0",
-    "jest-watch-typeahead": "^3.0.1",
+    "prettier": "^3.2.5",
     "uglify-js": "^3.17.4"
   },
   "engines": {
@@ -52,5 +50,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/wasm-game-engine.git"
-  }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
 }

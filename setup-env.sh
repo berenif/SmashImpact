@@ -1,87 +1,103 @@
 #!/bin/bash
 
-# Setup script for WASM development environment
-# Run this script to configure Emscripten for building the WASM game engine
+# Environment Setup Script
+# Sets up development environment for WASM Game Engine
 
 set -e
 
-echo "========================================="
-echo "Setting up WASM Development Environment"
-echo "========================================="
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
 
-# Check if Emscripten is already installed
-if [ -d "/workspace/emsdk" ]; then
-    echo "✓ Emscripten SDK found at /workspace/emsdk"
-    
-    # Source the environment
-    echo "Configuring Emscripten environment..."
-    source "/workspace/emsdk/emsdk_env.sh" > /dev/null 2>&1
-    
-    # Verify emcc is available
-    if command -v emcc >/dev/null 2>&1; then
-        echo "✓ Emscripten is properly configured"
-        emcc --version | head -1
+echo -e "${GREEN}=== WASM Game Engine Environment Setup ===${NC}"
+
+# Check Node.js
+check_node() {
+    echo -e "${YELLOW}Checking Node.js...${NC}"
+    if command -v node &> /dev/null; then
+        NODE_VERSION=$(node --version)
+        echo -e "${GREEN}✓ Node.js ${NODE_VERSION} found${NC}"
     else
-        echo "⚠ Emscripten found but emcc not in PATH"
-        echo "Attempting to activate..."
-        cd /workspace/emsdk
-        ./emsdk activate latest
-        source ./emsdk_env.sh
+        echo -e "${RED}✗ Node.js not found. Please install Node.js >= 14.0.0${NC}"
+        exit 1
     fi
-else
-    echo "✗ Emscripten not found. Installing..."
+}
+
+# Check npm
+check_npm() {
+    echo -e "${YELLOW}Checking npm...${NC}"
+    if command -v npm &> /dev/null; then
+        NPM_VERSION=$(npm --version)
+        echo -e "${GREEN}✓ npm ${NPM_VERSION} found${NC}"
+    else
+        echo -e "${RED}✗ npm not found. Please install npm${NC}"
+        exit 1
+    fi
+}
+
+# Install dependencies
+install_dependencies() {
+    echo -e "${YELLOW}Installing Node.js dependencies...${NC}"
+    npm install
+    echo -e "${GREEN}✓ Dependencies installed${NC}"
+}
+
+# Setup Emscripten
+setup_emscripten() {
+    echo -e "${YELLOW}Setting up Emscripten SDK...${NC}"
     
-    # Install Emscripten
-    cd /workspace
-    git clone https://github.com/emscripten-core/emsdk.git
+    if [ -d "emsdk" ]; then
+        echo "Emscripten SDK directory already exists"
+    else
+        echo "Cloning Emscripten SDK..."
+        git clone https://github.com/emscripten-core/emsdk.git
+    fi
+    
     cd emsdk
-    
-    # Fetch and install latest SDK
     ./emsdk install latest
     ./emsdk activate latest
-    
-    # Source the environment
     source ./emsdk_env.sh
+    cd ..
     
-    echo "✓ Emscripten installed successfully"
-fi
+    echo -e "${GREEN}✓ Emscripten SDK setup complete${NC}"
+}
 
-# Check Node.js dependencies
-echo ""
-echo "Checking Node.js dependencies..."
-if [ -f "/workspace/package.json" ]; then
-    if [ ! -d "/workspace/node_modules" ]; then
-        echo "Installing Node.js dependencies..."
-        cd /workspace
-        npm install
+# Create necessary directories
+create_directories() {
+    echo -e "${YELLOW}Creating project directories...${NC}"
+    mkdir -p public/assets
+    mkdir -p public/css
+    mkdir -p public/js
+    mkdir -p wasm/build
+    echo -e "${GREEN}✓ Directories created${NC}"
+}
+
+# Main setup
+main() {
+    check_node
+    check_npm
+    install_dependencies
+    create_directories
+    
+    # Ask about Emscripten
+    read -p "Do you want to install Emscripten SDK? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        setup_emscripten
     else
-        echo "✓ Node.js dependencies already installed"
+        echo -e "${YELLOW}Skipping Emscripten setup. You'll need it to build WASM files.${NC}"
     fi
-else
-    echo "⚠ No package.json found"
-fi
+    
+    echo ""
+    echo -e "${GREEN}=== Setup Complete ===${NC}"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Run 'npm run build' to build the WASM module"
+    echo "  2. Run 'npm run dev' to start development server"
+    echo "  3. Open http://localhost:8080 in your browser"
+    echo ""
+}
 
-# Verify WASM build files
-echo ""
-echo "Checking WASM build system..."
-if [ -f "/workspace/public/game_engine.wasm" ]; then
-    echo "✓ WASM module found: /workspace/public/game_engine.wasm"
-    ls -lh /workspace/public/game_engine.* 2>/dev/null
-else
-    echo "⚠ WASM module not found. Run './build.sh' to compile"
-fi
-
-echo ""
-echo "========================================="
-echo "Environment Setup Complete!"
-echo "========================================="
-echo ""
-echo "To use Emscripten in this shell session, run:"
-echo "  source /workspace/emsdk/emsdk_env.sh"
-echo ""
-echo "To build the WASM module, run:"
-echo "  cd /workspace && ./build.sh"
-echo ""
-echo "For quick builds (JS only), run:"
-echo "  cd /workspace && ./build-quick.sh"
-echo ""
+main

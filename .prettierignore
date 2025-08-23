@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+coverage/
+test-results/
+*.min.js
+*.wasm
+
+# WASM/Emscripten
+emsdk/
+public/game_engine.js
+public/game_engine.wasm
+
+# Generated files
+*.log
+*.tmp
+.DS_Store

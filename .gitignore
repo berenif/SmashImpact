@@ -1,31 +1,47 @@
-# Emscripten SDK - downloaded during build
-emsdk/
-emsdk-install/
-
-# Node modules
+# Dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Build outputs
-*.wasm
-*.wasm.map
-*.js.map
-# Allow compiled WASM modules in public/
-!public/*.wasm
+dist/
+build/
+*.min.js
+*.min.css
 
-# IDE files
+# WASM/Emscripten
+emsdk/
+*.wasm
+*.wast
+*.bc
+public/game_engine.js
+public/game_engine.wasm
+
+# Test coverage
+coverage/
+test-results/
+*.lcov
+.nyc_output/
+
+# IDE
 .vscode/
 .idea/
-
-# OS files
+*.swp
+*.swo
+*~
 .DS_Store
-Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
 
 # Temporary files
 *.tmp
-*.temp
 *.log
+.wasm-setup-complete
 
-# Game assets
-public/assets/*.png
-
-emsdk/
+# OS files
+Thumbs.db
+desktop.ini
