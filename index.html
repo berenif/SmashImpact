@@ -2,335 +2,902 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WASM Game Engine</title>
-    <link rel="stylesheet" href="/src/game/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Isometric RPG</title>
     <style>
-        /* Additional styles for loading screen */
-        #loadingScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            color: white;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
             width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+            height: 100vh;
+        }
+
+        .main-panel {
+            flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            z-index: 10000;
-            font-family: 'Courier New', monospace;
-        }
-        
-        .loading-container {
-            text-align: center;
-            max-width: 400px;
+            justify-content: center;
             padding: 20px;
         }
-        
-        .loading-title {
-            font-size: 2em;
-            color: #00ff88;
-            margin-bottom: 20px;
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+
+        .side-panel {
+            width: 320px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
         }
-        
-        .loading-bar-container {
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #gameCanvas {
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            background: #0a0a0a;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        .stats-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-bar {
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .bar-container {
             width: 100%;
             height: 20px;
             background: rgba(0, 0, 0, 0.3);
-            border: 2px solid #00ff88;
             border-radius: 10px;
             overflow: hidden;
-            margin: 20px 0;
+            position: relative;
         }
-        
-        #loadingBar {
+
+        .bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #00ff88, #00ccff);
-            width: 0%;
             transition: width 0.3s ease;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.7);
+            border-radius: 10px;
         }
-        
-        .loading-text {
-            color: #00ccff;
-            font-size: 14px;
-            margin-top: 10px;
+
+        .health-bar {
+            background: linear-gradient(90deg, #ff3333, #ff6666);
         }
-        
-        .error-message {
+
+        .mana-bar {
+            background: linear-gradient(90deg, #3366ff, #6699ff);
+        }
+
+        .exp-bar {
+            background: linear-gradient(90deg, #33ff33, #66ff66);
+        }
+
+        .inventory {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .inventory-slot {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .inventory-slot:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        .item-icon {
+            font-size: 24px;
+        }
+
+        .item-quantity {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            gap: 5px;
+            justify-content: center;
+            margin: 10px 0;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .message-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 215, 0, 0.5);
+            font-size: 1.1em;
+            text-align: center;
+            max-width: 600px;
+            animation: fadeIn 0.3s;
+            z-index: 100;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .loading {
+            font-size: 1.5em;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .error {
             color: #ff6b6b;
             padding: 20px;
-            text-align: center;
-            font-family: 'Courier New', monospace;
+            background: rgba(255, 0, 0, 0.1);
+            border-radius: 10px;
+            margin: 20px;
         }
-        
-        .btn {
-            background: linear-gradient(135deg, #00ff88, #00ccff);
-            color: #000;
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
             border-radius: 5px;
+            color: white;
+            font-weight: bold;
             cursor: pointer;
-            transition: transform 0.2s;
-            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            margin: 5px;
         }
-        
-        .btn:hover {
-            transform: scale(1.05);
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 1.2em;
+            margin: 15px 0 10px 0;
+            color: #FFD700;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .gold-display {
+            font-size: 1.2em;
+            color: #FFD700;
+            margin: 10px 0;
+        }
+
+        .minimap {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #minimapCanvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
         }
     </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loadingScreen">
-        <div class="loading-container">
-            <h1 class="loading-title">WASM Game Engine</h1>
-            <div class="loading-bar-container">
-                <div id="loadingBar"></div>
-            </div>
-            <div class="loading-text">Initializing WebAssembly...</div>
-        </div>
-    </div>
-    
-    <!-- Game Container -->
-    <div id="gameContainer" style="display: none;">
-        <!-- Main Game Canvas -->
-        <canvas id="gameCanvas"></canvas>
-        
-        <!-- Minimap Canvas -->
-        <canvas id="minimapCanvas"></canvas>
-        
-        <!-- UI Overlay -->
-        <div id="uiOverlay">
-            <!-- Health Bar -->
-            <div class="health-container">
-                <div class="health-bar">
-                    <div id="healthFill" class="health-fill"></div>
-                </div>
-                <span id="healthText" class="health-text">100/100</span>
-            </div>
+    <div class="game-container">
+        <div class="main-panel">
+            <h1>⚔️ Isometric RPG</h1>
             
-            <!-- Energy Bar -->
-            <div class="energy-container">
-                <div class="energy-bar">
-                    <div id="energyFill" class="energy-fill"></div>
-                </div>
-                <span id="energyText" class="energy-text">100/100</span>
-            </div>
+            <div id="loadingMessage" class="loading">Loading WASM module...</div>
+            <div id="errorMessage" class="error" style="display: none;"></div>
             
-            <!-- Score Display -->
-            <div id="scoreDisplay" class="score-display">
-                Score: <span id="scoreValue">0</span>
-            </div>
+            <canvas id="gameCanvas" width="900" height="600" style="display: none;"></canvas>
             
-            <!-- Wave Display -->
-            <div id="waveDisplay" class="wave-display">
-                Wave: <span id="waveValue">1</span>
-            </div>
-            
-            <!-- FPS Counter -->
-            <div id="fpsCounter" class="fps-counter">
-                FPS: <span id="fpsValue">0</span>
-            </div>
+            <div id="messageBox" class="message-box" style="display: none;"></div>
         </div>
         
-        <!-- Mobile Controls (hidden by default) -->
-        <div id="mobileControls" style="display: none;">
-            <!-- Virtual Joystick -->
-            <div id="joystickContainer" class="joystick-container">
-                <div id="joystickBase" class="joystick-base">
-                    <div id="joystickHandle" class="joystick-handle"></div>
+        <div class="side-panel" id="sidePanel" style="display: none;">
+            <div class="stats-container">
+                <h3 class="section-title">Character Stats</h3>
+                
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>Health</span>
+                        <span id="healthText">100/100</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill health-bar" id="healthBar" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>Mana</span>
+                        <span id="manaText">50/50</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill mana-bar" id="manaBar" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <div class="stat-bar">
+                    <div class="stat-label">
+                        <span>Experience</span>
+                        <span id="expText">0/100</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar-fill exp-bar" id="expBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <div>Level: <span id="level">1</span></div>
+                    <div>Attack: <span id="attack">10</span></div>
+                    <div>Defense: <span id="defense">5</span></div>
+                    <div class="gold-display">💰 Gold: <span id="gold">0</span></div>
                 </div>
             </div>
             
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-                <button id="attackBtn" class="action-btn attack-btn">⚔️</button>
-                <button id="blockBtn" class="action-btn block-btn">🛡️</button>
-                <button id="rollBtn" class="action-btn roll-btn">💨</button>
-                <button id="targetBtn" class="action-btn target-btn">🎯</button>
+            <div class="stats-container">
+                <h3 class="section-title">Inventory</h3>
+                <div class="inventory" id="inventory"></div>
             </div>
-        </div>
-        
-        <!-- Pause Menu -->
-        <div id="pauseMenu" class="pause-menu" style="display: none;">
-            <div class="pause-content">
-                <h2>Game Paused</h2>
-                <button id="resumeBtn" class="menu-btn">Resume</button>
-                <button id="restartBtn" class="menu-btn">Restart</button>
-                <button id="settingsBtn" class="menu-btn">Settings</button>
-                <button id="quitBtn" class="menu-btn">Quit</button>
+            
+            <div class="controls">
+                <h3 class="section-title">Controls</h3>
+                <div class="control-grid">
+                    <div></div>
+                    <button class="control-btn" onclick="movePlayer(0, -1)">↑</button>
+                    <div></div>
+                    <button class="control-btn" onclick="movePlayer(-1, 0)">←</button>
+                    <button class="control-btn" onclick="enterDungeon()">🏰</button>
+                    <button class="control-btn" onclick="movePlayer(1, 0)">→</button>
+                    <div></div>
+                    <button class="control-btn" onclick="movePlayer(0, 1)">↓</button>
+                    <div></div>
+                </div>
+                <div style="margin-top: 10px; text-align: center;">
+                    <small>Use WASD or Arrow Keys to move</small><br>
+                    <small>Click items to use them</small>
+                </div>
             </div>
-        </div>
-        
-        <!-- Game Over Screen -->
-        <div id="gameOverScreen" class="game-over-screen" style="display: none;">
-            <div class="game-over-content">
-                <h1>Game Over</h1>
-                <p>Final Score: <span id="finalScore">0</span></p>
-                <p>Waves Survived: <span id="finalWave">0</span></p>
-                <button id="retryBtn" class="menu-btn">Try Again</button>
-                <button id="mainMenuBtn" class="menu-btn">Main Menu</button>
+            
+            <div class="minimap">
+                <canvas id="minimapCanvas"></canvas>
             </div>
         </div>
     </div>
-    
-    <!-- Main Game Script -->
-    <script type="module">
-        import { Game } from './src/game/game-core.js';
+
+    <script>
+        // Game variables
+        let wasmModule = null;
+        let canvas = null;
+        let ctx = null;
+        let minimapCanvas = null;
+        let minimapCtx = null;
         
-        // Global game instance
-        let game = null;
+        // WASM functions
+        let initGame = null;
+        let playerMove = null;
+        let useItem = null;
+        let getRenderData = null;
+        let getPlayerStats = null;
+        let getInventory = null;
+        let getMessage = null;
+        let enterDungeonWASM = null;
+        
+        // Tile size for isometric rendering
+        const TILE_WIDTH = 64;
+        const TILE_HEIGHT = 32;
+        
+        // Sprite definitions (using emojis and colors for simplicity)
+        const TILE_SPRITES = {
+            0: { color: '#4a7c59', name: 'Grass' },     // TILE_GRASS
+            1: { color: '#5a5a5a', name: 'Stone' },     // TILE_STONE
+            2: { color: '#2e86de', name: 'Water' },     // TILE_WATER
+            3: { color: '#27ae60', name: 'Tree', emoji: '🌲' },      // TILE_TREE
+            4: { color: '#7f8c8d', name: 'Wall' },      // TILE_WALL
+            5: { color: '#8b6914', name: 'Door', emoji: '🚪' },      // TILE_DOOR
+            6: { color: '#8b4513', name: 'Chest', emoji: '📦' },     // TILE_CHEST
+            7: { color: '#a0826d', name: 'Floor' },      // TILE_FLOOR
+            8: { color: '#95a5a6', name: 'Mountain', emoji: '⛰️' },  // TILE_MOUNTAIN
+            9: { color: '#f4e4c1', name: 'Sand' },       // TILE_SAND
+            10: { color: '#8b4513', name: 'Bridge' },    // TILE_BRIDGE
+            11: { color: '#2c3e50', name: 'Dungeon Floor' }, // TILE_DUNGEON_FLOOR
+            12: { color: '#1a1a1a', name: 'Dungeon Wall' }   // TILE_DUNGEON_WALL
+        };
+        
+        const ENTITY_SPRITES = {
+            1: '🧙',  // Player
+            2: '👹',  // Enemy
+            3: '👤',  // NPC
+            4: '✨',  // Item
+            5: '📦',  // Chest
+            6: '🌀'   // Portal
+        };
+        
+        const ENEMY_SPRITES = {
+            0: '👺',  // Goblin
+            1: '👹',  // Orc
+            2: '💀',  // Skeleton
+            3: '🐉',  // Dragon
+            4: '🐺',  // Wolf
+            5: '🗡️'   // Bandit
+        };
+        
+        const ITEM_SPRITES = {
+            1: '⚔️',   // Sword
+            2: '🛡️',   // Shield
+            3: '🧪',   // Potion
+            4: '🗝️',   // Key
+            5: '💰',   // Gold
+            6: '🏹',   // Bow
+            7: '➳',    // Arrow
+            8: '🎽',   // Armor
+            9: '📖',   // Spell Book
+            10: '🍖'   // Food
+        };
+        
+        // Convert grid coordinates to isometric screen coordinates
+        function gridToIso(x, y) {
+            const isoX = (x - y) * (TILE_WIDTH / 2);
+            const isoY = (x + y) * (TILE_HEIGHT / 2);
+            return { x: isoX, y: isoY };
+        }
         
         // Initialize the game
-        async function initGame() {
+        async function init() {
             try {
-                console.log('Starting game initialization...');
+                // Load WASM module
+                wasmModule = await createRPGModule();
                 
-                // Create game instance
-                game = new Game();
+                // Wrap WASM functions
+                initGame = wasmModule.cwrap('init_game', null, []);
+                playerMove = wasmModule.cwrap('player_move', null, ['number', 'number']);
+                useItem = wasmModule.cwrap('use_item', null, ['number']);
+                getPlayerStats = wasmModule.cwrap('get_player_stats', null, ['number']);
+                getInventory = wasmModule.cwrap('get_inventory', null, ['number']);
+                getMessage = wasmModule.cwrap('get_message', 'string', []);
+                enterDungeonWASM = wasmModule.cwrap('enter_dungeon', null, []);
                 
-                // Initialize the game
-                const success = await game.initialize('gameCanvas', 'minimapCanvas');
+                // Custom wrapper for getRenderData
+                getRenderData = function() {
+                    const bufferSize = 10000; // Sufficient for our needs
+                    const buffer = wasmModule._malloc(bufferSize * 4);
+                    wasmModule.ccall('get_render_data', null, ['number'], [buffer]);
+                    
+                    const data = [];
+                    for (let i = 0; i < bufferSize; i++) {
+                        data.push(wasmModule.HEAP32[buffer / 4 + i]);
+                    }
+                    
+                    wasmModule._free(buffer);
+                    return data;
+                };
                 
-                if (success) {
-                    console.log('✅ Game initialized successfully');
-                    
-                    // Hide loading screen
-                    document.getElementById('loadingScreen').style.display = 'none';
-                    
-                    // Show game container
-                    document.getElementById('gameContainer').style.display = 'block';
-                    
-                    // Start the game
-                    game.start();
-                    
-                    // Setup UI event listeners
-                    setupUIListeners();
-                    
-                } else {
-                    throw new Error('Game initialization failed');
-                }
+                // Setup canvases
+                canvas = document.getElementById('gameCanvas');
+                ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                
+                minimapCanvas = document.getElementById('minimapCanvas');
+                minimapCtx = minimapCanvas.getContext('2d');
+                minimapCanvas.width = 280;
+                minimapCanvas.height = 150;
+                
+                // Initialize game
+                initGame();
+                
+                // Hide loading and show game
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('gameCanvas').style.display = 'block';
+                document.getElementById('sidePanel').style.display = 'block';
+                
+                // Start render loop
+                requestAnimationFrame(gameLoop);
                 
             } catch (error) {
-                console.error('Failed to initialize game:', error);
-                showError(error.message);
+                showError('Failed to load WASM module: ' + error.message);
             }
-        }
-        
-        // Setup UI event listeners
-        function setupUIListeners() {
-            // Pause/Resume
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    togglePause();
-                }
-            });
-            
-            // Pause menu buttons
-            const resumeBtn = document.getElementById('resumeBtn');
-            if (resumeBtn) {
-                resumeBtn.addEventListener('click', () => {
-                    togglePause();
-                });
-            }
-            
-            const restartBtn = document.getElementById('restartBtn');
-            if (restartBtn) {
-                restartBtn.addEventListener('click', () => {
-                    restartGame();
-                });
-            }
-            
-            // Game over buttons
-            const retryBtn = document.getElementById('retryBtn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    restartGame();
-                });
-            }
-        }
-        
-        // Toggle pause state
-        function togglePause() {
-            if (!game) return;
-            
-            const pauseMenu = document.getElementById('pauseMenu');
-            if (game.isPaused) {
-                game.resume();
-                pauseMenu.style.display = 'none';
-            } else {
-                game.pause();
-                pauseMenu.style.display = 'flex';
-            }
-        }
-        
-        // Restart the game
-        async function restartGame() {
-            if (game) {
-                game.cleanup();
-            }
-            
-            // Hide menus
-            document.getElementById('pauseMenu').style.display = 'none';
-            document.getElementById('gameOverScreen').style.display = 'none';
-            
-            // Reinitialize
-            await initGame();
         }
         
         // Show error message
         function showError(message) {
-            const loadingScreen = document.getElementById('loadingScreen');
-            if (loadingScreen) {
-                loadingScreen.innerHTML = `
-                    <div class="error-message">
-                        <h2>Failed to Load Game</h2>
-                        <p>${message}</p>
-                        <button class="btn" onclick="location.reload()">Retry</button>
-                    </div>
-                `;
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+        
+        // Render the game
+        function render() {
+            if (!ctx || !getRenderData) return;
+            
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Get render data from WASM
+            const data = getRenderData();
+            let index = 0;
+            
+            const viewportWidth = data[index++];
+            const viewportHeight = data[index++];
+            const cameraX = data[index++];
+            const cameraY = data[index++];
+            
+            // Calculate offset to center the view
+            const offsetX = canvas.width / 2;
+            const offsetY = 100;
+            
+            // Collect all tiles and entities for proper depth sorting
+            const renderables = [];
+            
+            // Parse tiles
+            for (let y = 0; y < viewportHeight; y++) {
+                for (let x = 0; x < viewportWidth; x++) {
+                    const tileType = data[index++];
+                    const height = data[index++];
+                    const visibility = data[index++];
+                    
+                    if (visibility > 0) {
+                        renderables.push({
+                            type: 'tile',
+                            x: x,
+                            y: y,
+                            worldX: cameraX + x,
+                            worldY: cameraY + y,
+                            tileType: tileType,
+                            height: height,
+                            visibility: visibility,
+                            depth: (x + y) * 1000 + height
+                        });
+                    }
+                }
+            }
+            
+            // Parse entities
+            const entityCount = data[index++];
+            for (let i = 0; i < entityCount; i++) {
+                const entityType = data[index++];
+                const x = data[index++];
+                const y = data[index++];
+                const facing = data[index++];
+                const health = data[index++];
+                const maxHealth = data[index++];
+                const enemyType = data[index++];
+                
+                renderables.push({
+                    type: 'entity',
+                    x: x,
+                    y: y,
+                    entityType: entityType,
+                    facing: facing,
+                    health: health,
+                    maxHealth: maxHealth,
+                    enemyType: enemyType,
+                    depth: (x + y) * 1000 + 500
+                });
+            }
+            
+            // Parse items
+            const itemCount = data[index++];
+            for (let i = 0; i < itemCount; i++) {
+                const itemType = data[index++];
+                const x = data[index++];
+                const y = data[index++];
+                
+                renderables.push({
+                    type: 'item',
+                    x: x,
+                    y: y,
+                    itemType: itemType,
+                    depth: (x + y) * 1000 + 250
+                });
+            }
+            
+            // Sort by depth for proper rendering order
+            renderables.sort((a, b) => a.depth - b.depth);
+            
+            // Render everything
+            for (const obj of renderables) {
+                const iso = gridToIso(obj.x, obj.y);
+                const screenX = offsetX + iso.x;
+                const screenY = offsetY + iso.y;
+                
+                if (obj.type === 'tile') {
+                    // Draw tile
+                    const tile = TILE_SPRITES[obj.tileType] || TILE_SPRITES[0];
+                    
+                    // Apply fog of war
+                    const alpha = obj.visibility === 1 ? 1.0 : 0.4;
+                    ctx.globalAlpha = alpha;
+                    
+                    // Draw tile diamond
+                    ctx.fillStyle = tile.color;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY);
+                    ctx.lineTo(screenX + TILE_WIDTH/2, screenY + TILE_HEIGHT/2);
+                    ctx.lineTo(screenX, screenY + TILE_HEIGHT);
+                    ctx.lineTo(screenX - TILE_WIDTH/2, screenY + TILE_HEIGHT/2);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Draw tile border
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    
+                    // Draw height effect
+                    if (obj.height > 0) {
+                        const heightOffset = obj.height * 2;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                        ctx.beginPath();
+                        ctx.moveTo(screenX - TILE_WIDTH/2, screenY + TILE_HEIGHT/2);
+                        ctx.lineTo(screenX - TILE_WIDTH/2, screenY + TILE_HEIGHT/2 + heightOffset);
+                        ctx.lineTo(screenX, screenY + TILE_HEIGHT + heightOffset);
+                        ctx.lineTo(screenX, screenY + TILE_HEIGHT);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(screenX, screenY + TILE_HEIGHT);
+                        ctx.lineTo(screenX, screenY + TILE_HEIGHT + heightOffset);
+                        ctx.lineTo(screenX + TILE_WIDTH/2, screenY + TILE_HEIGHT/2 + heightOffset);
+                        ctx.lineTo(screenX + TILE_WIDTH/2, screenY + TILE_HEIGHT/2);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    
+                    // Draw tile emoji if exists
+                    if (tile.emoji) {
+                        ctx.font = '24px serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(tile.emoji, screenX, screenY + TILE_HEIGHT/2);
+                    }
+                    
+                } else if (obj.type === 'entity') {
+                    ctx.globalAlpha = 1.0;
+                    
+                    // Choose sprite based on entity type
+                    let sprite = ENTITY_SPRITES[obj.entityType];
+                    if (obj.entityType === 2) { // Enemy
+                        sprite = ENEMY_SPRITES[obj.enemyType] || '👹';
+                    }
+                    
+                    // Draw entity
+                    ctx.font = '32px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(sprite, screenX, screenY + TILE_HEIGHT/2);
+                    
+                    // Draw health bar for enemies
+                    if (obj.entityType === 2) {
+                        const barWidth = 40;
+                        const barHeight = 4;
+                        const barY = screenY - 10;
+                        
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                        ctx.fillRect(screenX - barWidth/2, barY, barWidth, barHeight);
+                        
+                        const healthPercent = obj.health / obj.maxHealth;
+                        ctx.fillStyle = healthPercent > 0.5 ? '#4CAF50' : 
+                                       healthPercent > 0.25 ? '#FFC107' : '#F44336';
+                        ctx.fillRect(screenX - barWidth/2, barY, barWidth * healthPercent, barHeight);
+                    }
+                    
+                } else if (obj.type === 'item') {
+                    ctx.globalAlpha = 1.0;
+                    
+                    // Draw item
+                    const sprite = ITEM_SPRITES[obj.itemType] || '✨';
+                    ctx.font = '20px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Add glow effect for items
+                    ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+                    ctx.shadowBlur = 10;
+                    ctx.fillText(sprite, screenX, screenY + TILE_HEIGHT/2);
+                    ctx.shadowBlur = 0;
+                }
+            }
+            
+            ctx.globalAlpha = 1.0;
+            
+            // Update minimap
+            updateMinimap(data, viewportWidth, viewportHeight, cameraX, cameraY);
+        }
+        
+        // Update minimap
+        function updateMinimap(data, viewportWidth, viewportHeight, cameraX, cameraY) {
+            const scale = 3;
+            minimapCtx.fillStyle = '#000';
+            minimapCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+            
+            let index = 4; // Skip viewport info
+            
+            // Draw tiles
+            for (let y = 0; y < viewportHeight; y++) {
+                for (let x = 0; x < viewportWidth; x++) {
+                    const tileType = data[index++];
+                    const height = data[index++];
+                    const visibility = data[index++];
+                    
+                    if (visibility > 0) {
+                        const tile = TILE_SPRITES[tileType] || TILE_SPRITES[0];
+                        minimapCtx.fillStyle = visibility === 1 ? tile.color : 
+                                              `${tile.color}66`;
+                        minimapCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
+                }
+            }
+            
+            // Draw player position
+            minimapCtx.fillStyle = '#FFD700';
+            minimapCtx.fillRect(
+                Math.floor(viewportWidth/2) * scale - 1,
+                Math.floor(viewportHeight/2) * scale - 1,
+                scale + 2,
+                scale + 2
+            );
+        }
+        
+        // Update UI
+        function updateUI() {
+            if (!getPlayerStats || !getInventory) return;
+            
+            // Get player stats
+            const statsBuffer = wasmModule._malloc(12 * 4);
+            getPlayerStats(statsBuffer);
+            
+            const stats = [];
+            for (let i = 0; i < 12; i++) {
+                stats.push(wasmModule.HEAP32[statsBuffer / 4 + i]);
+            }
+            wasmModule._free(statsBuffer);
+            
+            // Update stat displays
+            const [health, maxHealth, mana, maxMana, attack, defense, 
+                   level, experience, gold, turnCount, gameOver, victory] = stats;
+            
+            document.getElementById('healthText').textContent = `${health}/${maxHealth}`;
+            document.getElementById('healthBar').style.width = `${(health/maxHealth)*100}%`;
+            
+            document.getElementById('manaText').textContent = `${mana}/${maxMana}`;
+            document.getElementById('manaBar').style.width = `${(mana/maxMana)*100}%`;
+            
+            const expNeeded = level * 100;
+            document.getElementById('expText').textContent = `${experience}/${expNeeded}`;
+            document.getElementById('expBar').style.width = `${(experience/expNeeded)*100}%`;
+            
+            document.getElementById('level').textContent = level;
+            document.getElementById('attack').textContent = attack;
+            document.getElementById('defense').textContent = defense;
+            document.getElementById('gold').textContent = gold;
+            
+            // Update inventory
+            const invBuffer = wasmModule._malloc(20 * 3 * 4);
+            getInventory(invBuffer);
+            
+            const inventory = [];
+            for (let i = 0; i < 20; i++) {
+                inventory.push({
+                    type: wasmModule.HEAP32[invBuffer / 4 + i * 3],
+                    quantity: wasmModule.HEAP32[invBuffer / 4 + i * 3 + 1],
+                    power: wasmModule.HEAP32[invBuffer / 4 + i * 3 + 2]
+                });
+            }
+            wasmModule._free(invBuffer);
+            
+            // Render inventory
+            const invContainer = document.getElementById('inventory');
+            invContainer.innerHTML = '';
+            
+            for (let i = 0; i < 20; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'inventory-slot';
+                slot.onclick = () => useItemSlot(i);
+                
+                if (inventory[i].type > 0) {
+                    const icon = document.createElement('div');
+                    icon.className = 'item-icon';
+                    icon.textContent = ITEM_SPRITES[inventory[i].type] || '📦';
+                    slot.appendChild(icon);
+                    
+                    if (inventory[i].quantity > 1) {
+                        const qty = document.createElement('div');
+                        qty.className = 'item-quantity';
+                        qty.textContent = inventory[i].quantity;
+                        slot.appendChild(qty);
+                    }
+                    
+                    slot.title = `Power: ${inventory[i].power}`;
+                }
+                
+                invContainer.appendChild(slot);
+            }
+            
+            // Show message
+            const message = getMessage();
+            if (message) {
+                showMessage(message);
+            }
+            
+            // Check game over
+            if (gameOver) {
+                showMessage('GAME OVER - You have been defeated! Press F5 to restart.');
+            } else if (victory) {
+                showMessage('VICTORY! You have completed the game!');
             }
         }
         
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', () => {
-            if (game) {
-                if (document.hidden) {
-                    game.pause();
-                } else {
-                    // Don't auto-resume, let user decide
-                }
+        // Show message
+        let messageTimeout = null;
+        function showMessage(text) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = text;
+            messageBox.style.display = 'block';
+            
+            if (messageTimeout) clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Game loop
+        function gameLoop() {
+            render();
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Player movement
+        function movePlayer(dx, dy) {
+            if (playerMove) {
+                playerMove(dx, dy);
+            }
+        }
+        
+        // Use item
+        function useItemSlot(slot) {
+            if (useItem) {
+                useItem(slot);
+            }
+        }
+        
+        // Enter dungeon
+        function enterDungeon() {
+            if (enterDungeonWASM) {
+                enterDungeonWASM();
+                showMessage('Entering the dungeon...');
+            }
+        }
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'w':
+                case 'arrowup':
+                    e.preventDefault();
+                    movePlayer(0, -1);
+                    break;
+                case 's':
+                case 'arrowdown':
+                    e.preventDefault();
+                    movePlayer(0, 1);
+                    break;
+                case 'a':
+                case 'arrowleft':
+                    e.preventDefault();
+                    movePlayer(-1, 0);
+                    break;
+                case 'd':
+                case 'arrowright':
+                    e.preventDefault();
+                    movePlayer(1, 0);
+                    break;
+                case 'e':
+                    e.preventDefault();
+                    enterDungeon();
+                    break;
             }
         });
         
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            if (game && game.renderer) {
-                game.renderer.handleResize();
-            }
-        });
+        // Load the WASM module script
+        const script = document.createElement('script');
+        script.src = 'rpg_game.js';
+        script.onload = init;
+        script.onerror = () => showError('Failed to load rpg_game.js. Please compile the WASM module first.');
         
-        // Prevent context menu on game canvas
-        document.addEventListener('contextmenu', (e) => {
-            if (e.target.tagName === 'CANVAS') {
-                e.preventDefault();
-            }
-        });
+
         
-        // Start the game when the page loads
-        window.addEventListener('load', initGame);
-        
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (game) {
-                game.cleanup();
-            }
-        });
+        document.body.appendChild(script);
     </script>
 </body>
 </html>

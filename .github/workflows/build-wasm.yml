@@ -1,0 +1,77 @@
+name: Build WASM and Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'rpg_game.c'
+      - '.github/workflows/build-wasm.yml'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v12
+      with:
+        version: 'latest'
+        
+    - name: Verify Emscripten
+      run: emcc -v
+      
+    - name: Build WASM module
+      run: |
+        echo "Building RPG game WASM module..."
+        emcc rpg_game.c -o rpg_game.js \
+          -s WASM=1 \
+          -s EXPORTED_FUNCTIONS='["_init_game", "_player_move", "_use_item", "_get_render_data", "_get_player_stats", "_get_inventory", "_get_message", "_enter_dungeon", "_malloc", "_free"]' \
+          -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap", "UTF8ToString"]' \
+          -s MODULARIZE=1 \
+          -s EXPORT_NAME='createRPGModule' \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -O2
+        
+        echo "Build complete!"
+        ls -la rpg_game.*
+        
+    - name: Commit and push if changed
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add rpg_game.js rpg_game.wasm
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update WASM build [skip ci]" && git push)
+        
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
+        
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+      
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: '.'
+        
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
