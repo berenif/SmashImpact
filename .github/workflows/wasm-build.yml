@@ -87,6 +87,7 @@ jobs:
           em++ $SOURCES \
             $INCLUDES \
             -O3 \
+            -msimd128 \
             -s WASM=1 \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
             -s ALLOW_MEMORY_GROWTH=1 \

@@ -27,6 +27,7 @@ echo "Compiling Wolf AI WASM module..."
 em++ $SOURCES \
     $INCLUDES \
     -O3 \
+    -msimd128 \
     -s WASM=1 \
     -s MODULARIZE=1 \
     -s EXPORT_NAME="WolfAIModule" \
