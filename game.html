@@ -450,6 +450,138 @@
             border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
+        /* Game Over Screen Styles */
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        #gameOverScreen.show {
+            display: flex;
+        }
+
+        .game-over-content {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .game-over-title {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .final-stats {
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .stat-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .stat-label {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 300;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .game-over-buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary, .btn-secondary {
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
         #performanceStats {
             position: absolute;
             top: 10px;
@@ -480,6 +612,36 @@
             .btn {
                 padding: 15px 40px;
                 font-size: 16px;
+            }
+            
+            /* Game Over Screen Mobile Adjustments */
+            .game-over-title {
+                font-size: 36px;
+            }
+            
+            .game-over-content {
+                padding: 30px 20px;
+                width: 95%;
+            }
+            
+            .stat-label {
+                font-size: 14px;
+            }
+            
+            .stat-value {
+                font-size: 18px;
+            }
+            
+            .btn-primary, .btn-secondary {
+                padding: 12px 25px;
+                font-size: 14px;
+                width: 100%;
+                max-width: 200px;
+            }
+            
+            .game-over-buttons {
+                flex-direction: column;
+                align-items: center;
             }
         }
     </style>
@@ -596,6 +758,31 @@
         <button class="btn" onclick="Game.resume()">Resume</button>
         <button class="btn" onclick="Game.restart()">Restart</button>
         <button class="btn" onclick="Game.quit()">Quit</button>
+    </div>
+    
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen">
+        <div class="game-over-content">
+            <h1 class="game-over-title">GAME OVER</h1>
+            <div class="final-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Final Score</span>
+                    <span class="stat-value" id="finalScore">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Waves Survived</span>
+                    <span class="stat-value" id="finalWave">1</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Enemies Defeated</span>
+                    <span class="stat-value" id="enemiesDefeated">0</span>
+                </div>
+            </div>
+            <div class="game-over-buttons">
+                <button class="btn-primary" onclick="Game.newGame()">New Game</button>
+                <button class="btn-secondary" onclick="Game.showMainMenu()">Main Menu</button>
+            </div>
+        </div>
     </div>
     
     <!-- Load WASM and Game Scripts -->
@@ -1263,6 +1450,9 @@
         
         // Initialize game
         function initGame() {
+            // Reset game over state
+            Game.isGameOver = false;
+            
             // Clear wolves - WASM ONLY
             Game.wolves = [];
             wolfManager.clearWolves();
@@ -1523,6 +1713,11 @@
             // Don't update if game failed to initialize
             if (!Game.initialized) return;
             
+            // Award survival points over time (1 point per second)
+            if (Game.running && !Game.paused && !Game.isGameOver) {
+                Game.score += Math.floor(dt / 1000);
+            }
+            
             // Handle input
             handleInput();
             
@@ -1578,6 +1773,11 @@
                     const enemies = entities.filter(e => e.type === 'enemy' || e.type === 'wolf');
                     const livingWolves = Game.wolves.filter(w => w.health > 0);
                     if (enemies.length === 0 && livingWolves.length === 0) {
+                        // Award points for completing wave
+                        const waveBonus = Game.wave * 100;
+                        Game.score += waveBonus;
+                        Game.enemiesDefeated += (5 + Game.wave * 2); // Enemies spawned per wave
+                        
                         Game.wave++;
                         spawnWave(Game.wave);
                     }
@@ -1591,6 +1791,9 @@
             
             // Update HUD
             updateHUD();
+            
+            // Check for game over condition
+            Game.checkGameOver();
         }
         
         // JavaScript update function
@@ -1906,6 +2109,94 @@
             document.getElementById('gameUI').style.display = 'none';
             document.getElementById('mobileControls').style.display = 'none';
             document.getElementById('mainMenu').style.display = 'flex';
+        };
+        
+        // Game Over handling
+        Game.enemiesDefeated = 0;
+        Game.isGameOver = false;
+        
+        // Show game over screen
+        Game.showGameOver = function() {
+            if (Game.isGameOver) return; // Prevent multiple game over screens
+            
+            Game.isGameOver = true;
+            Game.running = false;
+            Game.paused = true;
+            
+            // Update final stats
+            document.getElementById('finalScore').textContent = Game.score || 0;
+            document.getElementById('finalWave').textContent = Game.wave || 1;
+            document.getElementById('enemiesDefeated').textContent = Game.enemiesDefeated || 0;
+            
+            // Hide other UI elements
+            document.getElementById('pauseMenu').style.display = 'none';
+            
+            // Show game over screen with animation
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            gameOverScreen.classList.add('show');
+            
+            // Play game over sound if available
+            if (Game.sounds && Game.sounds.gameOver) {
+                Game.sounds.gameOver.play();
+            }
+        };
+        
+        // Start new game from game over screen
+        Game.newGame = function() {
+            // Hide game over screen
+            document.getElementById('gameOverScreen').classList.remove('show');
+            
+            // Reset game state
+            Game.isGameOver = false;
+            Game.enemiesDefeated = 0;
+            Game.score = 0;
+            Game.wave = 1;
+            
+            // Restart the game
+            initGame();
+            Game.running = true;
+            Game.paused = false;
+        };
+        
+        // Show main menu from game over screen
+        Game.showMainMenu = function() {
+            // Hide game over screen
+            document.getElementById('gameOverScreen').classList.remove('show');
+            
+            // Reset game state
+            Game.isGameOver = false;
+            Game.enemiesDefeated = 0;
+            Game.score = 0;
+            Game.wave = 1;
+            
+            // Return to main menu
+            Game.running = false;
+            Game.paused = false;
+            document.getElementById('gameUI').style.display = 'none';
+            document.getElementById('mobileControls').style.display = 'none';
+            document.getElementById('mainMenu').style.display = 'flex';
+        };
+        
+        // Check for game over condition
+        Game.checkGameOver = function() {
+            if (Game.isGameOver) return;
+            
+            let playerHealth = 0;
+            
+            // Get player health from WASM engine or JavaScript fallback
+            if (Game.engine && Game.engine.getPlayerState) {
+                const playerState = Game.engine.getPlayerState();
+                if (playerState) {
+                    playerHealth = playerState.health || 0;
+                }
+            } else if (Game.player) {
+                playerHealth = Game.player.health || 0;
+            }
+            
+            // Trigger game over if health is 0 or below
+            if (playerHealth <= 0) {
+                Game.showGameOver();
+            }
         };
         
         // Show settings
