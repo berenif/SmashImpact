@@ -989,6 +989,9 @@
                     return;
                 }
                 
+                // Enter fullscreen and lock to landscape mode
+                enterFullscreenAndLockLandscape();
+                
                 // Hide start screen
                 document.getElementById('startScreen').style.display = 'none';
                 
@@ -1352,6 +1355,78 @@
             const warning = document.getElementById('orientationWarning');
             if (warning) {
                 warning.classList.remove('visible');
+            }
+        }
+        
+        // Function to enter fullscreen and lock to landscape when starting game
+        function enterFullscreenAndLockLandscape() {
+            const elem = document.documentElement;
+            
+            // Request fullscreen
+            let fullscreenPromise;
+            if (elem.requestFullscreen) {
+                fullscreenPromise = elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                fullscreenPromise = elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                fullscreenPromise = elem.mozRequestFullScreen();
+            } else if (elem.msRequestFullscreen) {
+                fullscreenPromise = elem.msRequestFullscreen();
+            }
+            
+            // Handle fullscreen promise
+            if (fullscreenPromise && typeof fullscreenPromise.then === 'function') {
+                fullscreenPromise.then(() => {
+                    console.log('Entered fullscreen mode');
+                    
+                    // Lock orientation to landscape after entering fullscreen
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').then(() => {
+                            console.log('Locked to landscape orientation');
+                        }).catch(err => {
+                            console.log('Could not lock orientation:', err);
+                            // Try alternative methods for mobile browsers
+                            tryAlternativeOrientationLock();
+                        });
+                    } else {
+                        // Try alternative methods if screen.orientation is not available
+                        tryAlternativeOrientationLock();
+                    }
+                }).catch(err => {
+                    console.log('Could not enter fullscreen:', err);
+                    // Continue without fullscreen if it fails
+                });
+            } else {
+                // For browsers that don't return a promise
+                console.log('Fullscreen requested (no promise support)');
+                setTimeout(() => {
+                    tryAlternativeOrientationLock();
+                }, 100);
+            }
+            
+            // Update device detector
+            deviceDetector.isFullscreen = true;
+            deviceDetector.landscapeLocked = true;
+            deviceDetector.updateBodyClasses();
+        }
+        
+        // Helper function to try alternative orientation lock methods
+        function tryAlternativeOrientationLock() {
+            if (window.screen && window.screen.lockOrientation) {
+                try {
+                    window.screen.lockOrientation('landscape');
+                    console.log('Locked orientation using screen.lockOrientation');
+                } catch(e) {}
+            } else if (window.screen && window.screen.mozLockOrientation) {
+                try {
+                    window.screen.mozLockOrientation('landscape');
+                    console.log('Locked orientation using screen.mozLockOrientation');
+                } catch(e) {}
+            } else if (window.screen && window.screen.msLockOrientation) {
+                try {
+                    window.screen.msLockOrientation('landscape');
+                    console.log('Locked orientation using screen.msLockOrientation');
+                } catch(e) {}
             }
         }
         

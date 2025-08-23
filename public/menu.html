@@ -657,12 +657,7 @@
       lastTouchEnd = now;
     }, false);
 
-    // Handle orientation change
-    window.addEventListener('orientationchange', () => {
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 100);
-    });
+
 
     // Register service worker for offline support
     if ('serviceWorker' in navigator) {
