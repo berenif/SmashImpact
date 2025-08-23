@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Snake Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .score, .high-score {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        #gameCanvas {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: #1a1a2e;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1em;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .game-over-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .game-over-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .game-over-content h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .game-over-content p {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .instructions h3 {
+            margin-bottom: 10px;
+        }
+
+        .instructions p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+
+        .loading {
+            font-size: 1.5em;
+            margin: 20px;
+        }
+
+        .error {
+            color: #ff6b6b;
+            padding: 20px;
+            background: rgba(255, 0, 0, 0.1);
+            border-radius: 10px;
+            margin: 20px;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🐍 WASM Snake Game</h1>
+        
+        <div id="loadingMessage" class="loading">Loading WASM module...</div>
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div id="gameContent" style="display: none;">
+            <div class="game-info">
+                <div class="score">Score: <span id="score">0</span></div>
+                <div class="high-score">High Score: <span id="highScore">0</span></div>
+            </div>
+            
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+            
+            <div class="controls">
+                <button id="startBtn">Start Game</button>
+                <button id="pauseBtn">Pause</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+            
+            <div class="instructions">
+                <h3>How to Play</h3>
+                <p>🎮 Use Arrow Keys or WASD to control the snake</p>
+                <p>🍎 Eat the red food to grow and increase your score</p>
+                <p>💀 Avoid hitting the walls or yourself</p>
+                <p>🏆 Try to beat your high score!</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-content">
+            <h2>Game Over!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <button id="playAgainBtn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state variables
+        let wasmModule = null;
+        let canvas = null;
+        let ctx = null;
+        let gameLoop = null;
+        let isPaused = false;
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        
+        // WASM function wrappers
+        let initGame = null;
+        let updateGame = null;
+        let setDirection = null;
+        let getGridState = null;
+        let getScore = null;
+        let isGameOver = null;
+        let getGridWidth = null;
+        let getGridHeight = null;
+        
+        // Grid dimensions
+        let gridWidth = 0;
+        let gridHeight = 0;
+        let cellSize = 0;
+        
+        // Initialize the game
+        async function init() {
+            try {
+                // Load WASM module
+                wasmModule = await createSnakeModule();
+                
+                // Wrap WASM functions
+                initGame = wasmModule.cwrap('init_game', null, []);
+                updateGame = wasmModule.cwrap('update_game', null, []);
+                setDirection = wasmModule.cwrap('set_direction', null, ['number']);
+                getScore = wasmModule.cwrap('get_score', 'number', []);
+                isGameOver = wasmModule.cwrap('is_game_over', 'number', []);
+                getGridWidth = wasmModule.cwrap('get_grid_width', 'number', []);
+                getGridHeight = wasmModule.cwrap('get_grid_height', 'number', []);
+                
+                // Custom wrapper for getGridState
+                getGridState = function() {
+                    const size = gridWidth * gridHeight;
+                    const buffer = wasmModule._malloc(size * 4); // 4 bytes per int
+                    wasmModule.ccall('get_grid_state', null, ['number'], [buffer]);
+                    
+                    const grid = [];
+                    for (let i = 0; i < size; i++) {
+                        grid.push(wasmModule.HEAP32[buffer / 4 + i]);
+                    }
+                    
+                    wasmModule._free(buffer);
+                    return grid;
+                };
+                
+                // Get grid dimensions
+                gridWidth = getGridWidth();
+                gridHeight = getGridHeight();
+                
+                // Setup canvas
+                canvas = document.getElementById('gameCanvas');
+                ctx = canvas.getContext('2d');
+                cellSize = canvas.width / gridWidth;
+                
+                // Update high score display
+                document.getElementById('highScore').textContent = highScore;
+                
+                // Hide loading message and show game
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('gameContent').style.display = 'block';
+                
+                // Initialize game
+                initGame();
+                render();
+                
+            } catch (error) {
+                showError('Failed to load WASM module: ' + error.message);
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+        
+        // Render the game
+        function render() {
+            if (!ctx || !getGridState) return;
+            
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Get grid state from WASM
+            const grid = getGridState();
+            
+            // Draw grid
+            for (let y = 0; y < gridHeight; y++) {
+                for (let x = 0; x < gridWidth; x++) {
+                    const value = grid[y * gridWidth + x];
+                    
+                    if (value === 0) continue; // Empty cell
+                    
+                    const px = x * cellSize;
+                    const py = y * cellSize;
+                    
+                    if (value === 1) {
+                        // Snake body
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+                        ctx.fillStyle = '#66BB6A';
+                        ctx.fillRect(px + 4, py + 4, cellSize - 8, cellSize - 8);
+                    } else if (value === 3) {
+                        // Snake head
+                        ctx.fillStyle = '#2E7D32';
+                        ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillRect(px + 3, py + 3, cellSize - 6, cellSize - 6);
+                    } else if (value === 2) {
+                        // Food
+                        ctx.fillStyle = '#FF5252';
+                        ctx.beginPath();
+                        ctx.arc(px + cellSize / 2, py + cellSize / 2, cellSize / 2 - 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // Add shine effect
+                        ctx.fillStyle = '#FF8A80';
+                        ctx.beginPath();
+                        ctx.arc(px + cellSize / 2 - 3, py + cellSize / 2 - 3, cellSize / 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            // Draw grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= gridWidth; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, 0);
+                ctx.lineTo(i * cellSize, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i <= gridHeight; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * cellSize);
+                ctx.lineTo(canvas.width, i * cellSize);
+                ctx.stroke();
+            }
+            
+            // Update score
+            const score = getScore();
+            document.getElementById('score').textContent = score;
+            
+            // Check game over
+            if (isGameOver()) {
+                stopGame();
+                showGameOver(score);
+            }
+        }
+        
+        // Game loop
+        function gameStep() {
+            if (!isPaused && !isGameOver()) {
+                updateGame();
+                render();
+            }
+        }
+        
+        // Start game
+        function startGame() {
+            if (gameLoop) return;
+            
+            initGame();
+            isPaused = false;
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            gameLoop = setInterval(gameStep, 100);
+            document.getElementById('startBtn').textContent = 'Restart';
+        }
+        
+        // Stop game
+        function stopGame() {
+            if (gameLoop) {
+                clearInterval(gameLoop);
+                gameLoop = null;
+            }
+        }
+        
+        // Toggle pause
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? 'Resume' : 'Pause';
+        }
+        
+        // Reset game
+        function resetGame() {
+            stopGame();
+            initGame();
+            render();
+            document.getElementById('startBtn').textContent = 'Start Game';
+            document.getElementById('gameOverOverlay').style.display = 'none';
+        }
+        
+        // Show game over screen
+        function showGameOver(score) {
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+            
+            // Update high score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('snakeHighScore', highScore);
+                document.getElementById('highScore').textContent = highScore;
+            }
+        }
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (!setDirection) return;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    e.preventDefault();
+                    setDirection(0);
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    e.preventDefault();
+                    setDirection(1);
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    e.preventDefault();
+                    setDirection(2);
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    e.preventDefault();
+                    setDirection(3);
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    togglePause();
+                    break;
+            }
+        });
+        
+        // Button event listeners
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('pauseBtn').addEventListener('click', togglePause);
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            startGame();
+        });
+        
+        // Load the WASM module script
+        const script = document.createElement('script');
+        script.src = 'snake.js';
+        script.onload = init;
+        script.onerror = () => showError('Failed to load snake.js. Please compile the WASM module first.');
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
