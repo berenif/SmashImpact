@@ -306,7 +306,7 @@ export class WasmGameAdapter {
     constructor(game) {
         this.game = game;
         this.wasmEngine = null;
-        this.useWasm = true;
+        // Removed: this.useWasm - WASM is always required
         this.entityMapping = new Map();
     }
     
@@ -334,9 +334,7 @@ export class WasmGameAdapter {
             return true;
         } catch (error) {
             console.error('Failed to initialize WebAssembly adapter:', error);
-            console.log('Falling back to JavaScript implementation');
-            this.useWasm = false;
-            return false;
+            throw new Error(`WebAssembly is required. Initialization failed: ${error.message}`);
         }
     }
     
@@ -345,9 +343,8 @@ export class WasmGameAdapter {
      * @param {number} deltaTime - Time since last update
      */
     update(deltaTime) {
-        if (!this.useWasm || !this.wasmEngine) {
-            // Fall back to original JavaScript update
-            return false;
+        if (!this.wasmEngine) {
+            throw new Error('WebAssembly engine not initialized');
         }
         
         // Update player input in WASM
@@ -494,7 +491,7 @@ export class WasmGameAdapter {
      * Get performance metrics
      */
     getPerformanceMetrics() {
-        if (!this.useWasm || !this.wasmEngine) {
+        if (!this.wasmEngine) {
             return null;
         }
         return this.wasmEngine.getPerformanceMetrics();

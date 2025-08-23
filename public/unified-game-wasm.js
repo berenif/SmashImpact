@@ -103,7 +103,7 @@
       this.multiplayer = null;
       this.wolfAI = null;
       this.wasmAdapter = null; // WebAssembly adapter
-      this.useWasm = false; // Flag to indicate if WASM is available
+      // Removed: this.useWasm = false; - WASM is now required
       
       this.input = {
         keys: {},
@@ -142,7 +142,7 @@
       this.initPlayer();
       
       // Initialize WebAssembly adapter
-      await this.initWasm();
+      await this.initWebAssembly();
       
       // Initialize visual effects
       if (window.VisualEffectsManager) {
@@ -170,30 +170,25 @@
       this.gameLoop();
     }
     
-    async initWasm() {
+    async initWebAssembly() {
       try {
-        // Wait a bit for the module to load
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
         if (window.WasmGameAdapter) {
-          console.log('Initializing WebAssembly acceleration...');
           this.wasmAdapter = new window.WasmGameAdapter(this);
-          this.useWasm = await this.wasmAdapter.initialize();
+          const initialized = await this.wasmAdapter.initialize();
           
-          if (this.useWasm) {
+          if (initialized) {
             console.log('✓ WebAssembly acceleration enabled');
             this.showNotification('WebAssembly Acceleration Active', '#00ff00');
           } else {
-            console.log('⚠ WebAssembly not available, using JavaScript fallback');
-            this.showNotification('Running in JavaScript mode', '#ffff00');
+            throw new Error('WebAssembly initialization failed');
           }
         } else {
-          console.log('WebAssembly adapter not found, using JavaScript implementation');
-          this.useWasm = false;
+          throw new Error('WebAssembly adapter not found');
         }
       } catch (error) {
         console.error('Failed to initialize WebAssembly:', error);
-        this.useWasm = false;
+        this.showNotification('WebAssembly is required to run this game', '#ff0000');
+        throw error; // Propagate error - game cannot run without WASM
       }
     }
     
@@ -252,14 +247,7 @@
           this.performance.showStats = !this.performance.showStats;
         }
         
-        // Toggle WebAssembly with W key
-        if (e.key.toLowerCase() === 'q' && this.wasmAdapter) {
-          this.useWasm = !this.useWasm;
-          this.showNotification(
-            this.useWasm ? 'WebAssembly Enabled' : 'WebAssembly Disabled',
-            this.useWasm ? '#00ff00' : '#ff0000'
-          );
-        }
+        // Removed: Toggle WebAssembly with Q key - WASM is now always on
       });
       
       window.addEventListener('keyup', (e) => {
@@ -292,7 +280,7 @@
       // Window resize
       window.addEventListener('resize', () => {
         this.resizeCanvas();
-        if (this.wasmAdapter && this.useWasm) {
+        if (this.wasmAdapter) {
           this.wasmAdapter.wasmEngine.setWorldBounds(this.canvas.width, this.canvas.height);
         }
       });
@@ -311,8 +299,8 @@
       this.deltaTime = deltaTime;
       this.frameCount++;
       
-      // Use WebAssembly engine if available
-      if (this.useWasm && this.wasmAdapter) {
+      // Always use WebAssembly engine
+      if (this.wasmAdapter) {
         const wasmStartTime = performance.now();
         
         // Update timers (still handled in JS)
@@ -324,8 +312,10 @@
         this.performance.wasmTime = performance.now() - wasmStartTime;
         
         if (!wasmHandled) {
-          // Fallback to JavaScript implementation
-          this.updateJavaScript(deltaTime);
+          console.error('WASM update failed');
+          this.state = 'error';
+          this.showNotification('Game engine error', '#ff0000');
+          return;
         }
         
         // Update visual effects (still in JS)
@@ -339,54 +329,12 @@
         // Check wave completion
         this.checkWaveCompletion();
       } else {
-        // Full JavaScript implementation
-        this.updateJavaScript(deltaTime);
+        console.error('WASM adapter not available');
+        this.state = 'error';
+        this.showNotification('Game engine not initialized', '#ff0000');
       }
       
       this.performance.updateTime = performance.now() - startTime;
-    }
-    
-    updateJavaScript(deltaTime) {
-      const startTime = performance.now();
-      
-      // Update timers
-      this.updateTimers(deltaTime);
-      
-      // Update player
-      this.updatePlayer(deltaTime);
-      
-      // Update enemies
-      this.updateEnemies(deltaTime);
-      
-      // Update wolves
-      this.updateWolves(deltaTime);
-      
-      // Update projectiles
-      this.updateProjectiles(deltaTime);
-      
-      // Update power-ups
-      this.updatePowerUps(deltaTime);
-      
-      // Update visual effects
-      if (this.vfx) {
-        this.vfx.update(deltaTime);
-      }
-      
-      // Check collisions
-      this.checkCollisions();
-      
-      // Spawn entities
-      this.spawnEntities(deltaTime);
-      
-      // Update multiplayer
-      if (this.multiplayer && this.multiplayer.isConnected()) {
-        this.multiplayer.broadcastPlayerState();
-      }
-      
-      // Check wave completion
-      this.checkWaveCompletion();
-      
-      this.performance.jsTime = performance.now() - startTime;
     }
     
     updateTimers(deltaTime) {
@@ -553,26 +501,13 @@
     }
     
     updateWolves(deltaTime) {
-      // Update wolves with pack AI
+      // Update wolves with pack AI (WASM required)
       for (const wolf of this.wolves) {
         if (this.wolfAI && this.player) {
-          // Use wolf AI system if available
+          // Use wolf AI system from WASM
           this.wolfAI.updateWolf(wolf, this.player, this.wolves, deltaTime);
         } else {
-          // Simple fallback AI
-          if (this.player) {
-            const dx = this.player.x - wolf.x;
-            const dy = this.player.y - wolf.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist < CONFIG.WOLF_ALERT_RADIUS) {
-              wolf.vx = (dx / dist) * CONFIG.WOLF_SPEED;
-              wolf.vy = (dy / dist) * CONFIG.WOLF_SPEED;
-            }
-          }
-          
-          wolf.x += wolf.vx * deltaTime / 16;
-          wolf.y += wolf.vy * deltaTime / 16;
+          console.warn('Wolf AI not available - WASM required');
         }
       }
     }
@@ -730,7 +665,7 @@
     
     renderPerformanceStats() {
       const ctx = this.ctx;
-      const metrics = this.wasmAdapter && this.useWasm ? 
+      const metrics = this.wasmAdapter ? 
         this.wasmAdapter.getPerformanceMetrics() : null;
       
       ctx.save();
@@ -743,7 +678,7 @@
       let y = 120;
       const lineHeight = 18;
       
-      ctx.fillText(`Mode: ${this.useWasm ? 'WebAssembly' : 'JavaScript'}`, 20, y);
+      ctx.fillText(`Mode: WebAssembly`, 20, y);
       y += lineHeight;
       
       ctx.fillText(`FPS: ${(1000 / (this.performance.updateTime + this.performance.renderTime)).toFixed(0)}`, 20, y);
@@ -1284,7 +1219,7 @@
       // Reinitialize WASM if needed
       if (this.wasmAdapter) {
         this.wasmAdapter.destroy();
-        this.initWasm();
+        this.initWebAssembly(); // Changed to initWebAssembly
       }
     }
     

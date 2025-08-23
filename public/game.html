@@ -898,10 +898,11 @@
                     
                 case 'error':
                     wasmStatus.classList.add('error');
-                    wasmStatusText.textContent = 'WASM Failed - Using JavaScript';
+                    wasmStatusText.textContent = 'WASM Failed - Cannot Start Game';
                     wasmReady = false;
-                    startButton.disabled = false; // Allow starting with JS fallback
-                    console.warn('WASM failed to load, using JavaScript fallback');
+                    startButton.disabled = true; // Keep button disabled - WASM is required
+                    console.error('WASM failed to load - game cannot start without WebAssembly');
+                    showError('WebAssembly is required to run this game. Please use a modern browser.');
                     break;
             }
         }
@@ -915,12 +916,12 @@
                 
                 // Check if wasmInitializer is available
                 if (typeof wasmInitializer === 'undefined') {
-                    console.warn('WASM initializer not found, game will run in JavaScript mode');
+                    console.error('WASM initializer not found - game cannot run without WebAssembly');
                     updateWASMStatus({
                         status: 'error',
                         message: 'WASM initializer not available'
                     });
-                    return false;
+                    throw new Error('WebAssembly initializer not found');
                 }
                 
                 // Register status callback
@@ -934,7 +935,7 @@
                     return true;
                 } else {
                     wasmReady = false;
-                    return false;
+                    throw new Error('WebAssembly module failed to initialize');
                 }
                 
             } catch (error) {
@@ -944,7 +945,7 @@
                     message: 'WASM initialization failed'
                 });
                 wasmReady = false;
-                return false;
+                throw error; // Propagate error - WASM is required
             }
         }
         
@@ -1052,12 +1053,12 @@
                     });
                 }
                 
-                // Pass WASM module if available
+                // WASM module is required
                 if (wasmReady && wasmInitializer && wasmInitializer.isReady()) {
                     game.wasmModule = wasmInitializer.getModule();
                     console.log('Game initialized with WASM acceleration');
                 } else {
-                    console.log('Game initialized with JavaScript engine');
+                    throw new Error('WebAssembly module not ready - cannot start game');
                 }
                 
                 // Initialize game

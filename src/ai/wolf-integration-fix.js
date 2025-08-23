@@ -18,15 +18,8 @@
         if (originalCartesianToIsometric) {
             return originalCartesianToIsometric(x, y, z);
         }
-        // Fallback implementation
-        const TILE_WIDTH = 80;
-        const TILE_HEIGHT = 40;
-        const VOXEL_HEIGHT = 24;
-        
-        return {
-            x: (x - y) * (TILE_WIDTH / 2),
-            y: (x + y) * (TILE_HEIGHT / 2) - z * VOXEL_HEIGHT
-        };
+        // Required implementation - should be provided by WASM
+        throw new Error('cartesianToIsometric function not available - WASM module required');
     };
     
     // Enhanced Wolf class with proper game integration

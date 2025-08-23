@@ -183,7 +183,7 @@
         }, 5000);
       }
     } else {
-      console.warn('No game connection found in window, trying fallback');
+      console.warn('No game connection found in window');
       // Try opener window if we were opened in a new window/tab
       if (window.opener && window.opener.gamePC && window.opener.gameDataChannel) {
         console.log('Found game connection in opener window');
@@ -233,24 +233,13 @@
           }
         }
       } else {
-        console.error('No WebRTC connection found - game may not work in multiplayer mode');
-        this.setupMessagePassingFallback();
+        console.error('No WebRTC connection found - multiplayer mode requires WebRTC');
+        throw new Error('WebRTC connection required for multiplayer mode');
       }
     }
   }
   
-  setupMessagePassingFallback() {
-    // Listen for messages from the game's WebRTC connection via postMessage
-    window.addEventListener('message', (event) => {
-      if (event.data.type === 'webrtc-message') {
-        this.handleMessage(event.data.message);
-      }
-    });
-    
-    // Start sync loops anyway
-    this.startSyncLoop();
-    this.startPingLoop();
-  }
+  // Removed: setupMessagePassingFallback - WebRTC is required
   
   // Send message through data channel
   sendMessage(message) {

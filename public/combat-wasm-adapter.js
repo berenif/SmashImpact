@@ -6,7 +6,7 @@
     constructor(game) {
       this.game = game;
       this.wasmEngine = null;
-      this.useWasm = false;
+      // Removed: this.useWasm - WASM is always required
       this.entityIdMap = new Map();
     }
     
@@ -14,15 +14,13 @@
       try {
         // Check WebAssembly support
         if (typeof WebAssembly === 'undefined') {
-          console.warn('WebAssembly not supported');
-          return false;
+          throw new Error('WebAssembly not supported in this browser');
         }
         
         // Load WASM module
         const WasmGameEngine = window.Module?.GameEngine;
         if (!WasmGameEngine) {
-          console.warn('WASM module not loaded');
-          return false;
+          throw new Error('WASM module not loaded - game engine required');
         }
         
         // Initialize engine
@@ -40,18 +38,19 @@
           this.entityIdMap.set('player', id);
         }
         
-        this.useWasm = true;
         console.log('✅ WASM engine initialized');
         return true;
         
       } catch (error) {
         console.error('WASM init failed:', error);
-        return false;
+        throw error; // Propagate error - WASM is required
       }
     }
     
     update(deltaTime) {
-      if (!this.useWasm || !this.wasmEngine) return;
+      if (!this.wasmEngine) {
+        throw new Error('WASM engine not initialized');
+      }
       
       const playerId = this.entityIdMap.get('player');
       if (!playerId) return;
