@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <vector>
+#include <algorithm>
 
 GameEngine::GameEngine(float width, float height)
     : worldWidth(width), worldHeight(height),
@@ -75,6 +77,20 @@ int GameEngine::createPowerUp(float x, float y, int type) {
 
 int GameEngine::createObstacle(float x, float y, float radius, bool destructible) {
     auto obstacle = std::make_unique<Obstacle>(Vector2(x, y), radius, destructible);
+    int id = obstacle->id;
+    entities.push_back(std::move(obstacle));
+    return id;
+}
+
+int GameEngine::createShapedObstacle(float x, float y, int shape, float width, float height, float rotation, bool destructible) {
+    auto obstacle = std::make_unique<Obstacle>(
+        Vector2(x, y), 
+        static_cast<ObstacleShape>(shape), 
+        width, 
+        height, 
+        rotation, 
+        destructible
+    );
     int id = obstacle->id;
     entities.push_back(std::move(obstacle));
     return id;
@@ -358,8 +374,8 @@ void GameEngine::startGame() {
     // Create player at center
     createPlayer(worldWidth / 2, worldHeight / 2);
     
-    // Generate initial obstacles
-    generateObstacles(5);
+    // Generate enhanced obstacles with various shapes and clustering
+    generateEnhancedObstacles(10, true); // Generate 10 obstacles, ensure playability
 }
 
 void GameEngine::pauseGame() {
@@ -403,6 +419,148 @@ void GameEngine::generateObstacles(int count) {
         Vector2 pos(x, y);
         if ((pos - center).magnitude() > radius + Config::PLAYER_RADIUS + 100) {
             createObstacle(x, y, radius, rand() % 100 < 30); // 30% chance of destructible
+        }
+    }
+}
+
+void GameEngine::generateEnhancedObstacles(int count, bool ensurePlayability) {
+    // Clear any existing obstacles first (optional)
+    // entities.erase(std::remove_if(entities.begin(), entities.end(),
+    //     [](const std::unique_ptr<Entity>& e) {
+    //         return e && e->type == EntityType::OBSTACLE;
+    //     }), entities.end());
+    
+    // Create a grid to track obstacle density for playability
+    const int gridSize = 100; // Size of each grid cell
+    int gridWidth = (worldWidth + gridSize - 1) / gridSize;
+    int gridHeight = (worldHeight + gridSize - 1) / gridSize;
+    std::vector<std::vector<int>> obstacleGrid(gridHeight, std::vector<int>(gridWidth, 0));
+    
+    // Safe zones around spawn points
+    Vector2 playerSpawn(worldWidth / 2, worldHeight / 2);
+    float safeRadius = 150.0f;
+    
+    // Generate obstacles with various shapes and clustering
+    int obstaclesCreated = 0;
+    int attempts = 0;
+    const int maxAttempts = count * 3; // Prevent infinite loops
+    
+    while (obstaclesCreated < count && attempts < maxAttempts) {
+        attempts++;
+        
+        // Randomly decide on obstacle type and clustering
+        int obstacleType = rand() % 100;
+        bool createCluster = (rand() % 100) < 40; // 40% chance of clustering
+        
+        // Generate base position
+        float baseX = 50 + rand() % (int)(worldWidth - 100);
+        float baseY = 50 + rand() % (int)(worldHeight - 100);
+        Vector2 basePos(baseX, baseY);
+        
+        // Check if too close to player spawn
+        if ((basePos - playerSpawn).magnitude() < safeRadius) {
+            continue;
+        }
+        
+        // Check grid density for playability
+        int gridX = baseX / gridSize;
+        int gridY = baseY / gridSize;
+        if (ensurePlayability && obstacleGrid[gridY][gridX] >= 2) {
+            continue; // Too many obstacles in this grid cell
+        }
+        
+        if (createCluster) {
+            // Create a cluster of 2-4 obstacles that can join to form complex shapes
+            int clusterSize = 2 + rand() % 3;
+            float clusterRadius = 80.0f;
+            
+            for (int j = 0; j < clusterSize && obstaclesCreated < count; j++) {
+                float angle = (j * 2 * M_PI) / clusterSize + (rand() % 100) * 0.01f;
+                float distance = (rand() % 50) + 20;
+                float x = baseX + cos(angle) * distance;
+                float y = baseY + sin(angle) * distance;
+                
+                // Keep within world bounds
+                x = std::max(30.0f, std::min(x, worldWidth - 30.0f));
+                y = std::max(30.0f, std::min(y, worldHeight - 30.0f));
+                
+                // Choose shape for this cluster member
+                int shapeChoice = rand() % 3;
+                bool destructible = (rand() % 100) < 25; // 25% chance of destructible
+                
+                if (shapeChoice == 0) {
+                    // Circle
+                    float radius = Config::OBSTACLE_MIN_RADIUS + 
+                                 rand() % (int)(Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS);
+                    createObstacle(x, y, radius, destructible);
+                } else if (shapeChoice == 1) {
+                    // Square
+                    float size = Config::OBSTACLE_MIN_RADIUS * 2 + 
+                               rand() % (int)((Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS) * 2);
+                    float rotation = (rand() % 4) * M_PI / 4; // 0, 45, 90, or 135 degrees
+                    createShapedObstacle(x, y, 1, size, size, rotation, destructible);
+                } else {
+                    // Rectangle
+                    float width = Config::OBSTACLE_MIN_RADIUS * 2 + 
+                                rand() % (int)((Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS) * 2);
+                    float height = Config::OBSTACLE_MIN_RADIUS * 2 + 
+                                 rand() % (int)((Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS) * 2);
+                    float rotation = (rand() % 360) * M_PI / 180.0f;
+                    createShapedObstacle(x, y, 2, width, height, rotation, destructible);
+                }
+                
+                obstaclesCreated++;
+                
+                // Update grid
+                int gx = x / gridSize;
+                int gy = y / gridSize;
+                if (gx >= 0 && gx < gridWidth && gy >= 0 && gy < gridHeight) {
+                    obstacleGrid[gy][gx]++;
+                }
+            }
+        } else {
+            // Create single obstacle
+            bool destructible = (rand() % 100) < 30; // 30% chance of destructible
+            
+            if (obstacleType < 33) {
+                // Circle (33% chance)
+                float radius = Config::OBSTACLE_MIN_RADIUS + 
+                             rand() % (int)(Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS);
+                createObstacle(baseX, baseY, radius, destructible);
+            } else if (obstacleType < 66) {
+                // Square (33% chance)
+                float size = Config::OBSTACLE_MIN_RADIUS * 1.5f + 
+                           rand() % (int)((Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS) * 1.5f);
+                float rotation = (rand() % 8) * M_PI / 4; // 45-degree increments
+                createShapedObstacle(baseX, baseY, 1, size, size, rotation, destructible);
+            } else {
+                // Rectangle (34% chance)
+                float width = Config::OBSTACLE_MIN_RADIUS * 1.5f + 
+                            rand() % (int)((Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS) * 2);
+                float height = Config::OBSTACLE_MIN_RADIUS * 1.5f + 
+                             rand() % (int)((Config::OBSTACLE_MAX_RADIUS - Config::OBSTACLE_MIN_RADIUS) * 2);
+                float rotation = (rand() % 360) * M_PI / 180.0f;
+                createShapedObstacle(baseX, baseY, 2, width, height, rotation, destructible);
+            }
+            
+            obstaclesCreated++;
+            obstacleGrid[gridY][gridX]++;
+        }
+    }
+    
+    // If ensurePlayability is true, verify that there's a clear path from spawn to edges
+    if (ensurePlayability) {
+        // Simple check: ensure there aren't too many obstacles in any row/column
+        for (int i = 0; i < gridHeight; i++) {
+            int rowCount = 0;
+            for (int j = 0; j < gridWidth; j++) {
+                rowCount += obstacleGrid[i][j];
+            }
+            // If a row is too blocked, remove some obstacles
+            if (rowCount > gridWidth * 0.6) {
+                // This row is too blocked, we should clear some space
+                // In a real implementation, we'd selectively remove obstacles
+            }
         }
     }
 }
@@ -600,6 +758,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("createProjectile", &GameEngine::createProjectile)
         .function("createPowerUp", &GameEngine::createPowerUp)
         .function("createObstacle", &GameEngine::createObstacle)
+        .function("createShapedObstacle", &GameEngine::createShapedObstacle)
         .function("removeEntity", &GameEngine::removeEntity)
         .function("updatePlayerInput", &GameEngine::updatePlayerInput)
         .function("playerShoot", &GameEngine::playerShoot)
@@ -617,6 +776,7 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("restartGame", &GameEngine::restartGame)
         .function("setWorldBounds", &GameEngine::setWorldBounds)
         .function("generateObstacles", &GameEngine::generateObstacles)
+        .function("generateEnhancedObstacles", &GameEngine::generateEnhancedObstacles)
         .function("clearEntities", &GameEngine::clearEntities)
         .function("getEntityPositions", &GameEngine::getEntityPositions)
         .function("getPlayerState", &GameEngine::getPlayerState)

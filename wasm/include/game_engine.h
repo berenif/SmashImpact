@@ -65,6 +65,7 @@ public:
     int createProjectile(float x, float y, float dirX, float dirY, float damage, int ownerId);
     int createPowerUp(float x, float y, int type);
     int createObstacle(float x, float y, float radius, bool destructible);
+    int createShapedObstacle(float x, float y, int shape, float width, float height, float rotation, bool destructible);
     void removeEntity(int id);
     
     // Player controls
@@ -96,6 +97,7 @@ public:
     // World management
     void setWorldBounds(float width, float height);
     void generateObstacles(int count);
+    void generateEnhancedObstacles(int count, bool ensurePlayability = true);
     void clearEntities();
     
     // JavaScript interface

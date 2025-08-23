@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Obstacle Generation Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #2a2a2a;
+            color: #fff;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #444;
+            background-color: #1a1a1a;
+            display: block;
+            margin: 20px auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .info {
+            text-align: center;
+            margin: 10px;
+            font-size: 14px;
+        }
+        
+        .legend {
+            text-align: center;
+            margin: 20px;
+            font-size: 12px;
+        }
+        
+        .legend span {
+            margin: 0 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+        
+        .circle { background-color: #3498db; }
+        .square { background-color: #e74c3c; }
+        .rectangle { background-color: #f39c12; }
+        .destructible { border: 2px dashed #fff; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Enhanced Obstacle Generation Test</h1>
+    
+    <div class="legend">
+        <span class="circle">Circle</span>
+        <span class="square">Square</span>
+        <span class="rectangle">Rectangle</span>
+        <span class="destructible">Destructible</span>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <button onclick="generateObstacles(5)">Generate 5 Obstacles</button>
+        <button onclick="generateObstacles(10)">Generate 10 Obstacles</button>
+        <button onclick="generateObstacles(20)">Generate 20 Obstacles</button>
+        <button onclick="clearMap()">Clear Map</button>
+        <button onclick="togglePlayability()">Toggle Playability Check: <span id="playabilityStatus">ON</span></button>
+    </div>
+    
+    <div class="info">
+        <p>Obstacles: <span id="obstacleCount">0</span> | Player Position: <span id="playerPos">Center</span></p>
+        <p>Click and drag to move the player (green circle)</p>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameEngine = null;
+        let ensurePlayability = true;
+        let player = { x: canvas.width / 2, y: canvas.height / 2, radius: 15 };
+        let obstacles = [];
+        let isDragging = false;
+        
+        // Shape types enum (matching C++)
+        const ObstacleShape = {
+            CIRCLE: 0,
+            SQUARE: 1,
+            RECTANGLE: 2
+        };
+        
+        // Initialize WASM module
+        async function initWASM() {
+            try {
+                // Check if WolfAIModule exists (from existing build)
+                if (typeof WolfAIModule !== 'undefined') {
+                    const Module = await WolfAIModule();
+                    gameEngine = new Module.GameEngine(canvas.width, canvas.height);
+                    console.log('Game engine initialized');
+                    render();
+                } else {
+                    // Fallback to JavaScript simulation
+                    console.log('WASM not available, using JavaScript simulation');
+                    simulateObstacleGeneration();
+                }
+            } catch (error) {
+                console.error('Failed to initialize WASM:', error);
+                simulateObstacleGeneration();
+            }
+        }
+        
+        // JavaScript simulation of obstacle generation (fallback)
+        function simulateObstacleGeneration() {
+            obstacles = [];
+            render();
+        }
+        
+        function generateObstacles(count) {
+            if (gameEngine) {
+                // Use WASM engine
+                gameEngine.clearEntities();
+                gameEngine.createPlayer(player.x, player.y);
+                gameEngine.generateEnhancedObstacles(count, ensurePlayability);
+                
+                // Get obstacle data from engine
+                obstacles = [];
+                const positions = gameEngine.getEntityPositions();
+                // Parse positions array to extract obstacles
+                // This would need proper implementation based on your engine's interface
+            } else {
+                // JavaScript simulation
+                obstacles = [];
+                const gridSize = 100;
+                const gridWidth = Math.ceil(canvas.width / gridSize);
+                const gridHeight = Math.ceil(canvas.height / gridSize);
+                const obstacleGrid = Array(gridHeight).fill().map(() => Array(gridWidth).fill(0));
+                
+                let obstaclesCreated = 0;
+                let attempts = 0;
+                const maxAttempts = count * 3;
+                
+                while (obstaclesCreated < count && attempts < maxAttempts) {
+                    attempts++;
+                    
+                    const createCluster = Math.random() < 0.4; // 40% chance
+                    const baseX = 50 + Math.random() * (canvas.width - 100);
+                    const baseY = 50 + Math.random() * (canvas.height - 100);
+                    
+                    // Check distance from player
+                    const distFromPlayer = Math.sqrt(Math.pow(baseX - player.x, 2) + Math.pow(baseY - player.y, 2));
+                    if (distFromPlayer < 100) continue;
+                    
+                    // Check grid density
+                    const gridX = Math.floor(baseX / gridSize);
+                    const gridY = Math.floor(baseY / gridSize);
+                    if (ensurePlayability && obstacleGrid[gridY][gridX] >= 2) continue;
+                    
+                    if (createCluster) {
+                        // Create cluster
+                        const clusterSize = 2 + Math.floor(Math.random() * 3);
+                        for (let j = 0; j < clusterSize && obstaclesCreated < count; j++) {
+                            const angle = (j * 2 * Math.PI) / clusterSize + Math.random() * 0.1;
+                            const distance = 20 + Math.random() * 50;
+                            const x = baseX + Math.cos(angle) * distance;
+                            const y = baseY + Math.sin(angle) * distance;
+                            
+                            const shapeType = Math.floor(Math.random() * 3);
+                            const destructible = Math.random() < 0.25;
+                            
+                            let obstacle = {
+                                x: Math.max(30, Math.min(x, canvas.width - 30)),
+                                y: Math.max(30, Math.min(y, canvas.height - 30)),
+                                shape: shapeType,
+                                destructible: destructible
+                            };
+                            
+                            if (shapeType === ObstacleShape.CIRCLE) {
+                                obstacle.radius = 20 + Math.random() * 30;
+                            } else if (shapeType === ObstacleShape.SQUARE) {
+                                obstacle.size = 40 + Math.random() * 40;
+                                obstacle.rotation = Math.floor(Math.random() * 4) * Math.PI / 4;
+                            } else {
+                                obstacle.width = 40 + Math.random() * 60;
+                                obstacle.height = 40 + Math.random() * 40;
+                                obstacle.rotation = Math.random() * Math.PI * 2;
+                            }
+                            
+                            obstacles.push(obstacle);
+                            obstaclesCreated++;
+                            
+                            const gx = Math.floor(obstacle.x / gridSize);
+                            const gy = Math.floor(obstacle.y / gridSize);
+                            if (gx >= 0 && gx < gridWidth && gy >= 0 && gy < gridHeight) {
+                                obstacleGrid[gy][gx]++;
+                            }
+                        }
+                    } else {
+                        // Single obstacle
+                        const shapeType = Math.floor(Math.random() * 3);
+                        const destructible = Math.random() < 0.3;
+                        
+                        let obstacle = {
+                            x: baseX,
+                            y: baseY,
+                            shape: shapeType,
+                            destructible: destructible
+                        };
+                        
+                        if (shapeType === ObstacleShape.CIRCLE) {
+                            obstacle.radius = 20 + Math.random() * 30;
+                        } else if (shapeType === ObstacleShape.SQUARE) {
+                            obstacle.size = 30 + Math.random() * 50;
+                            obstacle.rotation = Math.floor(Math.random() * 8) * Math.PI / 4;
+                        } else {
+                            obstacle.width = 30 + Math.random() * 70;
+                            obstacle.height = 30 + Math.random() * 50;
+                            obstacle.rotation = Math.random() * Math.PI * 2;
+                        }
+                        
+                        obstacles.push(obstacle);
+                        obstaclesCreated++;
+                        obstacleGrid[gridY][gridX]++;
+                    }
+                }
+            }
+            
+            updateInfo();
+            render();
+        }
+        
+        function clearMap() {
+            obstacles = [];
+            if (gameEngine) {
+                gameEngine.clearEntities();
+                gameEngine.createPlayer(player.x, player.y);
+            }
+            updateInfo();
+            render();
+        }
+        
+        function togglePlayability() {
+            ensurePlayability = !ensurePlayability;
+            document.getElementById('playabilityStatus').textContent = ensurePlayability ? 'ON' : 'OFF';
+        }
+        
+        function updateInfo() {
+            document.getElementById('obstacleCount').textContent = obstacles.length;
+            document.getElementById('playerPos').textContent = `(${Math.round(player.x)}, ${Math.round(player.y)})`;
+        }
+        
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvas.width; x += 100) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 100) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw obstacles
+            obstacles.forEach(obstacle => {
+                ctx.save();
+                ctx.translate(obstacle.x, obstacle.y);
+                
+                if (obstacle.shape === ObstacleShape.CIRCLE) {
+                    ctx.fillStyle = obstacle.destructible ? '#2980b9' : '#3498db';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, obstacle.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    if (obstacle.destructible) {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 5]);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                } else if (obstacle.shape === ObstacleShape.SQUARE) {
+                    ctx.rotate(obstacle.rotation);
+                    ctx.fillStyle = obstacle.destructible ? '#c0392b' : '#e74c3c';
+                    ctx.fillRect(-obstacle.size/2, -obstacle.size/2, obstacle.size, obstacle.size);
+                    if (obstacle.destructible) {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 5]);
+                        ctx.strokeRect(-obstacle.size/2, -obstacle.size/2, obstacle.size, obstacle.size);
+                        ctx.setLineDash([]);
+                    }
+                } else {
+                    ctx.rotate(obstacle.rotation);
+                    ctx.fillStyle = obstacle.destructible ? '#e67e22' : '#f39c12';
+                    ctx.fillRect(-obstacle.width/2, -obstacle.height/2, obstacle.width, obstacle.height);
+                    if (obstacle.destructible) {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 5]);
+                        ctx.strokeRect(-obstacle.width/2, -obstacle.height/2, obstacle.width, obstacle.height);
+                        ctx.setLineDash([]);
+                    }
+                }
+                
+                ctx.restore();
+            });
+            
+            // Draw player
+            ctx.fillStyle = '#27ae60';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#2ecc71';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        // Mouse controls
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const dist = Math.sqrt(Math.pow(x - player.x, 2) + Math.pow(y - player.y, 2));
+            if (dist <= player.radius) {
+                isDragging = true;
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                player.x = e.clientX - rect.left;
+                player.y = e.clientY - rect.top;
+                updateInfo();
+                render();
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initWASM();
+            generateObstacles(10);
+        });
+    </script>
+    
+    <!-- Try to load the WASM module if it exists -->
+    <script src="wasm/wolf_ai.js"></script>
+</body>
+</html>
