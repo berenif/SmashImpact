@@ -24,6 +24,16 @@ private:
     std::vector<std::shared_ptr<AI::Wolf>> wolves;
     std::vector<std::shared_ptr<AI::WolfAI>> wolfAIs;
     int nextId = 0;
+    
+    // Helper method to find wolf index by ID
+    int findWolfIndex(int wolfId) const {
+        for (size_t i = 0; i < wolves.size(); i++) {
+            if (wolves[i]->id == wolfId) {
+                return static_cast<int>(i);
+            }
+        }
+        return -1;
+    }
 
 public:
     WolfPackManager() = default;
@@ -43,7 +53,8 @@ public:
     // Update a specific wolf
     void updateWolf(int wolfId, float deltaTime, float playerX, float playerY, 
                    float playerVX, float playerVY, bool playerVisible) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolves.size())) return;
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return;
         
         // Create a temporary player entity for the AI
         Entity player(EntityType::PLAYER, Vector2(playerX, playerY), 15.0f);
@@ -51,58 +62,62 @@ public:
         
         // Update the wolf AI
         std::vector<Entity*> obstacles; // Empty for now
-        wolfAIs[wolfId]->update(deltaTime, &player, wolfAIs, obstacles);
+        wolfAIs[index]->update(deltaTime, &player, wolfAIs, obstacles);
         
         // Update wolf position based on AI decisions
-        wolves[wolfId]->update(deltaTime);
+        wolves[index]->update(deltaTime);
     }
     
     // Get wolf state
     int getWolfState(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolfAIs.size())) return 0;
-        return static_cast<int>(wolfAIs[wolfId]->getState());
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return 0;
+        return static_cast<int>(wolfAIs[index]->getState());
     }
     
     // Get wolf position
     float getWolfX(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolves.size())) return 0;
-        return wolves[wolfId]->position.x;
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return 0;
+        return wolves[index]->position.x;
     }
     
     float getWolfY(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolves.size())) return 0;
-        return wolves[wolfId]->position.y;
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return 0;
+        return wolves[index]->position.y;
     }
     
     // Get wolf rotation
     float getWolfRotation(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolves.size())) return 0;
-        return wolves[wolfId]->rotation;
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return 0;
+        return wolves[index]->rotation;
     }
     
     // Get wolf alert level
     float getWolfAlertLevel(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolfAIs.size())) return 0;
-        return wolfAIs[wolfId]->getAlertLevel();
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return 0;
+        return wolfAIs[index]->getAlertLevel();
     }
     
     // Get wolf health
     float getWolfHealth(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolves.size())) return 0;
-        return wolves[wolfId]->health;
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return 0;
+        return wolves[index]->health;
     }
     
     // Remove a wolf
     void removeWolf(int wolfId) {
-        if (wolfId < 0 || wolfId >= static_cast<int>(wolves.size())) return;
+        int index = findWolfIndex(wolfId);
+        if (index < 0) return;
         
-        wolves.erase(wolves.begin() + wolfId);
-        wolfAIs.erase(wolfAIs.begin() + wolfId);
+        wolves.erase(wolves.begin() + index);
+        wolfAIs.erase(wolfAIs.begin() + index);
         
-        // Update IDs for remaining wolves
-        for (size_t i = wolfId; i < wolves.size(); i++) {
-            wolves[i]->id = static_cast<int>(i);
-        }
+        // No longer reassigning IDs - they remain stable
     }
     
     // Get pack size
