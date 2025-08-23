@@ -1,7 +1,7 @@
 /**
  * Modern WebAssembly Game Engine Wrapper
  * Uses async/await patterns and modern JavaScript features
- * Implements error boundaries and graceful fallbacks
+ * Implements error boundaries and proper error handling
  */
 
 class WasmGameEngineModern {

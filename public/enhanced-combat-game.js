@@ -87,15 +87,14 @@
       
       this.canvas = canvas;
       
-      // Try to get 2D context with fallback options
+      // Get 2D context with optimized options
       try {
         this.ctx = canvas.getContext('2d', { 
           alpha: false,  // Disable alpha for better performance
           desynchronized: true  // Hint for better performance
         });
       } catch (e) {
-        // Fallback to basic context
-        this.ctx = canvas.getContext('2d');
+        throw new Error('Failed to get 2D context with optimized settings: ' + e.message);
       }
       
       if (!this.ctx) {
@@ -252,8 +251,8 @@
         // This would need proper implementation based on WASM interface
         console.log('Using WASM obstacle generation');
       } else {
-        // Fallback to JavaScript obstacle generation
-        this.generateObstaclesJS(15);
+        // WASM is required
+        throw new Error('WASM module not available - cannot generate obstacles');
       }
     }
     

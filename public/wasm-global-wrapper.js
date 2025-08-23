@@ -38,12 +38,10 @@
             };
             
         } catch (error) {
-            console.error('Failed to create WASM Game Engine:', error);
-            // Return a fallback object so the game can still run without WASM
-            return {
-                isReady: false,
-                error: error.message
-            };
+            console.error('Failed to initialize WASM:', error);
+            
+            // WASM is required - throw error instead of returning fallback
+            throw new Error(`WebAssembly is required. Initialization failed: ${error.message}`);
         }
     };
     

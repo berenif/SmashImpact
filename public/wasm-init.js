@@ -132,9 +132,9 @@ class WASMInitializer {
             
             console.error('WASM initialization failed:', error);
             
-            // Return null to indicate fallback to JavaScript
+            // WASM is required - throw error instead of returning null
             this.isInitialized = false;
-            return null;
+            throw new Error(`WebAssembly initialization failed: ${error.message}`);
         }
     }
 
