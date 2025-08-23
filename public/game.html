@@ -78,27 +78,6 @@
             display: block;
         }
 
-        /* Enhanced orientation warning with fullscreen button */
-        .orientation-warning {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--primary-gradient);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .orientation-warning.visible {
-            display: flex;
-        }
-
         .fullscreen-button {
             padding: 15px 40px;
             background: rgba(255, 255, 255, 0.2);
@@ -313,36 +292,7 @@
             }
         }
         
-        .orientation-warning.visible {
-            display: flex;
-        }
-        
-        .orientation-warning h2 {
-            margin-bottom: 20px;
-            font-size: 28px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-            animation: slideDown 0.6s ease-out 0.2s both;
-        }
-        
-        @keyframes slideDown {
-            from {
-                transform: translateY(-30px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .orientation-warning p {
-            font-size: 16px;
-            margin-bottom: 20px;
-            opacity: 0.95;
-            animation: slideUp 0.6s ease-out 0.4s both;
-            max-width: 300px;
-        }
+
         
         @keyframes slideUp {
             from {
@@ -488,25 +438,7 @@
             font-weight: 500;
         }
         
-        .continue-portrait-btn {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            border-radius: 25px;
-            color: white;
-            font-size: 14px;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            animation: slideUp 0.6s ease-out 0.8s both;
-        }
-        
-        .continue-portrait-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.6);
-            transform: scale(1.05);
-        }
+
         
         .sparkle {
             position: absolute;
@@ -575,34 +507,7 @@
         Performance Mode: <span id="perfModeText">Normal</span>
     </div>
     
-    <!-- Orientation Warning (for mobile portrait mode) -->
-    <div class="orientation-warning" id="orientationWarning">
-        <div class="rotate-icon-container">
-            <div class="rotate-icon">📱</div>
-            <div class="rotation-arrows">
-                <div class="rotation-arrow top-right"></div>
-                <div class="rotation-arrow bottom-left"></div>
-            </div>
-        </div>
-        <h2>🎮 Ready for Battle? 🎮</h2>
-        <p>Rotate your device to landscape mode for the ultimate gaming experience!</p>
-        <div class="landscape-benefits">
-            <div class="benefit-item">
-                <div class="benefit-icon">🎮</div>
-                <div class="benefit-text">Better controls</div>
-            </div>
-            <div class="benefit-item">
-                <div class="benefit-icon">⚔️</div>
-                <div class="benefit-text">Enhanced combat</div>
-            </div>
-            <div class="benefit-item">
-                <div class="benefit-icon">🎯</div>
-                <div class="benefit-text">Wider view</div>
-            </div>
-        </div>
-        <button class="fullscreen-button" onclick="enterFullscreenMode()">Enter Fullscreen Mode</button>
-        <button class="continue-portrait-btn" onclick="continuePortraitMode()">Continue in Portrait Mode</button>
-    </div>
+
     
     <!-- Start Screen -->
     <div id="startScreen">
@@ -827,7 +732,6 @@
                 
                 if (oldOrientation !== this.orientation) {
                     console.log('Orientation changed:', this.orientation);
-                    this.handleOrientationChange();
                     this.adjustCanvasScale();
                 }
             },
@@ -865,49 +769,7 @@
                 }
             },
             
-            handleOrientationChange() {
-                const warning = document.getElementById('orientationWarning');
-                
-                // Check if user has already chosen to continue in portrait mode
-                const allowPortrait = localStorage.getItem('allowPortraitMode');
-                const portraitTimestamp = localStorage.getItem('portraitModeTimestamp');
-                
-                // Only show warning if:
-                // 1. Device is mobile and in portrait mode
-                // 2. User hasn't chosen to continue in portrait mode, OR
-                // 3. It's been more than 24 hours since they made that choice
-                const hoursSinceChoice = portraitTimestamp ? 
-                    (Date.now() - parseInt(portraitTimestamp)) / (1000 * 60 * 60) : 
-                    Infinity;
-                
-                if (this.isMobile && this.orientation === 'portrait') {
-                    // Show warning if no preference or it's been more than 24 hours
-                    if (!allowPortrait || hoursSinceChoice > 24) {
-                        warning.classList.add('visible');
-                        this.addSparkles();
-                        
-                        // Add a welcoming sound effect if available
-                        try {
-                            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
-                            audio.volume = 0.3;
-                            audio.play().catch(() => {}); // Ignore if audio fails
-                        } catch(e) {}
-                    } else {
-                        // User has chosen portrait mode recently, don't show warning
-                        console.log('Portrait mode allowed by user preference');
-                    }
-                } else {
-                    warning.classList.remove('visible');
-                    this.removeSparkles();
-                    
-                    // Clear portrait mode preference when user rotates to landscape
-                    if (this.orientation === 'landscape' && allowPortrait) {
-                        localStorage.removeItem('allowPortraitMode');
-                        localStorage.removeItem('portraitModeTimestamp');
-                        console.log('Portrait mode preference cleared - user rotated to landscape');
-                    }
-                }
-            },
+
             
             addSparkles() {
                 // Add random sparkles to the orientation warning
@@ -1020,8 +882,7 @@
                     if (mobileControlsHint) mobileControlsHint.classList.remove('visible');
                 }
                 
-                // Handle orientation for mobile
-                this.handleOrientationChange();
+
                 
                 // Auto-enter fullscreen for mobile in landscape
                 if (this.isMobile && this.orientation === 'landscape') {
@@ -1568,60 +1429,10 @@
             
             if (deviceDetector.isFullscreen && deviceDetector.isMobile) {
                 console.log('Entered fullscreen mode on mobile');
-                // Auto-rotate to landscape if in portrait
-                if (deviceDetector.orientation === 'portrait') {
-                    deviceDetector.handleOrientationChange();
-                }
             }
         }
         
-        // Function to continue in portrait mode (for the button)
-        function continuePortraitMode() {
-            const warning = document.getElementById('orientationWarning');
-            
-            // Store user preference
-            localStorage.setItem('allowPortraitMode', 'true');
-            localStorage.setItem('portraitModeTimestamp', Date.now().toString());
-            
-            // Hide the warning with animation
-            warning.style.animation = 'fadeOut 0.5s ease-out';
-            setTimeout(() => {
-                warning.classList.remove('visible');
-                warning.style.animation = '';
-                deviceDetector.removeSparkles();
-            }, 500);
-            
-            // Show a brief notification
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 15px 25px;
-                border-radius: 25px;
-                font-size: 14px;
-                z-index: 10001;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-                animation: slideDown 0.5s ease-out;
-            `;
-            notification.innerHTML = '⚠️ Playing in portrait mode - Rotate anytime for better experience!';
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.style.animation = 'slideUp 0.5s ease-out';
-                setTimeout(() => notification.remove(), 500);
-            }, 3000);
-            
-            // Adjust game settings for portrait mode if game is running
-            if (window.game) {
-                window.game.portraitMode = true;
-                // Could adjust UI scale or other settings here
-                console.log('Portrait mode enabled by user choice');
-            }
-        }
+
         
         // Add fadeOut animation to the styles
         const styleSheet = document.createElement('style');
