@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -13,7 +13,54 @@
     
     <!-- Mobile-specific styles -->
     <style>
-        /* Mobile device indicator */
+        /* Enhanced responsive styles */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --ui-background: rgba(0, 0, 0, 0.8);
+            --ui-border: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Device mode classes */
+        body.desktop-mode {
+            cursor: default;
+        }
+
+        body.mobile-mode {
+            cursor: none;
+        }
+
+        body.mobile-mode.landscape-locked {
+            transform-origin: center center;
+        }
+
+        /* Canvas scaling for mobile landscape */
+        body.mobile-mode.landscape #gameCanvas {
+            transform: scale(0.85);
+            transform-origin: center center;
+        }
+
+        /* Fullscreen styles */
+        body:-webkit-full-screen {
+            width: 100%;
+            height: 100%;
+        }
+
+        body:-moz-full-screen {
+            width: 100%;
+            height: 100%;
+        }
+
+        body:-ms-fullscreen {
+            width: 100%;
+            height: 100%;
+        }
+
+        body:fullscreen {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Device info panel */
         .device-info {
             position: absolute;
             top: 10px;
@@ -30,7 +77,89 @@
         .device-info.visible {
             display: block;
         }
-        
+
+        /* Enhanced orientation warning with fullscreen button */
+        .orientation-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--primary-gradient);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .orientation-warning.visible {
+            display: flex;
+        }
+
+        .fullscreen-button {
+            padding: 15px 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50px;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            margin-top: 20px;
+        }
+
+        .fullscreen-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* Desktop-specific HUD */
+        #desktopHUD {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        body.desktop-mode #desktopHUD {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .desktop-stats {
+            background: var(--ui-background);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--ui-border);
+            border-radius: 15px;
+            padding: 15px 25px;
+            pointer-events: auto;
+        }
+
+        /* Performance stats for desktop */
+        #perfStats {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            z-index: 101;
+        }
+
+        body.desktop-mode #perfStats {
+            display: block;
+        }
+
         /* Mobile controls hint */
         .mobile-controls-hint {
             background: rgba(0, 0, 0, 0.8);
@@ -471,6 +600,7 @@
                 <div class="benefit-text">Wider view</div>
             </div>
         </div>
+        <button class="fullscreen-button" onclick="enterFullscreenMode()">Enter Fullscreen Mode</button>
         <button class="continue-portrait-btn" onclick="continuePortraitMode()">Continue in Portrait Mode</button>
     </div>
     
@@ -555,6 +685,26 @@
     <!-- Game Canvas -->
     <canvas id="gameCanvas"></canvas>
     
+    <!-- Desktop HUD -->
+    <div id="desktopHUD">
+        <div class="desktop-stats">
+            <div class="stat-item">
+                <span class="stat-label">Health:</span>
+                <span id="desktopHealth">100/100</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Score:</span>
+                <span id="desktopScore">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Stats (Desktop Only) -->
+    <div id="perfStats">
+        <div>FPS: <span id="fps">60</span></div>
+        <div>MS: <span id="ms">16</span></div>
+    </div>
+    
     <!-- Game UI Overlay -->
     <div id="gameUI">
         <div class="health-bar-container">
@@ -607,7 +757,7 @@
     
     <!-- Game Initialization Script -->
     <script>
-        // Mobile Detection and Device Info
+        // Enhanced Mobile Detection and Device Info
         const deviceDetector = {
             isMobile: false,
             isTablet: false,
@@ -617,6 +767,8 @@
             screenHeight: 0,
             pixelRatio: 1,
             orientation: 'landscape',
+            isFullscreen: false,
+            landscapeLocked: false,
             
             detect() {
                 // Check for mobile user agents
@@ -670,9 +822,46 @@
                 this.screenHeight = window.innerHeight;
                 this.orientation = this.screenWidth > this.screenHeight ? 'landscape' : 'portrait';
                 
+                // Update body classes
+                this.updateBodyClasses();
+                
                 if (oldOrientation !== this.orientation) {
                     console.log('Orientation changed:', this.orientation);
                     this.handleOrientationChange();
+                    this.adjustCanvasScale();
+                }
+            },
+            
+            updateBodyClasses() {
+                const body = document.body;
+                body.classList.remove('desktop-mode', 'mobile-mode', 'tablet-mode', 'landscape', 'portrait');
+                
+                if (this.isMobile) {
+                    body.classList.add('mobile-mode');
+                    if (this.isTablet) {
+                        body.classList.add('tablet-mode');
+                    }
+                } else {
+                    body.classList.add('desktop-mode');
+                }
+                
+                body.classList.add(this.orientation);
+                
+                if (this.isFullscreen) {
+                    body.classList.add('landscape-locked');
+                }
+            },
+            
+            adjustCanvasScale() {
+                const canvas = document.getElementById('gameCanvas');
+                if (!canvas) return;
+                
+                // Apply zoom-out effect for mobile landscape
+                if (this.isMobile && this.orientation === 'landscape') {
+                    canvas.style.transform = 'scale(0.85)';
+                    canvas.style.transformOrigin = 'center center';
+                } else {
+                    canvas.style.transform = 'none';
                 }
             },
             
@@ -833,6 +1022,16 @@
                 
                 // Handle orientation for mobile
                 this.handleOrientationChange();
+                
+                // Auto-enter fullscreen for mobile in landscape
+                if (this.isMobile && this.orientation === 'landscape') {
+                    setTimeout(() => {
+                        if (!deviceDetector.isFullscreen) {
+                            console.log('Auto-entering fullscreen for mobile landscape');
+                            enterFullscreenMode();
+                        }
+                    }, 500);
+                }
             },
             
             addTouchFeedback() {
@@ -1138,6 +1337,38 @@
             deviceDetector.adjustUIForMobile();
             deviceDetector.addTouchFeedback();
             
+            // Start FPS tracking for desktop
+            if (!deviceDetector.isMobile) {
+                let fps = 60;
+                let frameCount = 0;
+                let fpsUpdateTime = performance.now();
+                
+                function updateFPS() {
+                    const currentTime = performance.now();
+                    frameCount++;
+                    
+                    if (currentTime - fpsUpdateTime >= 1000) {
+                        fps = frameCount;
+                        frameCount = 0;
+                        fpsUpdateTime = currentTime;
+                        
+                        // Update FPS display
+                        const fpsElement = document.getElementById('fps');
+                        const msElement = document.getElementById('ms');
+                        if (fpsElement) {
+                            fpsElement.textContent = fps;
+                        }
+                        if (msElement) {
+                            msElement.textContent = (1000 / Math.max(fps, 1)).toFixed(1);
+                        }
+                    }
+                    
+                    requestAnimationFrame(updateFPS);
+                }
+                
+                updateFPS();
+            }
+            
             // Start WASM initialization (non-blocking)
             initializeWASM().then(success => {
                 console.log('WASM initialization completed:', success ? 'Success' : 'Failed');
@@ -1287,6 +1518,63 @@
             }, 5000);
         }
 
+        // Function to enter fullscreen mode
+        function enterFullscreenMode() {
+            const elem = document.documentElement;
+            
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                elem.mozRequestFullScreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+            
+            // Lock orientation to landscape if supported
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(err => {
+                    console.log('Orientation lock failed:', err);
+                });
+            }
+            
+            deviceDetector.isFullscreen = true;
+            deviceDetector.landscapeLocked = true;
+            deviceDetector.updateBodyClasses();
+            deviceDetector.adjustCanvasScale();
+            
+            // Hide orientation warning
+            const warning = document.getElementById('orientationWarning');
+            if (warning) {
+                warning.classList.remove('visible');
+            }
+        }
+        
+        // Handle fullscreen change events
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+        
+        function handleFullscreenChange() {
+            deviceDetector.isFullscreen = !!(document.fullscreenElement || 
+                                           document.webkitFullscreenElement || 
+                                           document.mozFullScreenElement || 
+                                           document.msFullscreenElement);
+            
+            deviceDetector.updateBodyClasses();
+            deviceDetector.adjustCanvasScale();
+            
+            if (deviceDetector.isFullscreen && deviceDetector.isMobile) {
+                console.log('Entered fullscreen mode on mobile');
+                // Auto-rotate to landscape if in portrait
+                if (deviceDetector.orientation === 'portrait') {
+                    deviceDetector.handleOrientationChange();
+                }
+            }
+        }
+        
         // Function to continue in portrait mode (for the button)
         function continuePortraitMode() {
             const warning = document.getElementById('orientationWarning');
