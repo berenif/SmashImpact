@@ -111,6 +111,10 @@ class TargetingButton {
         const targetingEnabled = this.gameEngine && this.gameEngine.isTargetingEnabled ? 
             this.gameEngine.isTargetingEnabled() : true;
         
+        // Check if auto-disabled due to distance
+        const autoDisabled = this.gameEngine && this.gameEngine.isAutoDisabledDueToDistance ? 
+            this.gameEngine.isAutoDisabledDueToDistance() : false;
+        
         // Get current target from WASM engine
         const currentTargetId = this.gameEngine && this.gameEngine.getCurrentTargetId ? 
             this.gameEngine.getCurrentTargetId() : -1;
@@ -121,7 +125,7 @@ class TargetingButton {
         
         // Choose color based on state
         let color = this.config.color;
-        if (!targetingEnabled) {
+        if (!targetingEnabled || autoDisabled) {
             color = this.config.disabledColor;
         } else if (this.active) {
             color = this.config.activeColor;
@@ -134,7 +138,7 @@ class TargetingButton {
         ctx.fill();
         
         // Draw border
-        ctx.strokeStyle = !targetingEnabled ? 'rgba(100, 100, 100, 0.6)' : 
+        ctx.strokeStyle = (!targetingEnabled || autoDisabled) ? 'rgba(100, 100, 100, 0.6)' : 
             (currentTargetId >= 0 ? 'rgba(255, 100, 200, 0.9)' : 'rgba(255, 255, 255, 0.8)');
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -145,7 +149,10 @@ class TargetingButton {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        if (!targetingEnabled) {
+        if (autoDisabled) {
+            // Show auto-disabled state (too far from enemy)
+            ctx.fillText('FAR', this.config.x, this.config.y);
+        } else if (!targetingEnabled) {
             // Show disabled state
             ctx.fillText('OFF', this.config.x, this.config.y);
         } else {
