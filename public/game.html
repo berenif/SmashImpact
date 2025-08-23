@@ -2,13 +2,478 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>SmashImpact - Sword & Shield Combat</title>
     
     <!-- External CSS -->
     <link rel="stylesheet" href="css/game-styles.css">
+    
+    <!-- Mobile-specific styles -->
+    <style>
+        /* Mobile device indicator */
+        .device-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .device-info.visible {
+            display: block;
+        }
+        
+        /* Mobile controls hint */
+        .mobile-controls-hint {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .mobile-controls-hint.visible {
+            display: block;
+        }
+        
+        .mobile-controls-hint h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+        
+        .mobile-control-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .mobile-control-icon {
+            width: 30px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) and (orientation: portrait) {
+            #startScreen h1 {
+                font-size: 2em;
+            }
+            
+            #startScreen h2 {
+                font-size: 1.2em;
+            }
+            
+            .controls-info {
+                display: none;
+            }
+            
+            .mobile-controls-hint {
+                display: block !important;
+            }
+        }
+        
+        @media (max-width: 768px) and (orientation: landscape) {
+            #startScreen {
+                padding: 10px;
+            }
+            
+            #startScreen h1 {
+                font-size: 1.5em;
+                margin: 10px 0;
+            }
+            
+            #startScreen h2 {
+                font-size: 1em;
+                margin: 5px 0;
+            }
+            
+            .controls-info {
+                display: none;
+            }
+            
+            .mobile-controls-hint {
+                display: block !important;
+                font-size: 12px;
+                padding: 10px;
+            }
+        }
+        
+        /* Performance mode indicator */
+        .performance-mode {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .performance-mode.visible {
+            display: block;
+        }
+        
+        /* Touch feedback */
+        .touch-feedback {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: touchRipple 0.5s ease-out;
+            z-index: 9999;
+        }
+        
+        @keyframes touchRipple {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+        
+        /* Mobile orientation warning */
+        .orientation-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 10000;
+            padding: 20px;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .orientation-warning.visible {
+            display: flex;
+        }
+        
+        .orientation-warning h2 {
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.6s ease-out 0.2s both;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .orientation-warning p {
+            font-size: 16px;
+            margin-bottom: 20px;
+            opacity: 0.95;
+            animation: slideUp 0.6s ease-out 0.4s both;
+            max-width: 300px;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .rotate-icon-container {
+            position: relative;
+            margin: 30px 0;
+            animation: slideUp 0.6s ease-out 0.3s both;
+        }
+        
+        .rotate-icon {
+            font-size: 80px;
+            animation: rotatePhone 3s ease-in-out infinite;
+            display: inline-block;
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+        }
+        
+        @keyframes rotatePhone {
+            0%, 100% { 
+                transform: rotate(0deg) scale(1);
+            }
+            25% {
+                transform: rotate(-10deg) scale(1.05);
+            }
+            50% { 
+                transform: rotate(90deg) scale(1.1);
+            }
+            75% {
+                transform: rotate(80deg) scale(1.05);
+            }
+        }
+        
+        .rotation-arrows {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 120px;
+            pointer-events: none;
+        }
+        
+        .rotation-arrow {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            opacity: 0;
+            animation: arrowPulse 3s ease-in-out infinite;
+        }
+        
+        .rotation-arrow::before {
+            content: '↻';
+            font-size: 30px;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .rotation-arrow.top-right {
+            top: -10px;
+            right: -10px;
+            animation-delay: 0.5s;
+        }
+        
+        .rotation-arrow.bottom-left {
+            bottom: -10px;
+            left: -10px;
+            transform: rotate(180deg);
+            animation-delay: 0.7s;
+        }
+        
+        @keyframes arrowPulse {
+            0%, 30%, 100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            40%, 60% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+        
+        .landscape-benefits {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            animation: slideUp 0.6s ease-out 0.6s both;
+        }
+        
+        .benefit-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .benefit-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .benefit-item:nth-child(1) .benefit-icon {
+            animation-delay: 0s;
+        }
+        
+        .benefit-item:nth-child(2) .benefit-icon {
+            animation-delay: 0.5s;
+        }
+        
+        .benefit-item:nth-child(3) .benefit-icon {
+            animation-delay: 1s;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        .benefit-text {
+            font-size: 12px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        
+        .continue-portrait-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 25px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            animation: slideUp 0.6s ease-out 0.8s both;
+        }
+        
+        .continue-portrait-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: scale(1.05);
+        }
+        
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            animation: sparkle 2s linear infinite;
+        }
+        
+        @keyframes sparkle {
+            0% {
+                opacity: 0;
+                transform: scale(0) rotate(0deg);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1) rotate(180deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0) rotate(360deg);
+            }
+        }
+        
+        .sparkle::before {
+            content: '✨';
+            font-size: 20px;
+        }
+        
+        /* Responsive adjustments for small screens */
+        @media (max-height: 500px) {
+            .orientation-warning h2 {
+                font-size: 20px;
+                margin-bottom: 10px;
+            }
+            
+            .rotate-icon {
+                font-size: 60px;
+            }
+            
+            .landscape-benefits {
+                gap: 20px;
+                margin: 20px 0;
+            }
+            
+            .benefit-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+            
+            .benefit-text {
+                font-size: 11px;
+            }
+        }
+    </style>
 </head>
 <body>
+    <!-- Device Info Display -->
+    <div class="device-info" id="deviceInfo">
+        <span id="deviceType">Desktop</span> | 
+        <span id="screenSize">0x0</span> | 
+        <span id="touchSupport">No Touch</span>
+    </div>
+    
+    <!-- Performance Mode Indicator -->
+    <div class="performance-mode" id="performanceMode">
+        Performance Mode: <span id="perfModeText">Normal</span>
+    </div>
+    
+    <!-- Orientation Warning (for mobile portrait mode) -->
+    <div class="orientation-warning" id="orientationWarning">
+        <div class="rotate-icon-container">
+            <div class="rotate-icon">📱</div>
+            <div class="rotation-arrows">
+                <div class="rotation-arrow top-right"></div>
+                <div class="rotation-arrow bottom-left"></div>
+            </div>
+        </div>
+        <h2>🎮 Ready for Battle? 🎮</h2>
+        <p>Rotate your device to landscape mode for the ultimate gaming experience!</p>
+        <div class="landscape-benefits">
+            <div class="benefit-item">
+                <div class="benefit-icon">🎮</div>
+                <div class="benefit-text">Better controls</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">⚔️</div>
+                <div class="benefit-text">Enhanced combat</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">🎯</div>
+                <div class="benefit-text">Wider view</div>
+            </div>
+        </div>
+        <button class="continue-portrait-btn" onclick="continuePortraitMode()">Continue in Portrait Mode</button>
+    </div>
+    
     <!-- Start Screen -->
     <div id="startScreen">
         <h1>⚔️ SmashImpact ⚔️</h1>
@@ -21,8 +486,8 @@
             <span id="wasmStatusText">Initializing WASM...</span>
         </div>
         
-        <!-- Controls Info -->
-        <div class="controls-info">
+        <!-- Desktop Controls Info -->
+        <div class="controls-info" id="desktopControls">
             <h3>🎮 Controls</h3>
             <div class="control-row">
                 <span class="control-key">WASD/↑↓←→</span>
@@ -43,6 +508,31 @@
             <div class="control-row">
                 <span class="control-key">MOUSE</span>
                 <span class="control-action">Aim Direction</span>
+            </div>
+        </div>
+        
+        <!-- Mobile Controls Hint -->
+        <div class="mobile-controls-hint" id="mobileControlsHint">
+            <h3>📱 Touch Controls</h3>
+            <div class="mobile-control-item">
+                <div class="mobile-control-icon">🕹️</div>
+                <span>Left side: Virtual Joystick for movement</span>
+            </div>
+            <div class="mobile-control-item">
+                <div class="mobile-control-icon">⚔️</div>
+                <span>Attack button: Sword strike</span>
+            </div>
+            <div class="mobile-control-item">
+                <div class="mobile-control-icon">🛡️</div>
+                <span>Block button: Shield defense</span>
+            </div>
+            <div class="mobile-control-item">
+                <div class="mobile-control-icon">💨</div>
+                <span>Roll button: Quick dodge</span>
+            </div>
+            <div class="mobile-control-item">
+                <div class="mobile-control-icon">🎯</div>
+                <span>Touch anywhere to aim</span>
             </div>
         </div>
     </div>
@@ -117,6 +607,251 @@
     
     <!-- Game Initialization Script -->
     <script>
+        // Mobile Detection and Device Info
+        const deviceDetector = {
+            isMobile: false,
+            isTablet: false,
+            isTouchDevice: false,
+            deviceType: 'desktop',
+            screenWidth: 0,
+            screenHeight: 0,
+            pixelRatio: 1,
+            orientation: 'landscape',
+            
+            detect() {
+                // Check for mobile user agents
+                const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+                this.isMobile = mobileRegex.test(navigator.userAgent);
+                
+                // Check for tablet
+                const tabletRegex = /iPad|Android(?!.*Mobile)|Tablet/i;
+                this.isTablet = tabletRegex.test(navigator.userAgent);
+                
+                // Check for touch support
+                this.isTouchDevice = ('ontouchstart' in window) || 
+                                   (navigator.maxTouchPoints > 0) || 
+                                   (navigator.msMaxTouchPoints > 0);
+                
+                // Determine device type
+                if (this.isTablet) {
+                    this.deviceType = 'tablet';
+                } else if (this.isMobile) {
+                    this.deviceType = 'mobile';
+                } else if (this.isTouchDevice) {
+                    this.deviceType = 'touch-desktop';
+                } else {
+                    this.deviceType = 'desktop';
+                }
+                
+                // Get screen info
+                this.screenWidth = window.innerWidth;
+                this.screenHeight = window.innerHeight;
+                this.pixelRatio = window.devicePixelRatio || 1;
+                this.orientation = this.screenWidth > this.screenHeight ? 'landscape' : 'portrait';
+                
+                // Log device info
+                console.log('Device Detection:', {
+                    type: this.deviceType,
+                    isMobile: this.isMobile,
+                    isTablet: this.isTablet,
+                    isTouchDevice: this.isTouchDevice,
+                    screen: `${this.screenWidth}x${this.screenHeight}`,
+                    pixelRatio: this.pixelRatio,
+                    orientation: this.orientation,
+                    userAgent: navigator.userAgent
+                });
+                
+                return this;
+            },
+            
+            updateOrientation() {
+                const oldOrientation = this.orientation;
+                this.screenWidth = window.innerWidth;
+                this.screenHeight = window.innerHeight;
+                this.orientation = this.screenWidth > this.screenHeight ? 'landscape' : 'portrait';
+                
+                if (oldOrientation !== this.orientation) {
+                    console.log('Orientation changed:', this.orientation);
+                    this.handleOrientationChange();
+                }
+            },
+            
+            handleOrientationChange() {
+                const warning = document.getElementById('orientationWarning');
+                
+                // Check if user has already chosen to continue in portrait mode
+                const allowPortrait = localStorage.getItem('allowPortraitMode');
+                const portraitTimestamp = localStorage.getItem('portraitModeTimestamp');
+                
+                // Only show warning if:
+                // 1. Device is mobile and in portrait mode
+                // 2. User hasn't chosen to continue in portrait mode, OR
+                // 3. It's been more than 24 hours since they made that choice
+                const hoursSinceChoice = portraitTimestamp ? 
+                    (Date.now() - parseInt(portraitTimestamp)) / (1000 * 60 * 60) : 
+                    Infinity;
+                
+                if (this.isMobile && this.orientation === 'portrait') {
+                    // Show warning if no preference or it's been more than 24 hours
+                    if (!allowPortrait || hoursSinceChoice > 24) {
+                        warning.classList.add('visible');
+                        this.addSparkles();
+                        
+                        // Add a welcoming sound effect if available
+                        try {
+                            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
+                            audio.volume = 0.3;
+                            audio.play().catch(() => {}); // Ignore if audio fails
+                        } catch(e) {}
+                    } else {
+                        // User has chosen portrait mode recently, don't show warning
+                        console.log('Portrait mode allowed by user preference');
+                    }
+                } else {
+                    warning.classList.remove('visible');
+                    this.removeSparkles();
+                    
+                    // Clear portrait mode preference when user rotates to landscape
+                    if (this.orientation === 'landscape' && allowPortrait) {
+                        localStorage.removeItem('allowPortraitMode');
+                        localStorage.removeItem('portraitModeTimestamp');
+                        console.log('Portrait mode preference cleared - user rotated to landscape');
+                    }
+                }
+            },
+            
+            addSparkles() {
+                // Add random sparkles to the orientation warning
+                const warning = document.getElementById('orientationWarning');
+                if (!warning) return;
+                
+                // Remove existing sparkles first
+                this.removeSparkles();
+                
+                // Add new sparkles
+                const sparkleCount = 5;
+                for (let i = 0; i < sparkleCount; i++) {
+                    setTimeout(() => {
+                        const sparkle = document.createElement('div');
+                        sparkle.className = 'sparkle';
+                        sparkle.style.left = Math.random() * 100 + '%';
+                        sparkle.style.top = Math.random() * 100 + '%';
+                        sparkle.style.animationDelay = Math.random() * 2 + 's';
+                        warning.appendChild(sparkle);
+                        
+                        // Remove sparkle after animation
+                        setTimeout(() => sparkle.remove(), 2000);
+                    }, i * 200);
+                }
+                
+                // Keep adding sparkles periodically
+                this.sparkleInterval = setInterval(() => {
+                    if (warning.classList.contains('visible')) {
+                        const sparkle = document.createElement('div');
+                        sparkle.className = 'sparkle';
+                        sparkle.style.left = Math.random() * 100 + '%';
+                        sparkle.style.top = Math.random() * 100 + '%';
+                        warning.appendChild(sparkle);
+                        
+                        setTimeout(() => sparkle.remove(), 2000);
+                    }
+                }, 500);
+            },
+            
+            removeSparkles() {
+                // Clear sparkle interval
+                if (this.sparkleInterval) {
+                    clearInterval(this.sparkleInterval);
+                    this.sparkleInterval = null;
+                }
+                
+                // Remove all existing sparkles
+                const sparkles = document.querySelectorAll('.sparkle');
+                sparkles.forEach(sparkle => sparkle.remove());
+            },
+            
+            getPerformanceMode() {
+                // Determine performance mode based on device
+                if (this.isMobile) {
+                    if (this.pixelRatio > 2 || this.screenWidth * this.screenHeight > 2000000) {
+                        return 'low'; // High-res mobile devices need optimization
+                    }
+                    return 'medium';
+                } else if (this.isTablet) {
+                    return 'medium';
+                }
+                return 'high';
+            },
+            
+            showDeviceInfo() {
+                const deviceInfo = document.getElementById('deviceInfo');
+                const deviceTypeSpan = document.getElementById('deviceType');
+                const screenSizeSpan = document.getElementById('screenSize');
+                const touchSupportSpan = document.getElementById('touchSupport');
+                
+                if (deviceInfo && deviceTypeSpan && screenSizeSpan && touchSupportSpan) {
+                    deviceTypeSpan.textContent = this.deviceType.charAt(0).toUpperCase() + this.deviceType.slice(1);
+                    screenSizeSpan.textContent = `${this.screenWidth}x${this.screenHeight}`;
+                    touchSupportSpan.textContent = this.isTouchDevice ? 'Touch' : 'No Touch';
+                    
+                    // Show device info for mobile/tablet or if debug mode
+                    if (this.isMobile || this.isTablet || window.location.hash === '#debug') {
+                        deviceInfo.classList.add('visible');
+                    }
+                }
+                
+                // Update performance mode indicator
+                const perfMode = document.getElementById('performanceMode');
+                const perfModeText = document.getElementById('perfModeText');
+                if (perfMode && perfModeText) {
+                    const mode = this.getPerformanceMode();
+                    perfModeText.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+                    
+                    if (this.isMobile || this.isTablet) {
+                        perfMode.classList.add('visible');
+                    }
+                }
+            },
+            
+            adjustUIForMobile() {
+                // Show/hide appropriate controls
+                const desktopControls = document.getElementById('desktopControls');
+                const mobileControlsHint = document.getElementById('mobileControlsHint');
+                
+                if (this.isMobile || this.isTablet || this.isTouchDevice) {
+                    if (desktopControls) desktopControls.style.display = 'none';
+                    if (mobileControlsHint) mobileControlsHint.classList.add('visible');
+                    
+                    // Hide ability key hints on mobile
+                    document.querySelectorAll('.ability-key').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                } else {
+                    if (desktopControls) desktopControls.style.display = 'block';
+                    if (mobileControlsHint) mobileControlsHint.classList.remove('visible');
+                }
+                
+                // Handle orientation for mobile
+                this.handleOrientationChange();
+            },
+            
+            addTouchFeedback() {
+                if (!this.isTouchDevice) return;
+                
+                document.addEventListener('touchstart', (e) => {
+                    for (let touch of e.touches) {
+                        const feedback = document.createElement('div');
+                        feedback.className = 'touch-feedback';
+                        feedback.style.left = touch.clientX - 20 + 'px';
+                        feedback.style.top = touch.clientY - 20 + 'px';
+                        document.body.appendChild(feedback);
+                        
+                        setTimeout(() => feedback.remove(), 500);
+                    }
+                });
+            }
+        };
+        
         // Game state
         let game = null;
         let wasmReady = false;
@@ -267,16 +1002,49 @@
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
                 
+                // Adjust canvas resolution for mobile performance
+                if (deviceDetector.isMobile) {
+                    const perfMode = deviceDetector.getPerformanceMode();
+                    if (perfMode === 'low') {
+                        // Reduce resolution for better performance
+                        const scale = 0.75;
+                        canvas.width = Math.floor(window.innerWidth * scale);
+                        canvas.height = Math.floor(window.innerHeight * scale);
+                        canvas.style.width = window.innerWidth + 'px';
+                        canvas.style.height = window.innerHeight + 'px';
+                        console.log('Mobile performance mode: Low resolution scaling applied');
+                    }
+                }
+                
                 console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
                 console.log('WASM ready:', wasmReady);
+                console.log('Device type:', deviceDetector.deviceType);
                 
                 // Check if EnhancedCombatGame is available
                 if (typeof EnhancedCombatGame === 'undefined') {
                     throw new Error('Game engine not loaded');
                 }
                 
-                // Create game instance
+                // Create game instance with mobile settings
                 game = new EnhancedCombatGame(canvas);
+                
+                // Apply mobile-specific settings
+                if (deviceDetector.isMobile || deviceDetector.isTablet) {
+                    game.isMobile = true;
+                    game.performanceMode = deviceDetector.getPerformanceMode();
+                    
+                    // Reduce particle effects on mobile
+                    if (game.performanceMode === 'low') {
+                        game.maxParticles = 50; // Reduce from default
+                        game.shadowsEnabled = false;
+                    }
+                    
+                    console.log('Mobile optimizations applied:', {
+                        performanceMode: game.performanceMode,
+                        maxParticles: game.maxParticles || 'default',
+                        shadowsEnabled: game.shadowsEnabled !== false
+                    });
+                }
                 
                 // Pass WASM module if available
                 if (wasmReady && wasmInitializer && wasmInitializer.isReady()) {
@@ -288,6 +1056,13 @@
                 
                 // Initialize game
                 game.init();
+                
+                // Initialize mobile controls if needed
+                if (deviceDetector.isTouchDevice && typeof MobileControls !== 'undefined') {
+                    const mobileControls = new MobileControls(canvas, game);
+                    game.mobileControls = mobileControls;
+                    console.log('Mobile controls initialized');
+                }
                 
                 // Hide loading spinner
                 loadingSpinner.classList.remove('active');
@@ -315,8 +1090,18 @@
          * Handle window resize
          */
         function handleResize() {
+            // Update device detector
+            deviceDetector.updateOrientation();
+            deviceDetector.showDeviceInfo();
+            
+            // Resize game canvas
             if (game && game.resizeCanvas) {
                 game.resizeCanvas();
+            }
+            
+            // Update mobile controls positions
+            if (game && game.mobileControls && game.mobileControls.handleResize) {
+                game.mobileControls.handleResize();
             }
         }
         
@@ -346,6 +1131,12 @@
          */
         window.addEventListener('load', async function() {
             console.log('Page loaded, initializing...');
+            
+            // Detect device type
+            deviceDetector.detect();
+            deviceDetector.showDeviceInfo();
+            deviceDetector.adjustUIForMobile();
+            deviceDetector.addTouchFeedback();
             
             // Start WASM initialization (non-blocking)
             initializeWASM().then(success => {
@@ -432,11 +1223,23 @@
         
         // Event listeners
         window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
         
         // Prevent scrolling on mobile
         document.addEventListener('touchmove', function(e) {
+            if (e.target.tagName !== 'CANVAS') return;
             e.preventDefault();
         }, { passive: false });
+        
+        // Prevent double-tap zoom on mobile
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
         
         // Prevent context menu
         document.addEventListener('contextmenu', function(e) {
@@ -467,6 +1270,86 @@
                 }
             }
         });
+        
+        // Mobile-specific performance monitoring
+        if (window.performance && window.performance.memory) {
+            setInterval(() => {
+                if (deviceDetector.isMobile && game) {
+                    const memUsed = window.performance.memory.usedJSHeapSize / 1048576;
+                    const memLimit = window.performance.memory.jsHeapSizeLimit / 1048576;
+                    const memPercent = (memUsed / memLimit) * 100;
+                    
+                    if (memPercent > 80) {
+                        console.warn('High memory usage on mobile:', memPercent.toFixed(1) + '%');
+                        // Could trigger performance optimizations here
+                    }
+                }
+            }, 5000);
+        }
+
+        // Function to continue in portrait mode (for the button)
+        function continuePortraitMode() {
+            const warning = document.getElementById('orientationWarning');
+            
+            // Store user preference
+            localStorage.setItem('allowPortraitMode', 'true');
+            localStorage.setItem('portraitModeTimestamp', Date.now().toString());
+            
+            // Hide the warning with animation
+            warning.style.animation = 'fadeOut 0.5s ease-out';
+            setTimeout(() => {
+                warning.classList.remove('visible');
+                warning.style.animation = '';
+                deviceDetector.removeSparkles();
+            }, 500);
+            
+            // Show a brief notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 25px;
+                font-size: 14px;
+                z-index: 10001;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                animation: slideDown 0.5s ease-out;
+            `;
+            notification.innerHTML = '⚠️ Playing in portrait mode - Rotate anytime for better experience!';
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideUp 0.5s ease-out';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+            
+            // Adjust game settings for portrait mode if game is running
+            if (window.game) {
+                window.game.portraitMode = true;
+                // Could adjust UI scale or other settings here
+                console.log('Portrait mode enabled by user choice');
+            }
+        }
+        
+        // Add fadeOut animation to the styles
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes fadeOut {
+                from {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+                to {
+                    opacity: 0;
+                    transform: scale(0.9);
+                }
+            }
+        `;
+        document.head.appendChild(styleSheet);
     </script>
 </body>
 </html>
