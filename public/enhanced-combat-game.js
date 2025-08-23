@@ -847,11 +847,20 @@
         // Normal movement (not while shielding or rolling)
         let dx = 0, dy = 0;
         
-              // Keyboard input - ZQSD controls
-      if (this.input.keys['z'] || this.input.keys['arrowup']) dy -= 1;
-      if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
-      if (this.input.keys['q'] || this.input.keys['arrowleft']) dx -= 1;
-      if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+        // Check for joystick input first (mobile controls)
+        if (this.input.joystick) {
+          const joystickInput = this.input.joystick.getInput();
+          dx = joystickInput.x;
+          dy = joystickInput.y;
+        }
+        
+        // Keyboard input - ZQSD controls (if no joystick input)
+        if (dx === 0 && dy === 0) {
+          if (this.input.keys['z'] || this.input.keys['arrowup']) dy -= 1;
+          if (this.input.keys['s'] || this.input.keys['arrowdown']) dy += 1;
+          if (this.input.keys['q'] || this.input.keys['arrowleft']) dx -= 1;
+          if (this.input.keys['d'] || this.input.keys['arrowright']) dx += 1;
+        }
         
         // Track movement direction for facing
         if (dx !== 0 || dy !== 0) {
@@ -1366,6 +1375,11 @@
       
       // Render minimap (on top of everything)
       this.renderMinimap();
+      
+      // Render mobile controls (if available)
+      if (this.mobileControls && this.mobileControls.render) {
+        this.mobileControls.render(this.ctx);
+      }
     }
     
     renderGrid() {
@@ -1687,11 +1701,94 @@
       this.lastTime = now;
       
       this.update(deltaTime);
-      this.render();
-      
-      requestAnimationFrame(() => this.gameLoop());
+          this.render();
+    
+    requestAnimationFrame(() => this.gameLoop());
+  }
+  
+  // Mobile control methods
+  setJoystick(joystick) {
+    this.input.joystick = joystick;
+  }
+  
+  setButton(name, button) {
+    if (!this.input.buttons) {
+      this.input.buttons = {};
+    }
+    this.input.buttons[name] = button;
+  }
+  
+  // Mobile control action handlers
+  handleAttack() {
+    if (!this.player.swordActive && this.player.swordCooldown <= 0 && !this.player.rolling) {
+      this.performSwordAttack();
+    } else {
+      this.addToInputBuffer('attack');
     }
   }
+  
+  handleAttackRelease() {
+    // Optional: handle attack button release if needed
+  }
+  
+  handleBlock() {
+    if (!this.player.shielding && this.player.shieldCooldown <= 0 && !this.player.rolling && !this.player.swordActive) {
+      this.startShield();
+    } else {
+      this.addToInputBuffer('shield');
+    }
+  }
+  
+  handleBlockRelease() {
+    if (this.player.shielding) {
+      this.endShield();
+    }
+  }
+  
+  handleRoll() {
+    if (!this.player.rolling && this.player.rollCooldown <= 0 && !this.player.shielding) {
+      this.performRoll();
+    } else {
+      this.addToInputBuffer('roll');
+    }
+  }
+  
+  handleBoost() {
+    // Optional: implement speed boost
+    if (this.player.energy > 10) {
+      this.player.speed = CONFIG.PLAYER_SPEED * 1.5;
+      this.player.energy -= 0.5;
+    }
+  }
+  
+  handleShoot() {
+    // Optional: implement ranged attack
+    if (this.player.energy >= 20 && !this.player.rolling && !this.player.shielding) {
+      // Create a projectile
+      const angle = this.player.facing;
+      this.projectiles.push({
+        x: this.player.x + Math.cos(angle) * 30,
+        y: this.player.y + Math.sin(angle) * 30,
+        vx: Math.cos(angle) * 10,
+        vy: Math.sin(angle) * 10,
+        damage: 20,
+        radius: 5,
+        color: '#ffff00',
+        lifetime: 60
+      });
+      this.player.energy -= 20;
+      
+      // Visual feedback
+      if (this.vfx && this.vfx.createMuzzleFlash) {
+        this.vfx.createMuzzleFlash(
+          this.player.x + Math.cos(angle) * 30,
+          this.player.y + Math.sin(angle) * 30,
+          angle
+        );
+      }
+    }
+  }
+}
   
   // Export to global scope
   window.EnhancedCombatGame = EnhancedCombatGame;
