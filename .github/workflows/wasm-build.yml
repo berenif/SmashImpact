@@ -74,8 +74,18 @@ jobs:
           # Create wasm output directory
           mkdir -p wasm
           
+          # List of source files needed for Wolf AI
+          SOURCES="wolf_ai_wasm.cpp \
+                   wasm/src/entity.cpp \
+                   wasm/src/math/vector2_simd.cpp \
+                   wasm/src/ai/wolf_ai.cpp"
+          
+          # Include directories
+          INCLUDES="-I. -Iwasm/include"
+          
           # Compile the main WASM module with embind support
-          em++ wolf_ai_wasm.cpp \
+          em++ $SOURCES \
+            $INCLUDES \
             -O3 \
             -s WASM=1 \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
@@ -86,6 +96,7 @@ jobs:
             -s SINGLE_FILE=0 \
             -lembind \
             --bind \
+            -std=c++17 \
             -o wasm/wolf_ai.js
           
           echo "WASM build completed successfully!"

@@ -13,9 +13,19 @@ fi
 # Create public directory if it doesn't exist
 mkdir -p public
 
+# List of source files needed for Wolf AI
+SOURCES="wolf_ai_wasm.cpp \
+         wasm/src/entity.cpp \
+         wasm/src/math/vector2_simd.cpp \
+         wasm/src/ai/wolf_ai.cpp"
+
+# Include directories
+INCLUDES="-I. -Iwasm/include"
+
 # Compile the Wolf AI module
-echo "Compiling wolf_ai_wasm.cpp..."
-em++ wolf_ai_wasm.cpp \
+echo "Compiling Wolf AI WASM module..."
+em++ $SOURCES \
+    $INCLUDES \
     -O3 \
     -s WASM=1 \
     -s MODULARIZE=1 \
@@ -27,6 +37,7 @@ em++ wolf_ai_wasm.cpp \
     -s ASSERTIONS=1 \
     -lembind \
     --bind \
+    -std=c++17 \
     -o public/wolf_ai.js
 
 # Check if compilation was successful
