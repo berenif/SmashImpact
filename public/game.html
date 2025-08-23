@@ -161,7 +161,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.95);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             display: none;
             align-items: center;
@@ -170,6 +170,18 @@
             z-index: 10000;
             padding: 20px;
             text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
         
         .orientation-warning.visible {
@@ -178,22 +190,246 @@
         
         .orientation-warning h2 {
             margin-bottom: 20px;
-            font-size: 24px;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.6s ease-out 0.2s both;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
         
         .orientation-warning p {
             font-size: 16px;
             margin-bottom: 20px;
+            opacity: 0.95;
+            animation: slideUp 0.6s ease-out 0.4s both;
+            max-width: 300px;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .rotate-icon-container {
+            position: relative;
+            margin: 30px 0;
+            animation: slideUp 0.6s ease-out 0.3s both;
         }
         
         .rotate-icon {
-            font-size: 48px;
-            animation: rotateIcon 2s ease-in-out infinite;
+            font-size: 80px;
+            animation: rotatePhone 3s ease-in-out infinite;
+            display: inline-block;
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
         }
         
-        @keyframes rotateIcon {
-            0%, 100% { transform: rotate(-90deg); }
-            50% { transform: rotate(0deg); }
+        @keyframes rotatePhone {
+            0%, 100% { 
+                transform: rotate(0deg) scale(1);
+            }
+            25% {
+                transform: rotate(-10deg) scale(1.05);
+            }
+            50% { 
+                transform: rotate(90deg) scale(1.1);
+            }
+            75% {
+                transform: rotate(80deg) scale(1.05);
+            }
+        }
+        
+        .rotation-arrows {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 120px;
+            pointer-events: none;
+        }
+        
+        .rotation-arrow {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            opacity: 0;
+            animation: arrowPulse 3s ease-in-out infinite;
+        }
+        
+        .rotation-arrow::before {
+            content: '↻';
+            font-size: 30px;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .rotation-arrow.top-right {
+            top: -10px;
+            right: -10px;
+            animation-delay: 0.5s;
+        }
+        
+        .rotation-arrow.bottom-left {
+            bottom: -10px;
+            left: -10px;
+            transform: rotate(180deg);
+            animation-delay: 0.7s;
+        }
+        
+        @keyframes arrowPulse {
+            0%, 30%, 100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            40%, 60% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+        
+        .landscape-benefits {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            animation: slideUp 0.6s ease-out 0.6s both;
+        }
+        
+        .benefit-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .benefit-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .benefit-item:nth-child(1) .benefit-icon {
+            animation-delay: 0s;
+        }
+        
+        .benefit-item:nth-child(2) .benefit-icon {
+            animation-delay: 0.5s;
+        }
+        
+        .benefit-item:nth-child(3) .benefit-icon {
+            animation-delay: 1s;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        .benefit-text {
+            font-size: 12px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        
+        .continue-portrait-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 25px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            animation: slideUp 0.6s ease-out 0.8s both;
+        }
+        
+        .continue-portrait-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: scale(1.05);
+        }
+        
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            animation: sparkle 2s linear infinite;
+        }
+        
+        @keyframes sparkle {
+            0% {
+                opacity: 0;
+                transform: scale(0) rotate(0deg);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1) rotate(180deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0) rotate(360deg);
+            }
+        }
+        
+        .sparkle::before {
+            content: '✨';
+            font-size: 20px;
+        }
+        
+        /* Responsive adjustments for small screens */
+        @media (max-height: 500px) {
+            .orientation-warning h2 {
+                font-size: 20px;
+                margin-bottom: 10px;
+            }
+            
+            .rotate-icon {
+                font-size: 60px;
+            }
+            
+            .landscape-benefits {
+                gap: 20px;
+                margin: 20px 0;
+            }
+            
+            .benefit-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+            
+            .benefit-text {
+                font-size: 11px;
+            }
         }
     </style>
 </head>
@@ -212,10 +448,30 @@
     
     <!-- Orientation Warning (for mobile portrait mode) -->
     <div class="orientation-warning" id="orientationWarning">
-        <div class="rotate-icon">📱</div>
-        <h2>Rotate Your Device</h2>
-        <p>For the best gaming experience, please rotate your device to landscape mode.</p>
-        <p style="font-size: 14px; opacity: 0.7;">The game is optimized for landscape orientation</p>
+        <div class="rotate-icon-container">
+            <div class="rotate-icon">📱</div>
+            <div class="rotation-arrows">
+                <div class="rotation-arrow top-right"></div>
+                <div class="rotation-arrow bottom-left"></div>
+            </div>
+        </div>
+        <h2>🎮 Ready for Battle? 🎮</h2>
+        <p>Rotate your device to landscape mode for the ultimate gaming experience!</p>
+        <div class="landscape-benefits">
+            <div class="benefit-item">
+                <div class="benefit-icon">🎮</div>
+                <div class="benefit-text">Better controls</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">⚔️</div>
+                <div class="benefit-text">Enhanced combat</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">🎯</div>
+                <div class="benefit-text">Wider view</div>
+            </div>
+        </div>
+        <button class="continue-portrait-btn" onclick="continuePortraitMode()">Continue in Portrait Mode</button>
     </div>
     
     <!-- Start Screen -->
@@ -422,11 +678,96 @@
             
             handleOrientationChange() {
                 const warning = document.getElementById('orientationWarning');
+                
+                // Check if user has already chosen to continue in portrait mode
+                const allowPortrait = localStorage.getItem('allowPortraitMode');
+                const portraitTimestamp = localStorage.getItem('portraitModeTimestamp');
+                
+                // Only show warning if:
+                // 1. Device is mobile and in portrait mode
+                // 2. User hasn't chosen to continue in portrait mode, OR
+                // 3. It's been more than 24 hours since they made that choice
+                const hoursSinceChoice = portraitTimestamp ? 
+                    (Date.now() - parseInt(portraitTimestamp)) / (1000 * 60 * 60) : 
+                    Infinity;
+                
                 if (this.isMobile && this.orientation === 'portrait') {
-                    warning.classList.add('visible');
+                    // Show warning if no preference or it's been more than 24 hours
+                    if (!allowPortrait || hoursSinceChoice > 24) {
+                        warning.classList.add('visible');
+                        this.addSparkles();
+                        
+                        // Add a welcoming sound effect if available
+                        try {
+                            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
+                            audio.volume = 0.3;
+                            audio.play().catch(() => {}); // Ignore if audio fails
+                        } catch(e) {}
+                    } else {
+                        // User has chosen portrait mode recently, don't show warning
+                        console.log('Portrait mode allowed by user preference');
+                    }
                 } else {
                     warning.classList.remove('visible');
+                    this.removeSparkles();
+                    
+                    // Clear portrait mode preference when user rotates to landscape
+                    if (this.orientation === 'landscape' && allowPortrait) {
+                        localStorage.removeItem('allowPortraitMode');
+                        localStorage.removeItem('portraitModeTimestamp');
+                        console.log('Portrait mode preference cleared - user rotated to landscape');
+                    }
                 }
+            },
+            
+            addSparkles() {
+                // Add random sparkles to the orientation warning
+                const warning = document.getElementById('orientationWarning');
+                if (!warning) return;
+                
+                // Remove existing sparkles first
+                this.removeSparkles();
+                
+                // Add new sparkles
+                const sparkleCount = 5;
+                for (let i = 0; i < sparkleCount; i++) {
+                    setTimeout(() => {
+                        const sparkle = document.createElement('div');
+                        sparkle.className = 'sparkle';
+                        sparkle.style.left = Math.random() * 100 + '%';
+                        sparkle.style.top = Math.random() * 100 + '%';
+                        sparkle.style.animationDelay = Math.random() * 2 + 's';
+                        warning.appendChild(sparkle);
+                        
+                        // Remove sparkle after animation
+                        setTimeout(() => sparkle.remove(), 2000);
+                    }, i * 200);
+                }
+                
+                // Keep adding sparkles periodically
+                this.sparkleInterval = setInterval(() => {
+                    if (warning.classList.contains('visible')) {
+                        const sparkle = document.createElement('div');
+                        sparkle.className = 'sparkle';
+                        sparkle.style.left = Math.random() * 100 + '%';
+                        sparkle.style.top = Math.random() * 100 + '%';
+                        warning.appendChild(sparkle);
+                        
+                        setTimeout(() => sparkle.remove(), 2000);
+                    }
+                }, 500);
+            },
+            
+            removeSparkles() {
+                // Clear sparkle interval
+                if (this.sparkleInterval) {
+                    clearInterval(this.sparkleInterval);
+                    this.sparkleInterval = null;
+                }
+                
+                // Remove all existing sparkles
+                const sparkles = document.querySelectorAll('.sparkle');
+                sparkles.forEach(sparkle => sparkle.remove());
             },
             
             getPerformanceMode() {
@@ -945,6 +1286,70 @@
                 }
             }, 5000);
         }
+
+        // Function to continue in portrait mode (for the button)
+        function continuePortraitMode() {
+            const warning = document.getElementById('orientationWarning');
+            
+            // Store user preference
+            localStorage.setItem('allowPortraitMode', 'true');
+            localStorage.setItem('portraitModeTimestamp', Date.now().toString());
+            
+            // Hide the warning with animation
+            warning.style.animation = 'fadeOut 0.5s ease-out';
+            setTimeout(() => {
+                warning.classList.remove('visible');
+                warning.style.animation = '';
+                deviceDetector.removeSparkles();
+            }, 500);
+            
+            // Show a brief notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 25px;
+                font-size: 14px;
+                z-index: 10001;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                animation: slideDown 0.5s ease-out;
+            `;
+            notification.innerHTML = '⚠️ Playing in portrait mode - Rotate anytime for better experience!';
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideUp 0.5s ease-out';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+            
+            // Adjust game settings for portrait mode if game is running
+            if (window.game) {
+                window.game.portraitMode = true;
+                // Could adjust UI scale or other settings here
+                console.log('Portrait mode enabled by user choice');
+            }
+        }
+        
+        // Add fadeOut animation to the styles
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes fadeOut {
+                from {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+                to {
+                    opacity: 0;
+                    transform: scale(0.9);
+                }
+            }
+        `;
+        document.head.appendChild(styleSheet);
     </script>
 </body>
 </html>
