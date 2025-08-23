@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Game - 3x Map Size Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0a0a0a;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        #minimap {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.7);
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .control-row {
+            margin: 5px 0;
+        }
+        
+        .key {
+            display: inline-block;
+            background: #333;
+            padding: 3px 8px;
+            border-radius: 3px;
+            margin-right: 10px;
+            min-width: 60px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <canvas id="minimap"></canvas>
+    
+    <div id="info">
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Camera: <span id="cameraPos">0, 0</span></div>
+        <div>Player: <span id="playerPos">0, 0</span></div>
+        <div>World: <span id="worldSize">0x0</span></div>
+        <div>Enemies: <span id="enemyCount">0</span></div>
+    </div>
+    
+    <div id="controls">
+        <h3>Controls</h3>
+        <div class="control-row"><span class="key">WASD</span> Move</div>
+        <div class="control-row"><span class="key">Mouse</span> Aim</div>
+        <div class="control-row"><span class="key">Click</span> Attack</div>
+        <div class="control-row"><span class="key">Space</span> Roll</div>
+        <div class="control-row"><span class="key">Shift</span> Block</div>
+    </div>
+    
+    <script type="module">
+        import GameEngineModule from './game_engine.js';
+        
+        let gameEngine = null;
+        let canvas = null;
+        let ctx = null;
+        let minimapCanvas = null;
+        let minimapCtx = null;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 0;
+        
+        // Input state
+        const keys = {};
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        async function init() {
+            console.log('Initializing WASM game with 3x map size...');
+            
+            // Get canvases
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            minimapCanvas = document.getElementById('minimap');
+            minimapCtx = minimapCanvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Initialize WASM module
+            const Module = await GameEngineModule();
+            
+            // Create game engine with viewport size (world will be 3x larger)
+            gameEngine = new Module.GameEngine(canvas.width, canvas.height);
+            
+            // Create player at center of world
+            const cameraInfo = gameEngine.getCameraInfo();
+            const playerX = cameraInfo.worldWidth / 2;
+            const playerY = cameraInfo.worldHeight / 2;
+            gameEngine.createPlayer(playerX, playerY);
+            
+            // Update world size display
+            document.getElementById('worldSize').textContent = 
+                `${Math.round(cameraInfo.worldWidth)}x${Math.round(cameraInfo.worldHeight)}`;
+            
+            // Spawn enemies throughout the world
+            spawnEnemies();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+            
+            // Update FPS counter
+            setInterval(updateFPS, 1000);
+        }
+        
+        function spawnEnemies() {
+            const cameraInfo = gameEngine.getCameraInfo();
+            const numEnemies = 20;
+            
+            for (let i = 0; i < numEnemies; i++) {
+                const x = Math.random() * cameraInfo.worldWidth;
+                const y = Math.random() * cameraInfo.worldHeight;
+                const speed = 1 + Math.random() * 2;
+                gameEngine.createEnemy(x, y, speed);
+            }
+        }
+        
+        function setupEventListeners() {
+            // Keyboard events
+            window.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                
+                if (e.key === ' ') {
+                    gameEngine.playerRoll();
+                }
+                if (e.key === 'Shift') {
+                    gameEngine.startBlock(1);
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+                
+                if (e.key === 'Shift') {
+                    gameEngine.endBlock(1);
+                }
+            });
+            
+            // Mouse events
+            canvas.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+            
+            canvas.addEventListener('click', () => {
+                gameEngine.playerAttack();
+            });
+            
+            // Window resize
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gameEngine.setWorldBounds(canvas.width, canvas.height);
+            });
+        }
+        
+        function updateInput() {
+            // Calculate movement input
+            let dx = 0;
+            let dy = 0;
+            
+            if (keys['w']) dy -= 1;
+            if (keys['s']) dy += 1;
+            if (keys['a']) dx -= 1;
+            if (keys['d']) dx += 1;
+            
+            // Update player input (mouse position is in screen coordinates)
+            gameEngine.updatePlayerInput(dx, dy, mouseX, mouseY);
+        }
+        
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Get camera info
+            const cameraInfo = gameEngine.getCameraInfo();
+            
+            // Draw grid
+            drawGrid(cameraInfo);
+            
+            // Get all entities
+            const entities = gameEngine.getEntityPositions();
+            
+            // Draw entities
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                
+                // Only draw if on screen
+                if (entity.isOnScreen) {
+                    drawEntity(entity);
+                }
+            }
+            
+            // Draw world boundaries
+            drawWorldBoundaries(cameraInfo);
+            
+            // Update minimap
+            updateMinimap(entities, cameraInfo);
+            
+            // Update info display
+            updateInfo(entities, cameraInfo);
+        }
+        
+        function drawGrid(cameraInfo) {
+            const gridSize = 50;
+            ctx.strokeStyle = 'rgba(100, 100, 200, 0.1)';
+            ctx.lineWidth = 1;
+            
+            // Calculate visible grid bounds
+            const startX = Math.floor(cameraInfo.x / gridSize) * gridSize;
+            const startY = Math.floor(cameraInfo.y / gridSize) * gridSize;
+            const endX = Math.ceil((cameraInfo.x + cameraInfo.width) / gridSize) * gridSize;
+            const endY = Math.ceil((cameraInfo.y + cameraInfo.height) / gridSize) * gridSize;
+            
+            // Draw vertical lines
+            for (let x = startX; x <= endX; x += gridSize) {
+                const screenX = x - cameraInfo.x;
+                ctx.beginPath();
+                ctx.moveTo(screenX, 0);
+                ctx.lineTo(screenX, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Draw horizontal lines
+            for (let y = startY; y <= endY; y += gridSize) {
+                const screenY = y - cameraInfo.y;
+                ctx.beginPath();
+                ctx.moveTo(0, screenY);
+                ctx.lineTo(canvas.width, screenY);
+                ctx.stroke();
+            }
+        }
+        
+        function drawWorldBoundaries(cameraInfo) {
+            ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(
+                -cameraInfo.x,
+                -cameraInfo.y,
+                cameraInfo.worldWidth,
+                cameraInfo.worldHeight
+            );
+        }
+        
+        function drawEntity(entity) {
+            ctx.save();
+            
+            // Set color based on entity type
+            switch (entity.type) {
+                case 0: // PLAYER
+                    ctx.fillStyle = '#00ff00';
+                    ctx.shadowColor = '#00ff00';
+                    break;
+                case 1: // ENEMY
+                    ctx.fillStyle = '#ff4444';
+                    ctx.shadowColor = '#ff4444';
+                    break;
+                case 2: // WOLF
+                    ctx.fillStyle = '#ff8800';
+                    ctx.shadowColor = '#ff8800';
+                    break;
+                default:
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = '#ffffff';
+            }
+            
+            ctx.shadowBlur = 10;
+            
+            // Draw entity circle
+            ctx.beginPath();
+            ctx.arc(entity.screenX, entity.screenY, entity.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw health bar
+            if (entity.health < entity.maxHealth) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(entity.screenX - 20, entity.screenY - entity.radius - 10, 40, 4);
+                
+                ctx.fillStyle = '#ff0000';
+                const healthPercent = entity.health / entity.maxHealth;
+                ctx.fillRect(entity.screenX - 20, entity.screenY - entity.radius - 10, 40 * healthPercent, 4);
+            }
+            
+            ctx.restore();
+        }
+        
+        function updateMinimap(entities, cameraInfo) {
+            const scale = 150 / Math.max(cameraInfo.worldWidth, cameraInfo.worldHeight);
+            
+            // Clear minimap
+            minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            minimapCtx.fillRect(0, 0, 150, 150);
+            
+            // Draw world bounds
+            minimapCtx.strokeStyle = 'rgba(100, 100, 255, 0.5)';
+            minimapCtx.lineWidth = 1;
+            minimapCtx.strokeRect(0, 0, cameraInfo.worldWidth * scale, cameraInfo.worldHeight * scale);
+            
+            // Draw camera viewport
+            minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            minimapCtx.fillRect(
+                cameraInfo.x * scale,
+                cameraInfo.y * scale,
+                cameraInfo.width * scale,
+                cameraInfo.height * scale
+            );
+            
+            // Draw entities on minimap
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                
+                if (entity.type === 0) { // Player
+                    minimapCtx.fillStyle = '#00ff00';
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(entity.x * scale, entity.y * scale, 3, 0, Math.PI * 2);
+                    minimapCtx.fill();
+                } else if (entity.type === 1 || entity.type === 2) { // Enemy or Wolf
+                    minimapCtx.fillStyle = '#ff0000';
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(entity.x * scale, entity.y * scale, 2, 0, Math.PI * 2);
+                    minimapCtx.fill();
+                }
+            }
+        }
+        
+        function updateInfo(entities, cameraInfo) {
+            // Find player
+            let playerPos = null;
+            let enemyCount = 0;
+            
+            for (let i = 0; i < entities.size(); i++) {
+                const entity = entities.get(i);
+                if (entity.type === 0) {
+                    playerPos = { x: entity.x, y: entity.y };
+                } else if (entity.type === 1 || entity.type === 2) {
+                    enemyCount++;
+                }
+            }
+            
+            // Update displays
+            document.getElementById('cameraPos').textContent = 
+                `${Math.round(cameraInfo.x)}, ${Math.round(cameraInfo.y)}`;
+            
+            if (playerPos) {
+                document.getElementById('playerPos').textContent = 
+                    `${Math.round(playerPos.x)}, ${Math.round(playerPos.y)}`;
+            }
+            
+            document.getElementById('enemyCount').textContent = enemyCount;
+        }
+        
+        function updateFPS() {
+            document.getElementById('fps').textContent = Math.round(fps);
+            frameCount = 0;
+        }
+        
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Calculate FPS
+            frameCount++;
+            fps = 1000 / deltaTime;
+            
+            // Update input
+            updateInput();
+            
+            // Update game
+            gameEngine.update(deltaTime);
+            gameEngine.checkCollisions();
+            
+            // Render
+            render();
+            
+            // Continue loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Initialize when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

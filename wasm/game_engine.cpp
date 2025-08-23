@@ -28,6 +28,9 @@ namespace Config {
     constexpr float PROJECTILE_RADIUS = 5.0f;
     constexpr int MAX_ENTITIES = 1000;
     
+    // World configuration - 3x larger than viewport
+    constexpr float WORLD_SCALE = 3.0f;
+    
     // Shield/Block system configuration
     constexpr float SHIELD_DURATION = 2000.0f;
     constexpr float SHIELD_COOLDOWN = 500.0f;
@@ -106,6 +109,48 @@ struct Vector2 {
     
     float dot(const Vector2& other) const {
         return x * other.x + y * other.y;
+    }
+};
+
+// Camera struct for viewport management
+struct Camera {
+    float x, y;           // Camera position (top-left corner)
+    float width, height;  // Viewport dimensions
+    float smoothing;      // Camera smoothing factor
+    
+    Camera() : x(0), y(0), width(800), height(600), smoothing(0.1f) {}
+    Camera(float w, float h) : x(0), y(0), width(w), height(h), smoothing(0.1f) {}
+    
+    void update(float targetX, float targetY, float worldWidth, float worldHeight) {
+        // Target camera position (centered on target)
+        float desiredX = targetX - width / 2;
+        float desiredY = targetY - height / 2;
+        
+        // Smooth camera movement
+        x += (desiredX - x) * smoothing;
+        y += (desiredY - y) * smoothing;
+        
+        // Clamp camera to world boundaries
+        x = std::max(0.0f, std::min(worldWidth - width, x));
+        y = std::max(0.0f, std::min(worldHeight - height, y));
+    }
+    
+    // Convert world coordinates to screen coordinates
+    Vector2 worldToScreen(float worldX, float worldY) const {
+        return Vector2(worldX - x, worldY - y);
+    }
+    
+    // Convert screen coordinates to world coordinates
+    Vector2 screenToWorld(float screenX, float screenY) const {
+        return Vector2(screenX + x, screenY + y);
+    }
+    
+    // Check if a point is visible on screen
+    bool isOnScreen(float worldX, float worldY, float radius = 0) const {
+        return worldX + radius >= x && 
+               worldX - radius <= x + width &&
+               worldY + radius >= y && 
+               worldY - radius <= y + height;
     }
 };
 
@@ -590,6 +635,9 @@ private:
     int nextEntityId;
     float worldWidth;
     float worldHeight;
+    float viewportWidth;
+    float viewportHeight;
+    Camera camera;
     
     // Targeting system
     Entity* currentTarget;
@@ -616,7 +664,10 @@ private:
     
 public:
     GameEngine(float width, float height)
-        : player(nullptr), nextEntityId(1), worldWidth(width), worldHeight(height),
+        : player(nullptr), nextEntityId(1), 
+          viewportWidth(width), viewportHeight(height),
+          worldWidth(width * Config::WORLD_SCALE), worldHeight(height * Config::WORLD_SCALE),
+          camera(width, height),
           currentTarget(nullptr), targetLockEnabled(true), targetingDisabledUntil(0),
           physicsTime(0), collisionTime(0), collisionChecks(0) {
         // Initialize targeting button position (top-right for mobile)
@@ -676,7 +727,9 @@ public:
         if (player && player->active) {
             player->applyInput(dx, dy, 16.0f); // Assume 60 FPS (16ms per frame)
             if (aimX != 0 || aimY != 0) {
-                player->updateFacing(aimX, aimY);
+                // Convert screen coordinates to world coordinates for aiming
+                Vector2 worldAim = camera.screenToWorld(aimX, aimY);
+                player->updateFacing(worldAim.x, worldAim.y);
             }
         }
     }
@@ -698,6 +751,11 @@ public:
                 entity->position.y = std::max(entity->radius, 
                     std::min(worldHeight - entity->radius, entity->position.y));
             }
+        }
+        
+        // Update camera to follow player
+        if (player && player->active) {
+            camera.update(player->position.x, player->position.y, worldWidth, worldHeight);
         }
         
         physicsTime = emscripten_get_now() - startTime;
@@ -850,16 +908,22 @@ public:
         
         for (const auto& entity : entities) {
             if (entity->active) {
+                // Get screen coordinates
+                Vector2 screenPos = camera.worldToScreen(entity->position.x, entity->position.y);
+                
                 emscripten::val entityData = emscripten::val::object();
                 entityData.set("id", entity->id);
                 entityData.set("type", static_cast<int>(entity->type));
                 entityData.set("x", entity->position.x);
                 entityData.set("y", entity->position.y);
+                entityData.set("screenX", screenPos.x);
+                entityData.set("screenY", screenPos.y);
                 entityData.set("vx", entity->velocity.x);
                 entityData.set("vy", entity->velocity.y);
                 entityData.set("radius", entity->radius);
                 entityData.set("health", entity->health);
                 entityData.set("maxHealth", entity->maxHealth);
+                entityData.set("isOnScreen", camera.isOnScreen(entity->position.x, entity->position.y, entity->radius));
                 result.set(index++, entityData);
             }
         }
@@ -907,8 +971,44 @@ public:
     }
     
     void setWorldBounds(float width, float height) {
-        worldWidth = width;
-        worldHeight = height;
+        viewportWidth = width;
+        viewportHeight = height;
+        worldWidth = width * Config::WORLD_SCALE;
+        worldHeight = height * Config::WORLD_SCALE;
+        camera.width = width;
+        camera.height = height;
+    }
+    
+    // Camera-related methods
+    emscripten::val getCameraInfo() {
+        emscripten::val info = emscripten::val::object();
+        info.set("x", camera.x);
+        info.set("y", camera.y);
+        info.set("width", camera.width);
+        info.set("height", camera.height);
+        info.set("worldWidth", worldWidth);
+        info.set("worldHeight", worldHeight);
+        return info;
+    }
+    
+    emscripten::val worldToScreen(float worldX, float worldY) {
+        Vector2 screenPos = camera.worldToScreen(worldX, worldY);
+        emscripten::val result = emscripten::val::object();
+        result.set("x", screenPos.x);
+        result.set("y", screenPos.y);
+        return result;
+    }
+    
+    emscripten::val screenToWorld(float screenX, float screenY) {
+        Vector2 worldPos = camera.screenToWorld(screenX, screenY);
+        emscripten::val result = emscripten::val::object();
+        result.set("x", worldPos.x);
+        result.set("y", worldPos.y);
+        return result;
+    }
+    
+    bool isOnScreen(float worldX, float worldY, float radius) {
+        return camera.isOnScreen(worldX, worldY, radius);
     }
     
     void activateBoost(int playerId) {
@@ -1476,6 +1576,10 @@ EMSCRIPTEN_BINDINGS(game_engine) {
         .function("getPlayerState", &GameEngine::getPlayerState)
         .function("getPerformanceMetrics", &GameEngine::getPerformanceMetrics)
         .function("setWorldBounds", &GameEngine::setWorldBounds)
+        .function("getCameraInfo", &GameEngine::getCameraInfo)
+        .function("worldToScreen", &GameEngine::worldToScreen)
+        .function("screenToWorld", &GameEngine::screenToWorld)
+        .function("isOnScreen", &GameEngine::isOnScreen)
         .function("activateBoost", &GameEngine::activateBoost)
         .function("deactivateBoost", &GameEngine::deactivateBoost)
         .function("playerBoost", &GameEngine::playerBoost)
