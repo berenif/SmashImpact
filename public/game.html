@@ -771,55 +771,7 @@
             
 
             
-            addSparkles() {
-                // Add random sparkles to the orientation warning
-                const warning = document.getElementById('orientationWarning');
-                if (!warning) return;
-                
-                // Remove existing sparkles first
-                this.removeSparkles();
-                
-                // Add new sparkles
-                const sparkleCount = 5;
-                for (let i = 0; i < sparkleCount; i++) {
-                    setTimeout(() => {
-                        const sparkle = document.createElement('div');
-                        sparkle.className = 'sparkle';
-                        sparkle.style.left = Math.random() * 100 + '%';
-                        sparkle.style.top = Math.random() * 100 + '%';
-                        sparkle.style.animationDelay = Math.random() * 2 + 's';
-                        warning.appendChild(sparkle);
-                        
-                        // Remove sparkle after animation
-                        setTimeout(() => sparkle.remove(), 2000);
-                    }, i * 200);
-                }
-                
-                // Keep adding sparkles periodically
-                this.sparkleInterval = setInterval(() => {
-                    if (warning.classList.contains('visible')) {
-                        const sparkle = document.createElement('div');
-                        sparkle.className = 'sparkle';
-                        sparkle.style.left = Math.random() * 100 + '%';
-                        sparkle.style.top = Math.random() * 100 + '%';
-                        warning.appendChild(sparkle);
-                        
-                        setTimeout(() => sparkle.remove(), 2000);
-                    }
-                }, 500);
-            },
-            
-            removeSparkles() {
-                // Clear sparkle interval
-                if (this.sparkleInterval) {
-                    clearInterval(this.sparkleInterval);
-                    this.sparkleInterval = null;
-                }
-                
-                // Remove all existing sparkles
-                const sparkles = document.querySelectorAll('.sparkle');
-                sparkles.forEach(sparkle => sparkle.remove());
-            },
+
             
             getPerformanceMode() {
                 // Determine performance mode based on device
@@ -883,16 +835,7 @@
                 }
                 
 
-                
-                // Auto-enter fullscreen for mobile in landscape
-                if (this.isMobile && this.orientation === 'landscape') {
-                    setTimeout(() => {
-                        if (!deviceDetector.isFullscreen) {
-                            console.log('Auto-entering fullscreen for mobile landscape');
-                            enterFullscreenMode();
-                        }
-                    }, 500);
-                }
+
             },
             
             addTouchFeedback() {
