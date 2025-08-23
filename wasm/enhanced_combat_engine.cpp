@@ -49,7 +49,7 @@ namespace Config {
     constexpr float PERFECT_PARRY_ENERGY_RESTORE = 30.0f;
     
     // Roll settings - Fixed distance from enhanced-combat-game.js
-    constexpr float ROLL_DISTANCE = 150.0f;  // Distance covered during roll
+    constexpr float ROLL_DISTANCE = 10.0f;  // Distance covered during roll (reduced to 10 pixels)
     constexpr float ROLL_DURATION = 300.0f;
     constexpr float ROLL_COOLDOWN = 800.0f;
     constexpr bool ROLL_INVULNERABILITY = true;

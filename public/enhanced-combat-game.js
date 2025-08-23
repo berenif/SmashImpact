@@ -40,7 +40,7 @@
     PERFECT_PARRY_ENERGY_RESTORE: 30,
     
     // Roll settings
-    ROLL_DISTANCE: 150,  // Distance covered during roll
+    ROLL_DISTANCE: 10,  // Distance covered during roll (reduced to 10 pixels)
     ROLL_DURATION: 300,
     ROLL_COOLDOWN: 800,
     ROLL_INVULNERABILITY: true,  // Invincibility during roll
