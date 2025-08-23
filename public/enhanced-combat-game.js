@@ -10,6 +10,11 @@
     CANVAS_WIDTH: window.innerWidth,
     CANVAS_HEIGHT: window.innerHeight,
     
+    // World settings (3x larger than viewport)
+    WORLD_SCALE: 3,  // Map is 3x larger than viewport
+    WORLD_WIDTH: window.innerWidth * 3,
+    WORLD_HEIGHT: window.innerHeight * 3,
+    
     // Player settings
     PLAYER_RADIUS: 25,
     PLAYER_SPEED: 5,
@@ -104,6 +109,21 @@
       this.lastTime = performance.now();
       this.deltaTime = 0;
       
+      // Camera system for larger world
+      this.camera = {
+        x: 0,
+        y: 0,
+        width: CONFIG.CANVAS_WIDTH,
+        height: CONFIG.CANVAS_HEIGHT,
+        smoothing: 0.1  // Camera smoothing factor
+      };
+      
+      // World dimensions
+      this.world = {
+        width: CONFIG.WORLD_WIDTH,
+        height: CONFIG.WORLD_HEIGHT
+      };
+      
       // Game entities
       this.player = null;
       this.enemies = [];
@@ -142,6 +162,9 @@
       // Initialize player with sword and shield
       this.initPlayer();
       
+      // Initialize camera position to center on player
+      this.updateCamera();
+      
       // Initialize visual effects if available
       if (window.VFXSystem) {
         this.vfx = new window.VFXSystem(this.ctx);
@@ -159,9 +182,9 @@
     
     initPlayer() {
       this.player = {
-        // Position and physics
-        x: this.canvas.width / 2,
-        y: this.canvas.height / 2,
+        // Position and physics (spawn in center of world)
+        x: this.world.width / 2,
+        y: this.world.height / 2,
         vx: 0,
         vy: 0,
         radius: CONFIG.PLAYER_RADIUS,
@@ -290,10 +313,12 @@
       this.input.mouse.x = e.clientX - rect.left;
       this.input.mouse.y = e.clientY - rect.top;
       
-      // Calculate angle from player to mouse (only when not using movement-based facing)
+      // Calculate angle from player to mouse (using world coordinates)
       if (this.player && !this.targetLockEnabled) {
-        const dx = this.input.mouse.x - this.player.x;
-        const dy = this.input.mouse.y - this.player.y;
+        // Convert mouse screen position to world position
+        const worldMouse = this.screenToWorld(this.input.mouse.x, this.input.mouse.y);
+        const dx = worldMouse.x - this.player.x;
+        const dy = worldMouse.y - this.player.y;
         this.input.mouseAngle = Math.atan2(dy, dx);
         this.player.facing = this.input.mouseAngle;
       }
@@ -473,19 +498,19 @@
       const endX = this.player.x + dx * CONFIG.ROLL_DISTANCE;
       const endY = this.player.y + dy * CONFIG.ROLL_DISTANCE;
       
-      // Adjust roll vector if it would go out of bounds
-      if (endX < this.player.radius || endX > this.canvas.width - this.player.radius) {
+      // Adjust roll vector if it would go out of world bounds
+      if (endX < this.player.radius || endX > this.world.width - this.player.radius) {
         // Calculate maximum distance we can roll in X direction
         const maxDistX = dx > 0 ? 
-          (this.canvas.width - this.player.radius - this.player.x) : 
+          (this.world.width - this.player.radius - this.player.x) : 
           (this.player.x - this.player.radius);
         dx = dx * (maxDistX / CONFIG.ROLL_DISTANCE);
       }
       
-      if (endY < this.player.radius || endY > this.canvas.height - this.player.radius) {
+      if (endY < this.player.radius || endY > this.world.height - this.player.radius) {
         // Calculate maximum distance we can roll in Y direction
         const maxDistY = dy > 0 ? 
-          (this.canvas.height - this.player.radius - this.player.y) : 
+          (this.world.height - this.player.radius - this.player.y) : 
           (this.player.y - this.player.radius);
         dy = dy * (maxDistY / CONFIG.ROLL_DISTANCE);
       }
@@ -604,6 +629,55 @@
     resizeCanvas() {
       this.canvas.width = window.innerWidth;
       this.canvas.height = window.innerHeight;
+      
+      // Update camera dimensions
+      this.camera.width = this.canvas.width;
+      this.camera.height = this.canvas.height;
+      
+      // Update world dimensions
+      this.world.width = this.canvas.width * CONFIG.WORLD_SCALE;
+      this.world.height = this.canvas.height * CONFIG.WORLD_SCALE;
+    }
+    
+    // Camera system
+    updateCamera() {
+      if (!this.player) return;
+      
+      // Target camera position (centered on player)
+      const targetX = this.player.x - this.camera.width / 2;
+      const targetY = this.player.y - this.camera.height / 2;
+      
+      // Smooth camera movement
+      this.camera.x += (targetX - this.camera.x) * this.camera.smoothing;
+      this.camera.y += (targetY - this.camera.y) * this.camera.smoothing;
+      
+      // Clamp camera to world boundaries
+      this.camera.x = Math.max(0, Math.min(this.world.width - this.camera.width, this.camera.x));
+      this.camera.y = Math.max(0, Math.min(this.world.height - this.camera.height, this.camera.y));
+    }
+    
+    // Convert world coordinates to screen coordinates
+    worldToScreen(worldX, worldY) {
+      return {
+        x: worldX - this.camera.x,
+        y: worldY - this.camera.y
+      };
+    }
+    
+    // Convert screen coordinates to world coordinates
+    screenToWorld(screenX, screenY) {
+      return {
+        x: screenX + this.camera.x,
+        y: screenY + this.camera.y
+      };
+    }
+    
+    // Check if an object is visible on screen
+    isOnScreen(x, y, radius = 0) {
+      return x + radius >= this.camera.x && 
+             x - radius <= this.camera.x + this.camera.width &&
+             y + radius >= this.camera.y && 
+             y - radius <= this.camera.y + this.camera.height;
     }
     
     togglePause() {
@@ -636,6 +710,9 @@
       
       // Update player
       this.updatePlayer(deltaTime);
+      
+      // Update camera to follow player
+      this.updateCamera();
       
       // Update enemies
       this.updateEnemies(deltaTime);
@@ -824,9 +901,9 @@
       this.player.x += this.player.vx * dt * 60;
       this.player.y += this.player.vy * dt * 60;
       
-      // Keep player in bounds
-      this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
-      this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+      // Keep player in world bounds
+      this.player.x = Math.max(this.player.radius, Math.min(this.world.width - this.player.radius, this.player.x));
+      this.player.y = Math.max(this.player.radius, Math.min(this.world.height - this.player.radius, this.player.y));
     }
     
     updateEnemies(deltaTime) {
@@ -880,9 +957,9 @@
         enemy.x += enemy.vx * dt * 60;
         enemy.y += enemy.vy * dt * 60;
         
-        // Keep in bounds
-        enemy.x = Math.max(enemy.radius, Math.min(this.canvas.width - enemy.radius, enemy.x));
-        enemy.y = Math.max(enemy.radius, Math.min(this.canvas.height - enemy.radius, enemy.y));
+        // Keep in world bounds
+        enemy.x = Math.max(enemy.radius, Math.min(this.world.width - enemy.radius, enemy.x));
+        enemy.y = Math.max(enemy.radius, Math.min(this.world.height - enemy.radius, enemy.y));
       }
     }
     
@@ -984,26 +1061,26 @@
       this.timers.enemySpawn -= deltaTime;
       
       if (this.timers.enemySpawn <= 0 && this.enemies.length < CONFIG.MAX_ENEMIES) {
-        // Spawn enemy at random edge
+        // Spawn enemy at random edge of the world
         const side = Math.floor(Math.random() * 4);
         let x, y;
         
         switch(side) {
           case 0: // Top
-            x = Math.random() * this.canvas.width;
-            y = -CONFIG.ENEMY_RADIUS;
+            x = Math.random() * this.world.width;
+            y = CONFIG.ENEMY_RADIUS;
             break;
           case 1: // Right
-            x = this.canvas.width + CONFIG.ENEMY_RADIUS;
-            y = Math.random() * this.canvas.height;
+            x = this.world.width - CONFIG.ENEMY_RADIUS;
+            y = Math.random() * this.world.height;
             break;
           case 2: // Bottom
-            x = Math.random() * this.canvas.width;
-            y = this.canvas.height + CONFIG.ENEMY_RADIUS;
+            x = Math.random() * this.world.width;
+            y = this.world.height - CONFIG.ENEMY_RADIUS;
             break;
           case 3: // Left
-            x = -CONFIG.ENEMY_RADIUS;
-            y = Math.random() * this.canvas.height;
+            x = CONFIG.ENEMY_RADIUS;
+            y = Math.random() * this.world.height;
             break;
         }
         
@@ -1260,13 +1337,16 @@
     
     // Rendering
     render() {
-      // Clear canvas
-      this.ctx.fillStyle = 'rgba(20, 30, 50, 0.1)';
+      // Clear canvas with solid background
+      this.ctx.fillStyle = '#0a0a0a';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       
       // Apply screen shake
       this.ctx.save();
       this.ctx.translate(this.screenShake.x, this.screenShake.y);
+      
+      // Render grid background
+      this.renderGrid();
       
       // Render particles (behind everything)
       this.renderParticles();
@@ -1283,6 +1363,110 @@
       }
       
       this.ctx.restore();
+      
+      // Render minimap (on top of everything)
+      this.renderMinimap();
+    }
+    
+    renderGrid() {
+      const ctx = this.ctx;
+      const gridSize = 50;
+      
+      // Calculate visible grid bounds
+      const startX = Math.floor(this.camera.x / gridSize) * gridSize;
+      const startY = Math.floor(this.camera.y / gridSize) * gridSize;
+      const endX = Math.ceil((this.camera.x + this.camera.width) / gridSize) * gridSize;
+      const endY = Math.ceil((this.camera.y + this.camera.height) / gridSize) * gridSize;
+      
+      ctx.strokeStyle = 'rgba(100, 100, 200, 0.1)';
+      ctx.lineWidth = 1;
+      
+      // Draw vertical lines
+      for (let x = startX; x <= endX; x += gridSize) {
+        const screenX = x - this.camera.x;
+        ctx.beginPath();
+        ctx.moveTo(screenX, 0);
+        ctx.lineTo(screenX, this.canvas.height);
+        ctx.stroke();
+      }
+      
+      // Draw horizontal lines
+      for (let y = startY; y <= endY; y += gridSize) {
+        const screenY = y - this.camera.y;
+        ctx.beginPath();
+        ctx.moveTo(0, screenY);
+        ctx.lineTo(this.canvas.width, screenY);
+        ctx.stroke();
+      }
+      
+      // Draw world boundaries
+      ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(
+        -this.camera.x,
+        -this.camera.y,
+        this.world.width,
+        this.world.height
+      );
+    }
+    
+    renderMinimap() {
+      const ctx = this.ctx;
+      const minimapSize = 150;
+      const minimapX = this.canvas.width - minimapSize - 20;
+      const minimapY = 20;
+      const scale = minimapSize / Math.max(this.world.width, this.world.height);
+      
+      // Minimap background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(minimapX, minimapY, minimapSize, minimapSize);
+      
+      // Minimap border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(minimapX, minimapY, minimapSize, minimapSize);
+      
+      // Draw world bounds on minimap
+      const worldWidth = this.world.width * scale;
+      const worldHeight = this.world.height * scale;
+      ctx.strokeStyle = 'rgba(100, 100, 255, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(minimapX, minimapY, worldWidth, worldHeight);
+      
+      // Draw camera viewport on minimap
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillRect(
+        minimapX + this.camera.x * scale,
+        minimapY + this.camera.y * scale,
+        this.camera.width * scale,
+        this.camera.height * scale
+      );
+      
+      // Draw player on minimap
+      ctx.fillStyle = '#00ff00';
+      ctx.beginPath();
+      ctx.arc(
+        minimapX + this.player.x * scale,
+        minimapY + this.player.y * scale,
+        3,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      
+      // Draw enemies on minimap
+      ctx.fillStyle = '#ff0000';
+      for (const enemy of this.enemies) {
+        ctx.beginPath();
+        ctx.arc(
+          minimapX + enemy.x * scale,
+          minimapY + enemy.y * scale,
+          2,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
     }
     
     renderPlayer() {
@@ -1290,10 +1474,13 @@
       
       const ctx = this.ctx;
       
+      // Get screen coordinates for player
+      const screenPos = this.worldToScreen(this.player.x, this.player.y);
+      
       // Draw sword if active
       if (this.player.swordActive) {
         ctx.save();
-        ctx.translate(this.player.x, this.player.y);
+        ctx.translate(screenPos.x, screenPos.y);
         ctx.rotate(this.player.swordAngle);
         
         // Sword blade
@@ -1321,7 +1508,7 @@
       // Draw shield if active
       if (this.player.shielding) {
         ctx.save();
-        ctx.translate(this.player.x, this.player.y);
+        ctx.translate(screenPos.x, screenPos.y);
         ctx.rotate(this.player.shieldAngle);
         
         // Shield arc
@@ -1351,7 +1538,7 @@
       // Player shadow
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.beginPath();
-      ctx.ellipse(this.player.x, this.player.y + 5, this.player.radius * 0.8, this.player.radius * 0.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(screenPos.x, screenPos.y + 5, this.player.radius * 0.8, this.player.radius * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
       
       // Player body
@@ -1363,12 +1550,12 @@
       ctx.shadowColor = this.player.rolling ? '#88ccff' : this.player.color;
       ctx.shadowBlur = this.player.rolling ? 20 : 10;
       ctx.beginPath();
-      ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
+      ctx.arc(screenPos.x, screenPos.y, this.player.radius, 0, Math.PI * 2);
       ctx.fill();
       
       // Player direction indicator (enhanced)
       ctx.save();
-      ctx.translate(this.player.x, this.player.y);
+      ctx.translate(screenPos.x, screenPos.y);
       ctx.rotate(this.player.facing);
       
       // Direction arrow
@@ -1395,7 +1582,11 @@
     
     renderEnemies() {
       for (const enemy of this.enemies) {
+        // Skip rendering enemies that are not on screen
+        if (!this.isOnScreen(enemy.x, enemy.y, enemy.radius)) continue;
+        
         const ctx = this.ctx;
+        const screenPos = this.worldToScreen(enemy.x, enemy.y);
         
         // Draw targeting circle for targeted enemy
         if (enemy === this.targetedEnemy) {
@@ -1406,7 +1597,7 @@
           ctx.lineWidth = 3;
           ctx.setLineDash([5, 5]);
           ctx.beginPath();
-          ctx.arc(enemy.x, enemy.y, enemy.radius + 15, 0, Math.PI * 2);
+          ctx.arc(screenPos.x, screenPos.y, enemy.radius + 15, 0, Math.PI * 2);
           ctx.stroke();
           
           // Inner targeting circle (animated)
@@ -1415,7 +1606,7 @@
           ctx.lineWidth = 2;
           ctx.setLineDash([]);
           ctx.beginPath();
-          ctx.arc(enemy.x, enemy.y, (enemy.radius + 10) * pulseScale, 0, Math.PI * 2);
+          ctx.arc(screenPos.x, screenPos.y, (enemy.radius + 10) * pulseScale, 0, Math.PI * 2);
           ctx.stroke();
           
           // Target indicator arrows
@@ -1423,8 +1614,8 @@
           const arrowDist = enemy.radius + 25;
           for (let i = 0; i < 4; i++) {
             const angle = (Math.PI / 2) * i + performance.now() * 0.001;
-            const x = enemy.x + Math.cos(angle) * arrowDist;
-            const y = enemy.y + Math.sin(angle) * arrowDist;
+            const x = screenPos.x + Math.cos(angle) * arrowDist;
+            const y = screenPos.y + Math.sin(angle) * arrowDist;
             
             ctx.save();
             ctx.translate(x, y);
@@ -1444,7 +1635,7 @@
         // Enemy shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.beginPath();
-        ctx.ellipse(enemy.x, enemy.y + 3, enemy.radius * 0.8, enemy.radius * 0.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(screenPos.x, screenPos.y + 3, enemy.radius * 0.8, enemy.radius * 0.4, 0, 0, Math.PI * 2);
         ctx.fill();
         
         // Enemy body
@@ -1452,34 +1643,38 @@
         ctx.shadowColor = enemy.stunned ? '#ffaa00' : enemy.color;
         ctx.shadowBlur = enemy.stunned ? 15 : 8;
         ctx.beginPath();
-        ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+        ctx.arc(screenPos.x, screenPos.y, enemy.radius, 0, Math.PI * 2);
         ctx.fill();
         
         // Stun stars
         if (enemy.stunned) {
           ctx.fillStyle = '#ffff00';
           ctx.font = '20px Arial';
-          ctx.fillText('💫', enemy.x - 10, enemy.y - enemy.radius - 5);
+          ctx.fillText('💫', screenPos.x - 10, screenPos.y - enemy.radius - 5);
         }
         
         // Health bar
         if (enemy.health < CONFIG.ENEMY_HEALTH) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.fillRect(enemy.x - 20, enemy.y - enemy.radius - 15, 40, 4);
+          ctx.fillRect(screenPos.x - 20, screenPos.y - enemy.radius - 15, 40, 4);
           
           ctx.fillStyle = '#ff0000';
           const healthPercent = enemy.health / CONFIG.ENEMY_HEALTH;
-          ctx.fillRect(enemy.x - 20, enemy.y - enemy.radius - 15, 40 * healthPercent, 4);
+          ctx.fillRect(screenPos.x - 20, screenPos.y - enemy.radius - 15, 40 * healthPercent, 4);
         }
       }
     }
     
     renderParticles() {
       for (const particle of this.particles) {
+        // Skip particles not on screen
+        if (!this.isOnScreen(particle.x, particle.y, particle.radius)) continue;
+        
+        const screenPos = this.worldToScreen(particle.x, particle.y);
         this.ctx.globalAlpha = particle.life / 60;
         this.ctx.fillStyle = particle.color;
         this.ctx.beginPath();
-        this.ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        this.ctx.arc(screenPos.x, screenPos.y, particle.radius, 0, Math.PI * 2);
         this.ctx.fill();
       }
       this.ctx.globalAlpha = 1;
