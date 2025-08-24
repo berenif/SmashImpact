@@ -353,6 +353,7 @@
         </div>
     </div>
 
+    <script src="browser-compat.js"></script>
     <script src="wasm-memory-helper.js"></script>
     <script>
         // Game variables
@@ -433,6 +434,18 @@
         
         // Initialize the game
         async function init() {
+            // Check browser compatibility first
+            const compat = checkBrowserCompatibility();
+            if (!compat.compatible) {
+                showError('Browser compatibility issues detected:\n' + compat.issues.join('\n'));
+                return;
+            }
+            
+            // Show warnings if any
+            if (compat.warnings.length > 0) {
+                console.warn('Browser compatibility warnings:', compat.warnings);
+            }
+            
             try {
                 // Load WASM module
                 wasmModule = await createRPGModule();
@@ -448,21 +461,37 @@
                 
                 // Custom wrapper for getRenderData
                 getRenderData = function() {
-                    const bufferSize = 10000; // Sufficient for our needs
-                    const buffer = wasmModule._malloc(bufferSize * 4);
-                    wasmModule.ccall('get_render_data', null, ['number'], [buffer]);
-                    
-                    const data = [];
-                    // Access HEAP32 through the module instance
-                    // Use helper to handle different Emscripten versions
-                    const heaps = getWASMMemoryAccess(wasmModule);
-                    const HEAP32 = heaps.HEAP32;
-                    for (let i = 0; i < bufferSize; i++) {
-                        data.push(HEAP32[buffer / 4 + i]);
+                    try {
+                        const bufferSize = 10000; // Sufficient for our needs
+                        const buffer = wasmModule._malloc(bufferSize * 4);
+                        if (!buffer) {
+                            console.error('Failed to allocate memory for render data');
+                            return [];
+                        }
+                        
+                        wasmModule.ccall('get_render_data', null, ['number'], [buffer]);
+                        
+                        const data = [];
+                        // Access HEAP32 through the module instance
+                        // Use helper to handle different Emscripten versions
+                        let HEAP32;
+                        if (typeof getWASMMemoryAccess !== 'undefined') {
+                            const heaps = getWASMMemoryAccess(wasmModule);
+                            HEAP32 = heaps.HEAP32;
+                        } else {
+                            // Fallback if helper is not loaded
+                            HEAP32 = wasmModule.HEAP32 || new Int32Array(wasmModule.wasmMemory?.buffer || wasmModule.buffer);
+                        }
+                        for (let i = 0; i < bufferSize; i++) {
+                            data.push(HEAP32[buffer / 4 + i]);
+                        }
+                        
+                        wasmModule._free(buffer);
+                        return data;
+                    } catch (error) {
+                        console.error('Error in getRenderData:', error);
+                        return [];
                     }
-                    
-                    wasmModule._free(buffer);
-                    return data;
                 };
                 
                 // Setup canvases
@@ -493,14 +522,20 @@
         
         // Show error message
         function showError(message) {
-            document.getElementById('loadingMessage').style.display = 'none';
-            document.getElementById('errorMessage').textContent = message;
-            document.getElementById('errorMessage').style.display = 'block';
+            const loadingMsg = document.getElementById('loadingMessage');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            if (loadingMsg) loadingMsg.style.display = 'none';
+            if (errorMsg) {
+                errorMsg.textContent = message;
+                errorMsg.style.display = 'block';
+            }
+            console.error('Game Error:', message);
         }
         
         // Render the game
         function render() {
-            if (!ctx || !getRenderData) return;
+            if (!ctx || !getRenderData || !canvas) return;
             
             // Clear canvas
             ctx.fillStyle = '#0a0a0a';
@@ -508,6 +543,10 @@
             
             // Get render data from WASM
             const data = getRenderData();
+            if (!data || data.length < 4) {
+                console.warn('Invalid render data received');
+                return;
+            }
             let index = 0;
             
             const viewportWidth = data[index++];
@@ -546,7 +585,11 @@
             }
             
             // Parse entities
-            const entityCount = data[index++];
+            const entityCount = data[index++] || 0;
+            if (entityCount < 0 || entityCount > 1000) {
+                console.warn('Invalid entity count:', entityCount);
+                return;
+            }
             for (let i = 0; i < entityCount; i++) {
                 const entityType = data[index++];
                 const x = data[index++];
@@ -570,7 +613,11 @@
             }
             
             // Parse items
-            const itemCount = data[index++];
+            const itemCount = data[index++] || 0;
+            if (itemCount < 0 || itemCount > 1000) {
+                console.warn('Invalid item count:', itemCount);
+                return;
+            }
             for (let i = 0; i < itemCount; i++) {
                 const itemType = data[index++];
                 const x = data[index++];
@@ -735,35 +782,51 @@
         
         // Update UI
         function updateUI() {
-            if (!getPlayerStats || !getInventory) return;
+            if (!getPlayerStats || !getInventory || !wasmModule) return;
             
-            // Get player stats
-            const statsBuffer = wasmModule._malloc(12 * 4);
-            getPlayerStats(statsBuffer);
+            let statsBuffer = null;
+            let invBuffer = null;
+            
+            try {
+                // Get player stats
+                statsBuffer = wasmModule._malloc(12 * 4);
+                if (!statsBuffer) {
+                    console.error('Failed to allocate memory for stats');
+                    return;
+                }
+                getPlayerStats(statsBuffer);
             
             const stats = [];
             // Access HEAP32 through the module instance
             // Use helper to handle different Emscripten versions
-            const heaps = getWASMMemoryAccess(wasmModule);
-            const HEAP32 = heaps.HEAP32;
+            let HEAP32;
+            if (typeof getWASMMemoryAccess !== 'undefined') {
+                const heaps = getWASMMemoryAccess(wasmModule);
+                HEAP32 = heaps.HEAP32;
+            } else {
+                // Fallback if helper is not loaded
+                HEAP32 = wasmModule.HEAP32 || new Int32Array(wasmModule.wasmMemory?.buffer || wasmModule.buffer);
+            }
             for (let i = 0; i < 12; i++) {
                 stats.push(HEAP32[statsBuffer / 4 + i]);
             }
-            wasmModule._free(statsBuffer);
             
             // Update stat displays
             const [health, maxHealth, mana, maxMana, attack, defense, 
                    level, experience, gold, turnCount, gameOver, victory] = stats;
             
             document.getElementById('healthText').textContent = `${health}/${maxHealth}`;
-            document.getElementById('healthBar').style.width = `${(health/maxHealth)*100}%`;
+            const healthPercent = maxHealth > 0 ? (health/maxHealth)*100 : 0;
+            document.getElementById('healthBar').style.width = `${healthPercent}%`;
             
             document.getElementById('manaText').textContent = `${mana}/${maxMana}`;
-            document.getElementById('manaBar').style.width = `${(mana/maxMana)*100}%`;
+            const manaPercent = maxMana > 0 ? (mana/maxMana)*100 : 0;
+            document.getElementById('manaBar').style.width = `${manaPercent}%`;
             
             const expNeeded = level * 100;
             document.getElementById('expText').textContent = `${experience}/${expNeeded}`;
-            document.getElementById('expBar').style.width = `${(experience/expNeeded)*100}%`;
+            const expPercent = expNeeded > 0 ? (experience/expNeeded)*100 : 0;
+            document.getElementById('expBar').style.width = `${expPercent}%`;
             
             document.getElementById('level').textContent = level;
             document.getElementById('attack').textContent = attack;
@@ -771,14 +834,24 @@
             document.getElementById('gold').textContent = gold;
             
             // Update inventory
-            const invBuffer = wasmModule._malloc(20 * 3 * 4);
+            invBuffer = wasmModule._malloc(20 * 3 * 4);
+            if (!invBuffer) {
+                console.error('Failed to allocate memory for inventory');
+                return;
+            }
             getInventory(invBuffer);
             
             const inventory = [];
             // Access HEAP32 through the module instance
             // Use helper to handle different Emscripten versions
-            const heaps_inv = getWASMMemoryAccess(wasmModule);
-            const HEAP32_inv = heaps_inv.HEAP32;
+            let HEAP32_inv;
+            if (typeof getWASMMemoryAccess !== 'undefined') {
+                const heaps_inv = getWASMMemoryAccess(wasmModule);
+                HEAP32_inv = heaps_inv.HEAP32;
+            } else {
+                // Fallback if helper is not loaded
+                HEAP32_inv = wasmModule.HEAP32 || new Int32Array(wasmModule.wasmMemory?.buffer || wasmModule.buffer);
+            }
             for (let i = 0; i < 20; i++) {
                 inventory.push({
                     type: HEAP32_inv[invBuffer / 4 + i * 3],
@@ -786,10 +859,13 @@
                     power: HEAP32_inv[invBuffer / 4 + i * 3 + 2]
                 });
             }
-            wasmModule._free(invBuffer);
             
             // Render inventory
             const invContainer = document.getElementById('inventory');
+            if (!invContainer) {
+                console.warn('Inventory container not found');
+                return;
+            }
             invContainer.innerHTML = '';
             
             for (let i = 0; i < 20; i++) {
@@ -828,12 +904,24 @@
             } else if (victory) {
                 showMessage('VICTORY! You have completed the game!');
             }
+            } catch (error) {
+                console.error('Error in updateUI:', error);
+            } finally {
+                // Always free allocated memory
+                if (statsBuffer) wasmModule._free(statsBuffer);
+                if (invBuffer) wasmModule._free(invBuffer);
+            }
         }
         
         // Show message
         let messageTimeout = null;
         function showMessage(text) {
             const messageBox = document.getElementById('messageBox');
+            if (!messageBox) {
+                console.warn('Message box element not found');
+                return;
+            }
+            
             messageBox.textContent = text;
             messageBox.style.display = 'block';
             
@@ -844,11 +932,27 @@
         }
         
         // Game loop
+        let animationId = null;
         function gameLoop() {
-            render();
-            updateUI();
-            requestAnimationFrame(gameLoop);
+            try {
+                render();
+                updateUI();
+                animationId = requestAnimationFrame(gameLoop);
+            } catch (error) {
+                console.error('Error in game loop:', error);
+                // Try to recover
+                setTimeout(() => {
+                    animationId = requestAnimationFrame(gameLoop);
+                }, 1000);
+            }
         }
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        });
         
         // Player movement
         function movePlayer(dx, dy) {
@@ -903,14 +1007,17 @@
         });
         
         // Load the WASM module script
-        const script = document.createElement('script');
-        script.src = 'rpg_game.js';
-        script.onload = init;
-        script.onerror = () => showError('Failed to load rpg_game.js. Please compile the WASM module first.');
-        
-
-        
-        document.body.appendChild(script);
+        window.addEventListener('DOMContentLoaded', () => {
+            const script = document.createElement('script');
+            script.src = 'rpg_game.js';
+            script.async = true;
+            script.onload = () => {
+                // Give the module time to initialize
+                setTimeout(init, 100);
+            };
+            script.onerror = () => showError('Failed to load rpg_game.js. Please compile the WASM module first.');
+            document.body.appendChild(script);
+        });
     </script>
 </body>
 </html>
